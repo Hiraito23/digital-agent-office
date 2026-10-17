@@ -1,109 +1,213 @@
-// Background music playlist from local files (office/public/audio).
-// Plays the tracks in order and starts over after the last one.
-// Browsers block autoplay with sound, so playback may start on the first interaction.
+// Jukebox: background music from local files in office/public/audio.
+//
+// Controls: previous / play-pause / next, repeat mode (all, one, off), a
+// progress bar with the remaining time (click it to seek) and volume.
+// The chosen track, repeat mode and volume are remembered per browser.
+// Browsers block autoplay with sound, so playback may start on the first
+// click or key press anywhere on the page.
+
+// Add your own MP3s to office/public/audio and list them here.
 const PLAYLIST = [
   { src: "/audio/asuka-city.mp3", title: "Title / Asuka City — Digimon World 3 OST" },
   { src: "/audio/littleroot-town.mp3", title: "Littleroot Town — Pokémon Omega Ruby & Alpha Sapphire" },
 ];
-const STORE_KEY = "kantor-hermes-jukebox";
 
-const load = () => {
+const REPEAT_MODES = [
+  { id: "all", icon: "🔁", label: "Ulangi semua" },
+  { id: "one", icon: "🔂", label: "Ulangi lagu ini" },
+  { id: "off", icon: "➡", label: "Tanpa ulang" },
+];
+
+const STORE_KEY = "kantor-hermes-jukebox";
+const DUCK_LEVEL = 0.25; // music volume while an agent is speaking
+
+const loadState = () => {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
 };
-const save = (state) => {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+const saveState = (state) => {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+};
+
+// 75.4 → "1:15"
+const formatTime = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const s = Math.floor(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
 export const initJukebox = () => {
-  const panel = document.getElementById("jukebox");
-  const toggle = document.getElementById("music-toggle");
-  const playBtn = document.getElementById("jb-play");
-  const nextBtn = document.getElementById("jb-next");
-  const volume = document.getElementById("jb-volume");
-  const trackEl = document.querySelector("#jukebox .jb-track");
-  const state = { volume: 40, track: 0, ...load() };
+  const el = {
+    panel: document.getElementById("jukebox"),
+    toggle: document.getElementById("music-toggle"),
+    close: document.getElementById("jb-close"),
+    track: document.querySelector("#jukebox .jb-track"),
+    prev: document.getElementById("jb-prev"),
+    play: document.getElementById("jb-play"),
+    next: document.getElementById("jb-next"),
+    repeat: document.getElementById("jb-repeat"),
+    progress: document.getElementById("jb-progress"),
+    bar: document.getElementById("jb-progress-bar"),
+    elapsed: document.getElementById("jb-elapsed"),
+    remaining: document.getElementById("jb-remaining"),
+    volume: document.getElementById("jb-volume"),
+  };
+
+  const state = { volume: 40, track: 0, repeat: "all", ...loadState() };
   if (!(state.track >= 0 && state.track < PLAYLIST.length)) state.track = 0;
-  volume.value = state.volume;
+  if (!REPEAT_MODES.some((m) => m.id === state.repeat)) state.repeat = "all";
+  el.volume.value = state.volume;
 
   const audio = new Audio();
   audio.preload = "auto";
   let ducked = false;
+
+  // ---- rendering ------------------------------------------------------------
+
   const applyVolume = () => {
-    audio.volume = (ducked ? state.volume * 0.25 : state.volume) / 100;
+    audio.volume = (state.volume * (ducked ? DUCK_LEVEL : 1)) / 100;
   };
 
-  const showTrack = () => {
-    trackEl.textContent = `${state.track + 1}/${PLAYLIST.length} · ${PLAYLIST[state.track].title}`;
+  const renderTrack = () => {
+    el.track.textContent = `${state.track + 1}/${PLAYLIST.length} · ${PLAYLIST[state.track].title}`;
   };
+
+  const renderPlaying = () => {
+    const playing = !audio.paused;
+    el.play.textContent = playing ? "❚❚" : "▶";
+    el.play.title = playing ? "Jeda" : "Putar";
+    el.toggle.classList.toggle("playing", playing);
+  };
+
+  const renderRepeat = () => {
+    const mode = REPEAT_MODES.find((m) => m.id === state.repeat);
+    el.repeat.textContent = mode.icon;
+    el.repeat.title = mode.label;
+    el.repeat.classList.toggle("off", mode.id === "off");
+    audio.loop = mode.id === "one";
+  };
+
+  const renderTime = () => {
+    const duration = audio.duration;
+    const known = Number.isFinite(duration) && duration > 0;
+    el.bar.style.width = known ? `${(audio.currentTime / duration) * 100}%` : "0%";
+    el.elapsed.textContent = formatTime(audio.currentTime);
+    el.remaining.textContent = known ? `-${formatTime(duration - audio.currentTime)}` : "-0:00";
+  };
+
+  // ---- playback ---------------------------------------------------------------
+
   const loadTrack = (index) => {
     state.track = (index + PLAYLIST.length) % PLAYLIST.length;
     audio.src = PLAYLIST[state.track].src;
     applyVolume();
-    showTrack();
-    save(state);
+    renderTrack();
+    renderTime();
+    saveState(state);
   };
-  loadTrack(state.track);
-
-  const setPlayingUi = () => {
-    const playing = !audio.paused;
-    playBtn.textContent = playing ? "❚❚ Jeda" : "▶ Putar";
-    toggle.classList.toggle("playing", playing);
-  };
-  audio.addEventListener("play", setPlayingUi);
-  audio.addEventListener("pause", setPlayingUi);
 
   const play = () => {
     audio.play().then(() => {
       state.wantPlay = true;
-      save(state);
+      saveState(state);
     }).catch(() => { /* needs a user gesture first */ });
   };
+
   const pause = () => {
     audio.pause();
     state.wantPlay = false;
-    save(state);
-  };
-  const next = () => {
-    const wasPlaying = !audio.paused || state.wantPlay !== false;
-    loadTrack(state.track + 1);
-    if (wasPlaying) play();
+    saveState(state);
   };
 
-  // one track ends → the next one starts (and the list wraps around)
-  audio.addEventListener("ended", next);
+  const isPlaying = () => !audio.paused || state.wantPlay !== false;
 
-  // ♪ Musik shows/hides the small panel; the music keeps playing either way.
-  toggle.addEventListener("click", () => panel.classList.toggle("hidden"));
-  document.getElementById("jb-close").addEventListener("click", () => panel.classList.add("hidden"));
-  playBtn.addEventListener("click", () => (audio.paused ? play() : pause()));
-  nextBtn.addEventListener("click", next);
+  const goTo = (index) => {
+    const resume = isPlaying();
+    loadTrack(index);
+    if (resume) play();
+  };
 
-  volume.addEventListener("input", () => {
-    state.volume = Number(volume.value);
+  const next = () => goTo(state.track + 1);
+
+  // "Previous" restarts the current song when it is more than 3 s in,
+  // like most music players; otherwise it goes to the previous song.
+  const previous = () => {
+    if (audio.currentTime > 3) {
+      audio.currentTime = 0;
+      return;
+    }
+    goTo(state.track - 1);
+  };
+
+  // A song finished: "one" never gets here (audio.loop), "all" wraps around,
+  // "off" stops after the last song.
+  const onEnded = () => {
+    const last = state.track === PLAYLIST.length - 1;
+    if (state.repeat === "off" && last) {
+      loadTrack(0);
+      pause();
+      return;
+    }
+    goTo(state.track + 1);
+  };
+
+  const cycleRepeat = () => {
+    const i = REPEAT_MODES.findIndex((m) => m.id === state.repeat);
+    state.repeat = REPEAT_MODES[(i + 1) % REPEAT_MODES.length].id;
+    renderRepeat();
+    saveState(state);
+  };
+
+  const seek = (event) => {
+    if (!Number.isFinite(audio.duration)) return;
+    const rect = el.progress.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
+  };
+
+  // ---- wiring -----------------------------------------------------------------
+
+  audio.addEventListener("play", renderPlaying);
+  audio.addEventListener("pause", renderPlaying);
+  audio.addEventListener("ended", onEnded);
+  audio.addEventListener("timeupdate", renderTime);
+  audio.addEventListener("loadedmetadata", renderTime);
+
+  // ♪ Musik shows/hides the panel; the music keeps playing either way.
+  el.toggle.addEventListener("click", () => el.panel.classList.toggle("hidden"));
+  el.close.addEventListener("click", () => el.panel.classList.add("hidden"));
+  el.play.addEventListener("click", () => (audio.paused ? play() : pause()));
+  el.prev.addEventListener("click", previous);
+  el.next.addEventListener("click", next);
+  el.repeat.addEventListener("click", cycleRepeat);
+  el.progress.addEventListener("click", seek);
+  el.volume.addEventListener("input", () => {
+    state.volume = Number(el.volume.value);
     applyVolume();
-    save(state);
+    saveState(state);
   });
 
-  // Autoplay: music is on unless the user paused it last time. Try right away;
-  // if the browser blocks sound before any interaction, start on the first
-  // click, key, touch or scroll anywhere on the page.
+  loadTrack(state.track);
+  renderRepeat();
+  renderPlaying();
+
+  // Autoplay unless the user paused last time. If the browser blocks it,
+  // start on the first interaction (but let jukebox buttons handle their own click).
   if (state.wantPlay !== false) {
     const events = ["pointerdown", "keydown", "touchstart", "wheel"];
     const resume = (event) => {
       events.forEach((e) => window.removeEventListener(e, resume, true));
-      // a first click on the jukebox buttons is handled by the buttons themselves
-      if (event?.target?.closest?.("#jb-play, #jb-next")) return;
+      if (event?.target?.closest?.("#jukebox button, #jb-progress")) return;
       if (audio.paused) play();
     };
     audio.play().then(() => {
       state.wantPlay = true;
-      save(state);
+      saveState(state);
     }).catch(() => {
       events.forEach((e) => window.addEventListener(e, resume, { capture: true, passive: true }));
     });
   }
 
-  // Lower the music while an agent speaks.
+  // Lower the music while an agent speaks (called from main.js).
   const duck = (on) => {
     ducked = on;
     applyVolume();
