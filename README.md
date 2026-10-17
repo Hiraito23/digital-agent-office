@@ -1,6 +1,7 @@
 # Agentic Digital Office (Docker)
 
-Panduan lengkap (instalasi, cara kerja agen, soul, skill, suara): [docs/PANDUAN.md](docs/PANDUAN.md).
+Panduan pemakaian (instalasi, cara kerja agen, soul, skill, suara): [docs/PANDUAN.md](docs/PANDUAN.md).
+Untuk developer baru (arsitektur, peta folder, resep tugas umum): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Dua container:
 
@@ -34,17 +35,8 @@ docker compose up -d --build office   # build ulang setelah mengubah apa pun di 
   - `outfit`: `shirt`, `blazer`, `hoodie`, `dress`
   - `accessory`: `glasses`, `headset` (opsional)
   - warna: `hairColor`, `skin`, `top`, `shirt`, `tie`, `pants`, `shoes`, `cap`, `brim`
-- `office/public/` — kantor 3D (three.js). Ikut di-build ke dalam image: setelah mengedit, jalankan
-  `docker compose up -d --build office`, lalu refresh browser.
-  - `js/office3d.js` lantai, dinding, furnitur, taman · `js/people3d.js` karakter voxel + animasi
-  - `js/world3d.js` kamera, cahaya, perilaku agen · `js/main.js` UI & koneksi
-  - `js/jukebox.js` playlist musik dari `audio/` (file pribadi, jangan dibagikan; tambah lagu di
-    `PLAYLIST`) · `style.css` tampilan panel
-  - `js/voice.js` suara agen (suara browser; terbaik di Microsoft Edge). Atur per agen di
-    panel ⚙ Agen (`config/people.json` → `voice`): `lang`, `gender`, `prefer`, `pitch`, `rate`. Tombol 🔊 Suara / 🔊 Tes.
-  - Tombol ▦ di atas: HD / Pixel / Retro (gaya piksel).
-- `office/server.js` — server web, three.js dari `node_modules` (tanpa CDN), proxy WebSocket ke adapter.
-- `office/hermes-gateway-adapter.js` — adapter Hermes dari Claw3D (MIT), dimodifikasi agar memuat `config/team.json` dan menerapkan perubahan tim secara live.
-- `office/agents-api.js` — API panel ⚙ Agen; SOUL.md lewat API resmi dashboard Hermes.
+- `office/` — image Docker kantor: `server/` (Node: server web, API panel agen, adapter Hermes) dan `public/`
+  (UI 3D dalam ES modules: `office/` scene, `characters/` karakter, `world/` agen, `ui/` panel). Peta lengkapnya ada di
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Setelah mengubah apa pun di `office/`: `docker compose up -d --build office`.
 
 Data Hermes ada di volume Docker `kantor-hermes_hermes-data`, riwayat chat kantor di `kantor-hermes_office-data`.

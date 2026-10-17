@@ -248,20 +248,18 @@ Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu s
 | `config/team.json` | Daftar agen dan persona (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → `docker compose restart office` |
 | `docs/PANDUAN.md` | Panduan ini | – |
 | `config/people.json` | Tampilan karakter dan suara (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → refresh browser |
-| `office/agents-api.js` | API panel ⚙ Agen dan SOUL.md | `docker compose up -d --build office` |
-| `office/public/js/agents-panel.js` | Tampilan panel ⚙ Agen | `docker compose up -d --build office` |
-| `office/public/js/office3d.js` | Lantai, dinding, furnitur, taman | `docker compose up -d --build office` |
-| `office/public/js/people3d.js` | Model karakter voxel dan animasi | `docker compose up -d --build office` |
-| `office/public/js/world3d.js` | Kamera, cahaya, perilaku agen | `docker compose up -d --build office` |
-| `office/public/js/main.js` | Panel, chat, aktivitas, koneksi | `docker compose up -d --build office` |
-| `office/public/js/voice.js` | Suara agen (Web Speech API) | `docker compose up -d --build office` |
-| `office/public/js/jukebox.js` | Musik latar dari `office/public/audio/` | `docker compose up -d --build office` |
-| `office/server.js` | Server web + proxy WebSocket | `docker compose up -d --build office` |
-| `office/hermes-gateway-adapter.js` | Adapter dari Claw3D (MIT), memuat `config/team.json` dan menerapkan perubahan tim secara live | `docker compose up -d --build office` |
+| `office/server/` | Server web, API panel ⚙ Agen + SOUL.md, proxy WebSocket, adapter Hermes (Claw3D, MIT) | `docker compose up -d --build office` |
+| `office/public/js/office/` | Scene kantor: denah `layout.js` (ruangan, meja, titik kegiatan), dinding, dekorasi, properti, tekstur | `docker compose up -d --build office` |
+| `office/public/js/characters/` | Karakter voxel: rambut, wajah, kostum, animasi | `docker compose up -d --build office` |
+| `office/public/js/world/` | Kamera, cahaya, perilaku dan jalur jalan agen | `docker compose up -d --build office` |
+| `office/public/js/ui/` | Label nama, panel ⚙ Agen, jukebox, suara | `docker compose up -d --build office` |
+| `office/public/js/main.js` | Titik masuk UI: menyambungkan semua modul, chat, aktivitas | `docker compose up -d --build office` |
 
 Kostum (menggantikan rambut dan pakaian, warna kulit dan kacamata tetap): Tema Pokémon = Tikus Listrik, Kadal Api, Kura Air, Kodok Daun, Rubah Cokelat; Tema Digimon = Dino Oranye, Serigala Bertanduk, Naga Biru, Bayi Bersayap; Tema Anime = Ninja Oranye, Seragam Pelaut, Gakuran Sekolah, Petarung Gi, Bajak Laut Topi Jerami, Penyihir (kostum anime tetap memakai rambut, plus seragam dan atribut seperti ikat kepala atau topi). Desainnya voxel orisinal yang terinspirasi tema, tanpa nama atau logo resmi.
 
 Pilihan tampilan: `hair` = `short`, `long`, `bob`, `ponytail`, `bun`, `spiky`, `cap`; `outfit` = `shirt`, `blazer`, `hoodie`, `dress`; `accessory` = `glasses` atau `headset`. Tombol ▦ di kantor mengganti gaya HD, Pixel, atau Retro.
+
+Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Pemecahan masalah
 

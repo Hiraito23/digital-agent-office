@@ -1,6 +1,6 @@
 // "⚙ Agen" panel: add, edit and remove agents, and edit the shared SOUL.md.
 // Talks to /api/agents and /api/soul (office/agents-api.js).
-import { COSTUMES } from "./people3d.js";
+import { COSTUMES } from "../characters/costumes.js";
 
 const HAIR = [["short", "Pendek"], ["long", "Panjang"], ["bob", "Bob"], ["ponytail", "Kuncir kuda"], ["bun", "Sanggul"], ["spiky", "Jabrik"], ["cap", "Topi"]];
 const OUTFIT = [["shirt", "Kemeja"], ["blazer", "Jas + dasi"], ["hoodie", "Hoodie"], ["dress", "Dress"]];

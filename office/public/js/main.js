@@ -1,8 +1,15 @@
-import { World } from "./world3d.js";
-import { Gateway, sessionKeyFor, agentIdFromSession } from "./net.js";
-import { initJukebox } from "./jukebox.js";
-import { VoiceBox } from "./voice.js";
-import { initAgentPanel } from "./agents-panel.js";
+// Entry point of the office UI. It wires the pieces together:
+//   world/      3D scene, camera and agent movement (World)
+//   net/        WebSocket client for the Hermes gateway (Gateway)
+//   ui/         name tags, agent panel, jukebox and voices
+// and owns the app state shared between them: roster, agent status,
+// chat history per agent and the activity feed.
+import { World } from "./world/world.js";
+import { Gateway, sessionKeyFor, agentIdFromSession } from "./net/gateway.js";
+import { initJukebox } from "./ui/jukebox.js";
+import { VoiceBox } from "./ui/voice.js";
+import { NameTags } from "./ui/name-tags.js";
+import { initAgentPanel } from "./ui/agents-panel.js";
 
 const jukebox = initJukebox();
 
@@ -85,55 +92,8 @@ view.addEventListener("pointerup", (e) => {
   down = null;
 });
 
-// ---------------------------------------------------------------------------
-// Name tags and speech bubbles (DOM, so text stays sharp)
-// ---------------------------------------------------------------------------
-
-const tagNodes = new Map();
-const bubbles = new Map(); // agentId -> { text, until }
-
-const renderTags = (tags) => {
-  const seen = new Set();
-  for (const { agent, x, y } of tags) {
-    seen.add(agent.id);
-    let node = tagNodes.get(agent.id);
-    if (!node) {
-      node = { tag: document.createElement("div"), bubble: document.createElement("div") };
-      node.tag.className = `tag${agent.isMain ? " main" : ""}`;
-      node.bubble.className = "bubble";
-      tagsEl.append(node.tag, node.bubble);
-      tagNodes.set(agent.id, node);
-    }
-    const label = `${agent.activityIcon ? `${agent.activityIcon} ` : ""}${agent.name}<span class="role">${agent.role || ""}</span>`;
-    if (node.tag.innerHTML !== label) node.tag.innerHTML = label;
-    node.tag.classList.toggle("speaking", Boolean(agent.speaking));
-    const left = x;
-    const top = y - 4;
-    node.tag.style.left = `${left}px`;
-    node.tag.style.top = `${top}px`;
-    const b = bubbles.get(agent.id);
-    if (b && b.until > performance.now()) {
-      if (node.bubble.textContent !== b.text) node.bubble.textContent = b.text;
-      node.bubble.style.display = "block";
-      node.bubble.style.left = `${left}px`;
-      node.bubble.style.top = `${top - 26}px`;
-    } else {
-      node.bubble.style.display = "none";
-    }
-  }
-  for (const [id, node] of tagNodes) {
-    if (seen.has(id)) continue;
-    node.tag.remove();
-    node.bubble.remove();
-    tagNodes.delete(id);
-  }
-};
-
-const say = (agentId, text, ms = 6000) => {
-  const clean = text.replace(/```[\s\S]*?```/g, "[kode]").replace(/[#*_`>]/g, "").replace(/\s+/g, " ").trim();
-  if (!clean) return;
-  bubbles.set(agentId, { text: clean.length > 110 ? `${clean.slice(0, 109)}…` : clean, until: performance.now() + ms });
-};
+const nameTags = new NameTags(tagsEl);
+const say = (agentId, text, ms) => nameTags.say(agentId, text, ms);
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -145,7 +105,7 @@ const frame = (now) => {
   last = now;
   world.update(dt, now);
   world.render();
-  renderTags(world.tagPositions());
+  nameTags.render(world.tagPositions());
   requestAnimationFrame(frame);
 };
 requestAnimationFrame(frame);

@@ -55,13 +55,15 @@
     "outfit": "shirt",
     "hairColor": "#7a3e1d",
     "skin": "#ffd8b8",
-    "top": "#be4bdb",
+    "top": "#ff3db8",
     "shirt": "#fff0f6",
+    "tie": "#c92a2a",
     "pants": "#2b2f3a",
     "shoes": "#5c2b2b",
     "voice": {
       "lang": "id-ID",
       "gender": "female",
+      "prefer": [],
       "pitch": 1.2,
       "rate": 1
     }

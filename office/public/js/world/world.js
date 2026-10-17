@@ -1,40 +1,14 @@
-// Scene, camera, agents and their movement for the 3D office.
+// The 3D world: renderer, camera + orbit controls, lights, the office scene
+// and the agents (their seats, idle activities and movement). main.js feeds it
+// the roster and agent status from the gateway and asks it for tag positions.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { buildOffice, WANDER, PORTAL, CENTER, ACTIVITY_SPOTS, ROOMS } from "./office3d.js";
-import { createPerson, animatePerson, PRESETS } from "./people3d.js";
-
-const corridorFor = (z) => (z < 12.4 ? 11.1 : 14.3);
-const AISLE_LEFT = 7;
-const AISLE_RIGHT = 21.6;
-
-// Work-area route: detour around the desk rows using two corridors and the side aisles.
-const corridorRoute = (from, to) => {
-  const route = [];
-  const c1 = corridorFor(from.z);
-  const c2 = corridorFor(to.z);
-  route.push({ x: from.x, z: c1 });
-  if (c1 !== c2) {
-    const side = Math.abs(from.x - AISLE_LEFT) + Math.abs(to.x - AISLE_LEFT) < Math.abs(from.x - AISLE_RIGHT) + Math.abs(to.x - AISLE_RIGHT) ? AISLE_LEFT : AISLE_RIGHT;
-    route.push({ x: side, z: c1 }, { x: side, z: c2 });
-  }
-  route.push({ x: to.x, z: c2 }, { x: to.x, z: to.z });
-  return route;
-};
-
-const doorOf = (roomId) => ROOMS.find((r) => r.id === roomId)?.door ?? null;
-
-// Full route between two points, leaving/entering rooms through their doors.
-const planRoute = (from, to, fromRoom = null, toRoom = null) => {
-  if (fromRoom && fromRoom === toRoom) return [{ x: to.x, z: to.z }];
-  const exit = doorOf(fromRoom);
-  const entry = doorOf(toRoom);
-  const route = exit ? [exit.inside, exit.outside] : [];
-  const start = exit ? exit.outside : from;
-  route.push(...corridorRoute(start, entry ? entry.outside : to));
-  if (entry) route.push(entry.inside, { x: to.x, z: to.z });
-  return route;
-};
+import { buildOffice } from "../office/index.js";
+import { ACTIVITY_SPOTS, CENTER, PORTAL, WANDER } from "../office/layout.js";
+import { animatePerson } from "../characters/animation.js";
+import { createPerson } from "../characters/person.js";
+import { PRESETS } from "../characters/presets.js";
+import { corridorFor, doorOf, planRoute } from "./routing.js";
 
 // Pixel modes: render at a fraction of the CSS resolution, upscale crisply.
 export const PIXEL_MODES = [

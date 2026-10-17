@@ -10,7 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const PEOPLE_FILE = process.env.PEOPLE_FILE || path.join(__dirname, "public", "people.json");
+const PEOPLE_FILE = process.env.PEOPLE_FILE || path.join(__dirname, "..", "public", "people.json");
 const DASHBOARD_URL = (process.env.HERMES_DASHBOARD_URL || "http://hermes:9119").replace(/\/$/, "");
 const ORCHESTRATOR_NAME = process.env.HERMES_AGENT_NAME || "Hermes";
 

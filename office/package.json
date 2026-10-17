@@ -1,10 +1,10 @@
 {
-  "name": "kantor-hermes-office",
+  "name": "agentic-digital-office",
   "private": true,
-  "description": "Pixel-art office for Hermes agents + Hermes gateway adapter",
-  "main": "server.js",
+  "description": "Agentic Digital Office: 3D office UI and Hermes gateway adapter",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "three": "0.185.1",
