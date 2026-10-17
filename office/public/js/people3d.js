@@ -424,6 +424,44 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false) => {
     arms[1].rotation.x = -1.15 - type;
     head.rotation.x = 0.08;
     blob.visible = false;
+  } else if (mode === "lounge" || mode === "beanbag") {
+    // relaxed on the sofa / bean bag
+    body.position.y = mode === "beanbag" ? -0.1 : 0.02;
+    legs.forEach((l) => { l.rotation.x = -1.35; });
+    arms[0].rotation.set(-0.35, 0, -0.25);
+    arms[1].rotation.set(-0.35, 0, 0.25);
+    head.rotation.y = Math.sin(k * 0.5) * 0.3;
+    head.rotation.x = -0.05;
+    blob.visible = false;
+  } else if (mode === "drink") {
+    // sip every few seconds
+    const sip = Math.max(0, Math.sin(k * 1.6));
+    arms[1].rotation.x = -0.6 - sip * 1.4;
+    arms[1].rotation.z = 0.15;
+    head.rotation.x = -sip * 0.2;
+  } else if (mode === "look") {
+    head.rotation.y = Math.sin(k * 0.8) * 0.35;
+    head.rotation.x = 0.1;
+    arms[0].rotation.z = -0.06;
+    arms[1].rotation.z = 0.06;
+  } else if (mode === "read") {
+    arms[0].rotation.set(-1.1, 0, 0.3);
+    arms[1].rotation.set(-1.1, 0, -0.3);
+    head.rotation.x = 0.3;
+  } else if (mode === "write") {
+    arms[1].rotation.x = -2.2 + Math.sin(k * 5) * 0.12;
+    arms[1].rotation.z = Math.sin(k * 3) * 0.25;
+    head.rotation.x = -0.1;
+  } else if (mode === "play") {
+    // mashing arcade buttons
+    arms[0].rotation.x = -1.2 + Math.sin(k * 22) * 0.1;
+    arms[1].rotation.x = -1.2 - Math.sin(k * 25) * 0.1;
+    body.position.y = Math.abs(Math.sin(k * 6)) * 0.01;
+  } else if (mode === "pingpong") {
+    const swing = Math.sin(k * 7);
+    arms[1].rotation.x = -1.0 + swing * 0.5;
+    arms[1].rotation.z = swing * 0.5;
+    body.position.y = Math.abs(swing) * 0.02;
   } else {
     body.position.y = Math.sin(k * 2.2) * 0.008;
     arms[0].rotation.z = -0.06;

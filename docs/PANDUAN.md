@@ -114,6 +114,24 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 - Kalau ada pola kerja yang terus diulang, jadikan skill (lihat bagian berikut) agar konsisten.
 - Personality sementara tersedia lewat perintah `/personality` di chat Hermes (misalnya `concise`, `teacher`). Ini hanya lapisan sesi dan tidak mengubah `SOUL.md`.
 
+## Kantor dan kegiatan agen
+
+Setiap agen (termasuk Hermes) punya satu meja dan kursi sendiri. Jumlah meja otomatis mengikuti jumlah agen, maksimal 10 meja di dua baris. Saat mendapat tugas, agen berjalan ke mejanya dan mengetik.
+
+Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
+
+| Properti | Kegiatan | Ikon |
+| --- | --- | --- |
+| Sofa dan bean bag di area santai | Duduk bersantai | 🛋 |
+| Pantry (mesin kopi, microwave) | Minum kopi | ☕ |
+| Akuarium | Melihat ikan | 🐟 |
+| Rak buku | Membaca | 📖 |
+| Whiteboard dengan sticky note | Menulis | ✍ |
+| Dua mesin arcade | Main game | 🎮 |
+| Meja ping-pong | Main ping-pong | 🏓 |
+
+Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di sudut. Satu properti hanya dipakai satu agen dalam satu waktu; kegiatan berlangsung sekitar 9 sampai 18 detik.
+
 ## Mengelola agen (panel ⚙ Agen)
 
 Semua pengelolaan agen dilakukan dari kantor, tanpa edit file dan tanpa restart. Klik **⚙ Agen** di kanan atas.

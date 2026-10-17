@@ -104,7 +104,7 @@ const renderTags = (tags) => {
       tagsEl.append(node.tag, node.bubble);
       tagNodes.set(agent.id, node);
     }
-    const label = `${agent.name}<span class="role">${agent.role || ""}</span>`;
+    const label = `${agent.activityIcon ? `${agent.activityIcon} ` : ""}${agent.name}<span class="role">${agent.role || ""}</span>`;
     if (node.tag.innerHTML !== label) node.tag.innerHTML = label;
     node.tag.classList.toggle("speaking", Boolean(agent.speaking));
     const left = x;

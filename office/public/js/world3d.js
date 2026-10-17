@@ -1,10 +1,10 @@
 // Scene, camera, agents and their movement for the 3D office.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { buildOffice, SEATS, WANDER, PORTAL, CENTER } from "./office3d.js";
+import { buildOffice, WANDER, PORTAL, CENTER, ACTIVITY_SPOTS } from "./office3d.js";
 import { createPerson, animatePerson, PRESETS } from "./people3d.js";
 
-const corridorFor = (z) => (z < 12.5 ? 11.3 : 15.6);
+const corridorFor = (z) => (z < 12.4 ? 11.1 : 15.2);
 const AISLE_LEFT = 7;
 const AISLE_RIGHT = 21.6;
 
@@ -131,16 +131,42 @@ export class World {
       const isMain = info.id === "hermes";
       const order = others.indexOf(info.id);
       const preset = isMain ? PRESETS[0] : PRESETS[1 + (order % (PRESETS.length - 1))];
-      const seat = isMain ? null : SEATS[order % SEATS.length];
       const [sx, sz] = isMain ? [PORTAL.x - 0.6, PORTAL.z + 0.4] : WANDER[(order * 3) % WANDER.length];
       const a = {
-        id: info.id, name: info.name, role: info.role, isMain, preset, seat,
-        x: sx, z: sz, heading: Math.PI / 4, route: [], mode: "idle", status: "idle",
+        id: info.id, name: info.name, role: info.role, isMain, preset, seat: null,
+        x: sx, z: sz, heading: Math.PI / 4, route: [], mode: "idle", status: "idle", spot: null,
         nextWander: performance.now() + 1500 + Math.random() * 3000, lastActive: 0, phase: Math.random() * 10,
       };
       a.model = this.makeModel(info.id, { ...preset, ...(this.appearances[info.id] ?? {}) }, a);
       this.agents.set(info.id, a);
     });
+    this.assignDesks(["hermes", ...others].filter((id) => this.agents.has(id)));
+  }
+
+  // One desk + chair per agent: Hermes first, then the team in a stable order.
+  assignDesks(order) {
+    const seats = this.office.setDesks(order.length);
+    order.forEach((id, i) => {
+      const a = this.agents.get(id);
+      const seat = seats[i] ?? null;
+      const moved = a.seat && seat && (a.seat.x !== seat.x || a.seat.z !== seat.z);
+      a.seat = seat;
+      if (moved && (a.mode === "sitting" || a.mode === "toSeat")) {
+        a.mode = "toSeat";
+        a.route = planRoute(a, seat);
+      }
+    });
+  }
+
+  // Free activity spots (sofa, arcade, coffee, ...) that no agent is using or walking to.
+  freeSpots() {
+    const taken = new Set([...this.agents.values()].map((a) => a.spot?.id).filter(Boolean));
+    return ACTIVITY_SPOTS.filter((s) => !taken.has(s.id));
+  }
+
+  leaveSpot(a) {
+    a.spot = null;
+    if (a.mode === "activity" || a.mode === "toSpot") a.mode = "idle";
   }
 
   setSpeaking(id, on) {
@@ -154,6 +180,7 @@ export class World {
     a.status = status;
     a.lastActive = performance.now();
     if (status === "working" && a.seat && a.mode !== "sitting") {
+      this.leaveSpot(a); // drop the sofa/arcade/coffee and go to work
       a.route = planRoute(a, a.seat);
       a.mode = "toSeat";
     }
@@ -180,37 +207,58 @@ export class World {
           a.route.shift();
           if (!a.route.length && a.mode === "toSeat") a.mode = "sitting";
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
+          if (!a.route.length && a.mode === "toSpot") {
+            a.mode = "activity";
+            a.activityEnd = now + 9000 + Math.random() * 9000;
+          }
         } else {
           a.x += (dx / dist) * step;
           a.z += (dz / dist) * step;
           a.heading = Math.atan2(dx, dz);
           moving = true;
         }
+      } else if (a.mode === "activity" && now > a.activityEnd) {
+        // done with the sofa/arcade/...: step away and idle again
+        a.spot = null;
+        a.mode = "wander";
+        a.route = planRoute(a, { x: a.x + (a.x < 12 ? 1 : -1) * 0.8, z: a.z < 12.4 ? 11.1 : 15.2 });
+        a.nextWander = now + 3000 + Math.random() * 4000;
       } else if (a.mode === "idle" && now > a.nextWander) {
-        if (a.isMain) {
+        const spots = this.freeSpots();
+        const wantsActivity = spots.length && Math.random() < (a.isMain ? 0.3 : 0.6);
+        if (wantsActivity) {
+          a.spot = spots[Math.floor(Math.random() * spots.length)];
+          a.route = planRoute(a, a.spot);
+          a.mode = "toSpot";
+        } else if (a.isMain) {
           const ang = Math.random() * Math.PI * 2;
           a.route = [{ x: PORTAL.x + Math.cos(ang) * 1.2, z: PORTAL.z + Math.sin(ang) * 0.9 }];
+          a.mode = "wander";
         } else {
           const [tx, tz] = Math.random() < 0.18
             ? [PORTAL.x + (Math.random() - 0.5), PORTAL.z + (Math.random() - 0.5) * 0.6]
             : WANDER[Math.floor(Math.random() * WANDER.length)];
           a.route = planRoute(a, { x: tx, z: tz });
+          a.mode = "wander";
         }
-        a.mode = "wander";
         a.nextWander = now + 4000 + Math.random() * 7000;
       }
 
       const sitting = a.mode === "sitting" && !moving;
-      // face the desk when seated, face the camera side when idle
+      const atSpot = a.mode === "activity" && !moving && a.spot;
+      // face the desk when seated, the prop at an activity, the camera side when idle
       let targetHeading = a.heading;
       if (sitting) targetHeading = Math.PI;
+      else if (atSpot) targetHeading = a.spot.heading;
       else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
       let diff = targetHeading - a.model.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       a.model.rotation.y += diff * Math.min(1, dt / 120);
       a.model.position.set(a.x, this.office.floorTop, a.z);
-      animatePerson(a.model, moving ? "walk" : sitting ? "sit" : "idle", now, a.phase, Boolean(a.speaking));
+      const pose = moving ? "walk" : sitting ? "sit" : atSpot ? a.spot.pose : "idle";
+      a.activityIcon = atSpot ? a.spot.icon : "";
+      animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking));
     }
   }
 
