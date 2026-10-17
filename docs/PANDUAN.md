@@ -116,6 +116,8 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
+Kantor dibagi menjadi beberapa ruangan berdinding kaca dengan pintu dan papan nama: **Ruang Kerja** (meja agen), **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server**, **Pantry & Lounge** (kopi, akuarium, sofa), **Ruang Game** (arcade, ping-pong), dan **Lobby** (portal Hermes dan pintu masuk). Agen masuk dan keluar ruangan lewat pintunya.
+
 Setiap agen (termasuk Hermes) punya satu meja dan kursi sendiri. Jumlah meja otomatis mengikuti jumlah agen, maksimal 10 meja di dua baris. Saat mendapat tugas, agen berjalan ke mejanya dan mengetik.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
@@ -127,6 +129,8 @@ Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label n
 | Akuarium | Melihat ikan | 🐟 |
 | Rak buku | Membaca | 📖 |
 | Whiteboard dengan sticky note | Menulis | ✍ |
+| Meja rapat (4 kursi) | Rapat | 💬 |
+| Rak server | Cek server | 🖥 |
 | Dua mesin arcade | Main game | 🎮 |
 | Meja ping-pong | Main ping-pong | 🏓 |
 

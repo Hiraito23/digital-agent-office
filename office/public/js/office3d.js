@@ -4,8 +4,36 @@ import * as THREE from "three";
 
 export const N = 32;
 export const OFFICE = { x0: 6, x1: 24, z0: 5, z1: 19 };
-const SERVER_ZONE = { x0: 20, x1: 24, z0: 5, z1: 8 };
-export const PORTAL = { x: 16, z: 16.6 };
+// Rooms inside the office. Walls are glass partitions with a door gap; agents
+// enter and leave a room through its door (outside -> inside points).
+export const ROOMS = [
+  {
+    id: "rapat", name: "RUANG RAPAT", floor: "wood", x0: 6, x1: 12, z0: 5, z1: 8,
+    walls: [{ along: "x", at: 8, from: 6, to: 12, gaps: [[9.4, 10.5]] }, { along: "z", at: 12, from: 5, to: 8 }],
+    door: { outside: { x: 9.95, z: 8.6 }, inside: { x: 9.95, z: 7.6 } },
+  },
+  {
+    id: "server", name: "RUANG SERVER", floor: "dark", x0: 20, x1: 24, z0: 5, z1: 9,
+    walls: [{ along: "z", at: 20, from: 5, to: 9 }, { along: "x", at: 9, from: 20, to: 24, gaps: [[21.1, 22.1]] }],
+    door: { outside: { x: 21.6, z: 9.6 }, inside: { x: 21.6, z: 8.4 } },
+  },
+  {
+    id: "lounge", name: "PANTRY & LOUNGE", floor: "wood", x0: 6, x1: 12, z0: 15, z1: 19,
+    walls: [{ along: "x", at: 15, from: 6, to: 12, gaps: [[9.4, 10.6]] }, { along: "z", at: 12, from: 15, to: 19 }],
+    door: { outside: { x: 10, z: 14.3 }, inside: { x: 10, z: 15.6 } },
+  },
+  {
+    id: "game", name: "RUANG GAME", floor: "carpet", x0: 18, x1: 24, z0: 15, z1: 19,
+    walls: [{ along: "x", at: 15, from: 18, to: 24, gaps: [[21, 22.2]] }, { along: "z", at: 18, from: 15, to: 19 }],
+    door: { outside: { x: 21.6, z: 14.3 }, inside: { x: 21.6, z: 15.6 } },
+  },
+  // The lobby is open towards the work area (no wall, no door).
+  { id: "lobby", name: "LOBBY", floor: "marble", x0: 12, x1: 18, z0: 15, z1: 19, walls: [], door: null },
+];
+// Front gate in the glass railing (opens into the lobby).
+const GATE = { x0: 14, x1: 16 };
+const roomAt = (x, z) => ROOMS.find((r) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1) ?? null;
+export const PORTAL = { x: 15, z: 16.9 };
 export const CENTER = { x: (OFFICE.x0 + OFFICE.x1) / 2, z: (OFFICE.z0 + OFFICE.z1) / 2 };
 
 // One desk + chair per agent. Two rows of single desks; corridors run between
@@ -17,7 +45,7 @@ export const seatOf = (slot) => ({ x: slot.x + 0.65, z: slot.z + 1.15 });
 
 export const WANDER = [
   [9.95, 11.1], [14.5, 11.1], [17.75, 11.1], [21.6, 11.1],
-  [12.5, 15.2], [18, 15.2], [13.5, 18.2], [22.6, 9.8],
+  [13.5, 14.3], [17, 14.3], [13.8, 17.9], [16.6, 18.2], [22.6, 10.6],
 ];
 
 // ---------------------------------------------------------------------------
@@ -66,7 +94,7 @@ const box = (w, h, d, material, x = 0, y = 0, z = 0, shadow = true) => {
 
 const isPath = (i, j) => {
   const ring = i >= 3 && i <= 27 && j >= 2 && j <= 22 && (i === 3 || i === 27 || j === 2 || j === 22);
-  const entrance = (i === 6 || i === 7) && j >= 19 && j <= 22;
+  const entrance = (i === 14 || i === 15) && j >= 19 && j <= 22;
   return ring || entrance;
 };
 
@@ -119,32 +147,55 @@ const outerGrassTexture = () =>
     }
   }, [40, 40]);
 
+// One 16px tile, styled by the room it belongs to.
+const FLOOR_STYLES = {
+  tile: { base: "#e6ebef", grout: "#c3ccd5", light: "#f6f9fb", fleck: "#d3dbe2" },
+  dark: { base: "#2c3753", grout: "#222b44", light: "#3a4870", fleck: "#4dabf7" },
+  wood: { base: "#c08552", grout: "#8d5a2b", light: "#d9a066", fleck: "#a86b3c" },
+  carpet: { base: "#5f3dc4", grout: "#5f3dc4", light: "#7048e8", fleck: "#9775fa" },
+  marble: { base: "#f1f3f5", grout: "#dee2e6", light: "#ffffff", fleck: "#e9c46a" },
+};
+
+const drawFloorTile = (ctx, ox, oz, style) => {
+  const c = FLOOR_STYLES[style];
+  ctx.fillStyle = c.base;
+  ctx.fillRect(ox, oz, TPX, TPX);
+  if (style === "wood") {
+    // planks: a seam every 4px, staggered joints
+    ctx.fillStyle = c.grout;
+    for (let y = 3; y < TPX; y += 4) ctx.fillRect(ox, oz + y, TPX, 1);
+    ctx.fillRect(ox + 5, oz, 1, 3); ctx.fillRect(ox + 11, oz + 4, 1, 3); ctx.fillRect(ox + 3, oz + 8, 1, 3); ctx.fillRect(ox + 13, oz + 12, 1, 3);
+    ctx.fillStyle = c.light;
+    ctx.fillRect(ox + 1, oz + 1, 4, 1); ctx.fillRect(ox + 7, oz + 9, 4, 1);
+    return;
+  }
+  if (style === "carpet") {
+    ctx.fillStyle = c.fleck;
+    for (let k = 0; k < 6; k += 1) ctx.fillRect(ox + ((k * 7) % TPX), oz + ((k * 5 + 3) % TPX), 1, 1);
+    ctx.fillStyle = c.light;
+    ctx.fillRect(ox + 4, oz + 12, 1, 1); ctx.fillRect(ox + 12, oz + 2, 1, 1);
+    return;
+  }
+  ctx.fillStyle = c.grout;
+  ctx.fillRect(ox, oz + TPX - 1, TPX, 1);
+  ctx.fillRect(ox + TPX - 1, oz, 1, TPX);
+  ctx.fillStyle = c.light;
+  ctx.fillRect(ox + 1, oz + 1, 6, 1);
+  ctx.fillRect(ox + 1, oz + 1, 1, 6);
+  ctx.fillStyle = c.fleck;
+  if (style === "dark") ctx.fillRect(ox + 6, oz + 7, 4, 1);
+  else if (style === "marble") { ctx.fillRect(ox + 3, oz + 11, 5, 1); ctx.fillRect(ox + 8, oz + 4, 1, 1); }
+  else ctx.fillRect(ox + 9, oz + 10, 2, 1);
+};
+
 const floorTexture = () => {
   const w = OFFICE.x1 - OFFICE.x0;
   const h = OFFICE.z1 - OFFICE.z0;
   return pixelTexture(w * TPX, h * TPX, (ctx) => {
     for (let tz = 0; tz < h; tz += 1) {
       for (let tx = 0; tx < w; tx += 1) {
-        const wx = OFFICE.x0 + tx;
-        const wz = OFFICE.z0 + tz;
-        const dark = wx >= SERVER_ZONE.x0 && wx < SERVER_ZONE.x1 && wz >= SERVER_ZONE.z0 && wz < SERVER_ZONE.z1;
-        const ox = tx * TPX;
-        const oz = tz * TPX;
-        ctx.fillStyle = dark ? "#2c3753" : "#e6ebef";
-        ctx.fillRect(ox, oz, TPX, TPX);
-        ctx.fillStyle = dark ? "#222b44" : "#c3ccd5";
-        ctx.fillRect(ox, oz + TPX - 1, TPX, 1);
-        ctx.fillRect(ox + TPX - 1, oz, 1, TPX);
-        ctx.fillStyle = dark ? "#3a4870" : "#f6f9fb";
-        ctx.fillRect(ox + 1, oz + 1, 6, 1);
-        ctx.fillRect(ox + 1, oz + 1, 1, 6);
-        if (dark) {
-          ctx.fillStyle = "#4dabf7";
-          ctx.fillRect(ox + 6, oz + 7, 4, 1);
-        } else {
-          ctx.fillStyle = "#d3dbe2";
-          ctx.fillRect(ox + 9, oz + 10, 2, 1);
-        }
+        const room = roomAt(OFFICE.x0 + tx + 0.5, OFFICE.z0 + tz + 0.5);
+        drawFloorTile(ctx, tx * TPX, tz * TPX, room?.floor ?? "tile");
       }
     }
   });
@@ -229,18 +280,27 @@ const makeDesk = (screenTex, index = 0) => {
 
 // pose: how the agent is animated while there; icon shows on the name tag.
 export const ACTIVITY_SPOTS = [
-  { id: "sofa-1", x: 7.15, z: 16.95, heading: Math.PI / 2, pose: "lounge", icon: "🛋" },
-  { id: "sofa-2", x: 7.15, z: 17.85, heading: Math.PI / 2, pose: "lounge", icon: "🛋" },
-  { id: "beanbag-1", x: 9.75, z: 16.7, heading: -Math.PI / 2, pose: "beanbag", icon: "🛋" },
-  { id: "beanbag-2", x: 9.75, z: 18.05, heading: -Math.PI / 2, pose: "beanbag", icon: "🛋" },
-  { id: "coffee", x: 7.15, z: 11.7, heading: -Math.PI / 2, pose: "drink", icon: "☕" },
-  { id: "aquarium", x: 7.15, z: 13.4, heading: -Math.PI / 2, pose: "look", icon: "🐟" },
-  { id: "books", x: 7.15, z: 7.1, heading: -Math.PI / 2, pose: "read", icon: "📖" },
-  { id: "whiteboard", x: 10.2, z: 5.75, heading: Math.PI, pose: "write", icon: "✍" },
-  { id: "arcade-1", x: 22.55, z: 13.3, heading: Math.PI / 2, pose: "play", icon: "🎮" },
-  { id: "arcade-2", x: 22.55, z: 14.5, heading: Math.PI / 2, pose: "play", icon: "🎮" },
-  { id: "pingpong-1", x: 19.25, z: 17.2, heading: Math.PI / 2, pose: "pingpong", icon: "🏓" },
-  { id: "pingpong-2", x: 21.95, z: 17.2, heading: -Math.PI / 2, pose: "pingpong", icon: "🏓" },
+  // Pantry & Lounge
+  { id: "coffee", room: "lounge", x: 7.15, z: 15.75, heading: -Math.PI / 2, pose: "drink", icon: "☕" },
+  { id: "aquarium", room: "lounge", x: 7.15, z: 17.6, heading: -Math.PI / 2, pose: "look", icon: "🐟" },
+  { id: "sofa-1", room: "lounge", x: 9.1, z: 18.1, heading: Math.PI, pose: "lounge", icon: "🛋" },
+  { id: "sofa-2", room: "lounge", x: 10.1, z: 18.1, heading: Math.PI, pose: "lounge", icon: "🛋" },
+  { id: "beanbag-1", room: "lounge", x: 8.4, z: 16.35, heading: 0, pose: "beanbag", icon: "🛋" },
+  { id: "beanbag-2", room: "lounge", x: 10.9, z: 16.35, heading: 0, pose: "beanbag", icon: "🛋" },
+  // Ruang Rapat
+  { id: "meeting-1", room: "rapat", x: 8.0, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
+  { id: "meeting-2", room: "rapat", x: 9.2, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
+  { id: "meeting-3", room: "rapat", x: 8.0, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
+  { id: "meeting-4", room: "rapat", x: 9.2, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
+  { id: "books", room: "rapat", x: 7.0, z: 6.6, heading: -Math.PI / 2, pose: "read", icon: "📖" },
+  { id: "whiteboard", room: "rapat", x: 10.9, z: 5.75, heading: Math.PI, pose: "write", icon: "✍" },
+  // Ruang Server
+  { id: "server", room: "server", x: 21.85, z: 6.6, heading: Math.PI, pose: "look", icon: "🖥" },
+  // Ruang Game
+  { id: "arcade-1", room: "game", x: 22.55, z: 15.6, heading: Math.PI / 2, pose: "play", icon: "🎮" },
+  { id: "arcade-2", room: "game", x: 22.55, z: 16.6, heading: Math.PI / 2, pose: "play", icon: "🎮" },
+  { id: "pingpong-1", room: "game", x: 19.25, z: 17.6, heading: Math.PI / 2, pose: "pingpong", icon: "🏓" },
+  { id: "pingpong-2", room: "game", x: 21.95, z: 17.6, heading: -Math.PI / 2, pose: "pingpong", icon: "🏓" },
 ];
 
 const cone = (r, h, material, x, y, z, segments = 4) => {
@@ -254,6 +314,80 @@ const canvasTexture = (w, h, draw) => {
   const tex = pixelTexture(w, h, draw);
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
+};
+
+// Glass partition walls with door gaps, a name sign above each door, and the
+// meeting room furniture.
+const signTexture = (text) => canvasTexture(128, 16, (ctx) => {
+  ctx.fillStyle = "#1a2138"; ctx.fillRect(0, 0, 128, 16);
+  ctx.fillStyle = "#ffd43b"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, 64, 8);
+});
+
+const addRooms = (scene, top) => {
+  const glass = new THREE.MeshLambertMaterial({ color: "#cfe8ff", transparent: true, opacity: 0.28, depthWrite: false });
+  const frame = mat("#46557f");
+  const H = 1.25;
+  // one straight wall piece from a to b along x ("x") or along z ("z")
+  const piece = (along, at, a, b) => {
+    const len = b - a;
+    if (len <= 0.01) return;
+    const mid = a + len / 2;
+    const [x, z, sx, sz] = along === "x" ? [mid, at, len, 0.06] : [at, mid, 0.06, len];
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(sx, H, sz), glass);
+    pane.position.set(x, top + H / 2, z);
+    scene.add(pane);
+    scene.add(box(along === "x" ? len : 0.1, 0.08, along === "x" ? 0.1 : len, frame, x, top + H, z, false)); // top rail
+    scene.add(box(along === "x" ? len : 0.1, 0.12, along === "x" ? 0.1 : len, frame, x, top + 0.06, z, false)); // base
+    for (let p = a; p <= b + 0.001; p += 1.5) {
+      scene.add(along === "x" ? box(0.07, H, 0.1, frame, p, top + H / 2, at, false) : box(0.1, H, 0.07, frame, at, top + H / 2, p, false));
+    }
+  };
+  for (const room of ROOMS) {
+    for (const wall of room.walls) {
+      const gaps = [...(wall.gaps ?? [])].sort((g1, g2) => g1[0] - g2[0]);
+      let cursor = wall.from;
+      for (const [g0, g1] of gaps) {
+        piece(wall.along, wall.at, cursor, g0);
+        // door posts and lintel
+        for (const p of [g0, g1]) scene.add(wall.along === "x" ? box(0.1, H + 0.2, 0.12, frame, p, top + (H + 0.2) / 2, wall.at, false) : box(0.12, H + 0.2, 0.1, frame, wall.at, top + (H + 0.2) / 2, p, false));
+        if (wall.along === "x") scene.add(box(g1 - g0, 0.1, 0.12, frame, (g0 + g1) / 2, top + H + 0.15, wall.at, false));
+        else scene.add(box(0.12, 0.1, g1 - g0, frame, wall.at, top + H + 0.15, (g0 + g1) / 2, false));
+        cursor = g1;
+      }
+      piece(wall.along, wall.at, cursor, wall.to);
+    }
+    // name sign above the door (facing the work area), or on the floor for open rooms
+    if (room.door) {
+      const wall = room.walls.find((w) => w.gaps?.length);
+      const [g0, g1] = wall.gaps[0];
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), new THREE.MeshBasicMaterial({ map: signTexture(room.name), side: THREE.DoubleSide }));
+      const towardWork = room.door.outside.z > room.door.inside.z ? 1 : -1;
+      sign.position.set((g0 + g1) / 2, top + H + 0.42, wall.at + towardWork * 0.07);
+      if (towardWork < 0) sign.rotation.y = Math.PI;
+      scene.add(sign);
+    } else {
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshBasicMaterial({ map: signTexture(room.name), transparent: true }));
+      sign.rotation.x = -Math.PI / 2;
+      sign.position.set((room.x0 + room.x1) / 2, top + 0.015, room.z1 - 0.45);
+      scene.add(sign);
+    }
+  }
+
+  // meeting room: table + four chairs (seats are ACTIVITY_SPOTS meeting-1..4)
+  const table = new THREE.Group();
+  table.add(box(2.2, 0.06, 1.0, mat("#8d5a2b"), 0, 0.55, 0));
+  for (const [x, z] of [[-1, -0.42], [1, -0.42], [-1, 0.42], [1, 0.42]]) table.add(box(0.06, 0.52, 0.06, mat("#5a3418"), x, 0.26, z));
+  table.add(box(0.5, 0.02, 0.3, mat("#f8f9fa"), -0.3, 0.59, 0.1)); // papers
+  table.add(box(0.36, 0.04, 0.26, mat("#343a40"), 0.5, 0.6, -0.05)); // laptop
+  table.position.set(8.6, top, 6.6);
+  scene.add(table);
+  for (const spot of ACTIVITY_SPOTS.filter((s) => s.pose === "meeting")) {
+    const chair = makeChair();
+    chair.position.set(spot.x, top, spot.z);
+    chair.rotation.y = spot.heading === 0 ? Math.PI : 0; // backrest behind the sitter
+    scene.add(chair);
+  }
 };
 
 const addDecor = (scene, top, animated) => {
@@ -272,7 +406,7 @@ const addDecor = (scene, top, animated) => {
     ctx.fillStyle = "#ffdeeb"; for (let i = 6; i < 28; i += 4) ctx.fillRect(i, 12, 2, 2);
   }) }));
   rug.rotation.x = -Math.PI / 2;
-  rug.position.set(8.4, top + 0.012, 17.4);
+  rug.position.set(9.6, top + 0.012, 17.3);
   rug.receiveShadow = true;
   scene.add(rug);
   const sofa = new THREE.Group();
@@ -280,17 +414,17 @@ const addDecor = (scene, top, animated) => {
   sofa.add(box(0.2, 0.42, 2.0, mat("#1864ab"), -0.27, 0.5, 0));
   for (const z of [-1.0, 1.0]) sofa.add(box(0.7, 0.24, 0.16, mat("#1864ab"), 0, 0.4, z));
   for (const z of [-0.45, 0.45]) sofa.add(box(0.5, 0.06, 0.82, mat("#4dabf7"), 0.03, 0.35, z));
-  place(sofa, 6.85, 17.4);
+  place(sofa, 9.6, 18.55, Math.PI / 2);
   const table = new THREE.Group();
   table.add(box(0.9, 0.06, 0.6, mat("#8d5a2b"), 0, 0.32, 0));
   for (const [x, z] of [[-0.38, -0.25], [0.38, -0.25], [-0.38, 0.25], [0.38, 0.25]]) table.add(box(0.05, 0.3, 0.05, mat("#5a3418"), x, 0.15, z));
   table.add(box(0.08, 0.1, 0.08, mat("#ffffff"), 0.2, 0.4, 0.1));
   table.add(box(0.26, 0.03, 0.2, mat("#e64980"), -0.15, 0.36, -0.05));
-  place(table, 8.35, 17.4);
-  for (const [z, c] of [[16.7, "#f59f00"], [18.05, "#7048e8"]]) {
+  place(table, 9.6, 17.3);
+  for (const [x, z, c] of [[8.4, 16.35, "#f59f00"], [10.9, 16.35, "#7048e8"]]) {
     const bag = new THREE.Mesh(new THREE.IcosahedronGeometry(0.36, 1), mat(c));
     bag.scale.set(1, 0.6, 1);
-    bag.position.set(9.85, top + 0.2, z);
+    bag.position.set(x, top + 0.2, z);
     bag.castShadow = true;
     scene.add(bag);
   }
@@ -303,13 +437,13 @@ const addDecor = (scene, top, animated) => {
   pantry.add(box(0.04, 0.08, 0.1, new THREE.MeshBasicMaterial({ color: "#51cf66" }), 0.18, 1.2, -0.3));
   pantry.add(box(0.4, 0.26, 0.42, mat("#f1f3f5"), 0, 1.02, 0.35)); // microwave
   pantry.add(box(0.02, 0.18, 0.26, mat("#212529"), 0.21, 1.02, 0.32));
-  place(pantry, OFFICE.x0 + 0.35, 11.7);
+  place(pantry, OFFICE.x0 + 0.35, 15.75);
   const steam = new THREE.Group();
   for (let k = 0; k < 3; k += 1) {
     const puff = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.6 }));
     steam.add(puff);
   }
-  steam.position.set(OFFICE.x0 + 0.42, top + 1.35, 11.4);
+  steam.position.set(OFFICE.x0 + 0.42, top + 1.35, 15.45);
   scene.add(steam);
   animated.push((t) => steam.children.forEach((p, k) => {
     const phase = ((t / 1400) + k / 3) % 1;
@@ -334,7 +468,7 @@ const addDecor = (scene, top, animated) => {
     aquarium.add(f);
     return f;
   });
-  place(aquarium, OFFICE.x0 + 0.3, 13.4);
+  place(aquarium, OFFICE.x0 + 0.3, 17.6);
   animated.push((t) => fish.forEach((f, k) => {
     const a = t / (1600 + k * 400) + k * 2;
     f.position.set(Math.sin(a * 0.7) * 0.1, 0.9 + Math.sin(a * 1.3) * 0.12, Math.sin(a) * 0.38);
@@ -361,9 +495,9 @@ const addDecor = (scene, top, animated) => {
     ctx.fillStyle = "#e03131"; ctx.fillRect(20, 26, 3, 3);
   });
   const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.0), new THREE.MeshBasicMaterial({ map: boardTex }));
-  board.position.set(10.2, top + 1.05, OFFICE.z0 + 0.012);
+  board.position.set(10.8, top + 1.05, OFFICE.z0 + 0.012);
   scene.add(board);
-  scene.add(box(2.3, 0.06, 0.06, mat("#868e96"), 10.2, top + 0.52, OFFICE.z0 + 0.04, false));
+  scene.add(box(2.3, 0.06, 0.06, mat("#868e96"), 10.8, top + 0.52, OFFICE.z0 + 0.04, false));
 
   // --- neon sign (back wall) ---
   const neonTex = canvasTexture(128, 20, (ctx) => {
@@ -390,7 +524,7 @@ const addDecor = (scene, top, animated) => {
 
   // --- arcade cabinets (right side, facing into the room) ---
   const arcadeScreens = [];
-  for (const [z, body] of [[13.3, "#e03131"], [14.5, "#1971c2"]]) {
+  for (const [z, body] of [[15.6, "#e03131"], [16.6, "#1971c2"]]) {
     const cab = new THREE.Group();
     cab.add(box(0.55, 1.5, 0.6, mat(body), 0, 0.75, 0));
     cab.add(box(0.2, 0.12, 0.56, mat("#212529"), -0.32, 0.95, 0)); // control panel
@@ -416,7 +550,7 @@ const addDecor = (scene, top, animated) => {
   for (const [x, z] of [[-0.9, -0.48], [0.9, -0.48], [-0.9, 0.48], [0.9, 0.48]]) pp.add(box(0.05, 0.48, 0.05, mat("#343a40"), x, 0.24, z));
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: "#ff922b" }));
   pp.add(ball);
-  place(pp, 20.6, 17.2);
+  place(pp, 20.6, 17.6);
   animated.push((t) => {
     const ph = (t / 900) % 2;
     const x = ph < 1 ? -0.85 + ph * 1.7 : 0.85 - (ph - 1) * 1.7;
@@ -424,7 +558,7 @@ const addDecor = (scene, top, animated) => {
   });
 
   // --- big potted plants in the corners ---
-  for (const [x, z] of [[19.5, OFFICE.z0 + 0.5], [OFFICE.x1 - 0.5, OFFICE.z1 - 0.5], [11.4, OFFICE.z1 - 0.5], [OFFICE.x0 + 0.45, 15.9]]) {
+  for (const [x, z] of [[19.5, OFFICE.z0 + 0.5], [OFFICE.x1 - 0.5, OFFICE.z1 - 0.5], [11.5, OFFICE.z1 - 0.45], [12.5, 15.5], [17.5, 15.5]]) {
     const pot = new THREE.Group();
     pot.add(box(0.36, 0.4, 0.36, mat("#d9480f"), 0, 0.2, 0));
     for (let k = 0; k < 5; k += 1) {
@@ -597,17 +731,22 @@ export const buildOffice = (scene) => {
   scene.add(box(fw, 0.04, 0.02, trimMat, OFFICE.x0 + fw / 2, top + 0.15, OFFICE.z0 + 0.01, false));
   scene.add(box(0.02, 0.04, fd, trimMat, OFFICE.x0 + 0.01, top + 0.15, OFFICE.z0 + fd / 2, false));
 
-  // glass railing on the front edges (entrance at the front-left)
+  // glass railing on the front and right edges, with a gate into the lobby
   const glass = new THREE.MeshLambertMaterial({ color: "#d6ecff", transparent: true, opacity: 0.35 });
-  const railLen = OFFICE.x1 - (OFFICE.x0 + 2);
-  const front = new THREE.Mesh(new THREE.BoxGeometry(railLen, 0.5, 0.03), glass);
-  front.position.set(OFFICE.x0 + 2 + railLen / 2, top + 0.3, OFFICE.z1);
+  const railSegment = (x0, x1) => {
+    const len = x1 - x0;
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(len, 0.5, 0.03), glass);
+    pane.position.set(x0 + len / 2, top + 0.3, OFFICE.z1);
+    scene.add(pane);
+    scene.add(box(len, 0.04, 0.06, mat(C.rail), x0 + len / 2, top + 0.56, OFFICE.z1, false));
+    for (let x = x0; x <= x1 + 0.001; x += 1) scene.add(box(0.06, 0.58, 0.06, mat(C.rail), x, top + 0.29, OFFICE.z1));
+  };
+  railSegment(OFFICE.x0, GATE.x0);
+  railSegment(GATE.x1, OFFICE.x1);
   const right = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.5, fd), glass);
   right.position.set(OFFICE.x1, top + 0.3, OFFICE.z0 + fd / 2);
-  scene.add(front, right);
-  scene.add(box(railLen, 0.04, 0.06, mat(C.rail), OFFICE.x0 + 2 + railLen / 2, top + 0.56, OFFICE.z1, false));
+  scene.add(right);
   scene.add(box(0.06, 0.04, fd, mat(C.rail), OFFICE.x1, top + 0.56, OFFICE.z0 + fd / 2, false));
-  for (let x = OFFICE.x0 + 2; x <= OFFICE.x1; x += 1) scene.add(box(0.06, 0.58, 0.06, mat(C.rail), x, top + 0.29, OFFICE.z1));
   for (let z = OFFICE.z0; z <= OFFICE.z1; z += 1) scene.add(box(0.06, 0.58, 0.06, mat(C.rail), OFFICE.x1, top + 0.29, z));
 
   // desks and chairs: rebuilt to match the team size (setDesks)
@@ -634,6 +773,7 @@ export const buildOffice = (scene) => {
     return deskSeats;
   };
 
+  addRooms(scene, top);
   addDecor(scene, top, animated);
 
   // server corner + floating crystal
@@ -692,7 +832,7 @@ export const buildOffice = (scene) => {
     scene.add(c);
   }
   const cooler = makeCooler();
-  cooler.position.set(OFFICE.x0 + 0.35, top, 14.5);
+  cooler.position.set(11.55, top, 15.45);
   scene.add(cooler);
 
   // lamps (only a few cast real light to stay fast)
@@ -704,7 +844,7 @@ export const buildOffice = (scene) => {
     });
 
   // planters and bushes outside the railing
-  [[9, 1], [12.5, 2], [16, 3], [19.5, 4]].forEach(([x, k]) => {
+  [[8.5, 1], [11.2, 2], [17, 3], [20.5, 4]].forEach(([x, k]) => {
     const p = makePlanter(40 + k);
     p.position.set(x, 0, OFFICE.z1 + 0.35);
     scene.add(p);

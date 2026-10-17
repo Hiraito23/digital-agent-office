@@ -1,15 +1,15 @@
 // Scene, camera, agents and their movement for the 3D office.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { buildOffice, WANDER, PORTAL, CENTER, ACTIVITY_SPOTS } from "./office3d.js";
+import { buildOffice, WANDER, PORTAL, CENTER, ACTIVITY_SPOTS, ROOMS } from "./office3d.js";
 import { createPerson, animatePerson, PRESETS } from "./people3d.js";
 
-const corridorFor = (z) => (z < 12.4 ? 11.1 : 15.2);
+const corridorFor = (z) => (z < 12.4 ? 11.1 : 14.3);
 const AISLE_LEFT = 7;
 const AISLE_RIGHT = 21.6;
 
-// Detour around the desk rows using two corridors and the side aisles.
-const planRoute = (from, to) => {
+// Work-area route: detour around the desk rows using two corridors and the side aisles.
+const corridorRoute = (from, to) => {
   const route = [];
   const c1 = corridorFor(from.z);
   const c2 = corridorFor(to.z);
@@ -19,6 +19,20 @@ const planRoute = (from, to) => {
     route.push({ x: side, z: c1 }, { x: side, z: c2 });
   }
   route.push({ x: to.x, z: c2 }, { x: to.x, z: to.z });
+  return route;
+};
+
+const doorOf = (roomId) => ROOMS.find((r) => r.id === roomId)?.door ?? null;
+
+// Full route between two points, leaving/entering rooms through their doors.
+const planRoute = (from, to, fromRoom = null, toRoom = null) => {
+  if (fromRoom && fromRoom === toRoom) return [{ x: to.x, z: to.z }];
+  const exit = doorOf(fromRoom);
+  const entry = doorOf(toRoom);
+  const route = exit ? [exit.inside, exit.outside] : [];
+  const start = exit ? exit.outside : from;
+  route.push(...corridorRoute(start, entry ? entry.outside : to));
+  if (entry) route.push(entry.inside, { x: to.x, z: to.z });
   return route;
 };
 
@@ -166,6 +180,8 @@ export class World {
 
   leaveSpot(a) {
     a.spot = null;
+    a.leavingRoom = a.room;
+    a.room = null;
     if (a.mode === "activity" || a.mode === "toSpot") a.mode = "idle";
   }
 
@@ -181,7 +197,7 @@ export class World {
     a.lastActive = performance.now();
     if (status === "working" && a.seat && a.mode !== "sitting") {
       this.leaveSpot(a); // drop the sofa/arcade/coffee and go to work
-      a.route = planRoute(a, a.seat);
+      a.route = planRoute(a, a.seat, a.leavingRoom);
       a.mode = "toSeat";
     }
     if (status !== "working" && a.mode === "sitting") {
@@ -208,6 +224,7 @@ export class World {
           if (!a.route.length && a.mode === "toSeat") a.mode = "sitting";
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
           if (!a.route.length && a.mode === "toSpot") {
+            a.room = a.spot.room ?? null;
             a.mode = "activity";
             a.activityEnd = now + 9000 + Math.random() * 9000;
           }
@@ -219,16 +236,19 @@ export class World {
         }
       } else if (a.mode === "activity" && now > a.activityEnd) {
         // done with the sofa/arcade/...: step away and idle again
+        const exit = doorOf(a.room);
+        const out = exit ? exit.outside : { x: a.x, z: corridorFor(a.z) };
+        a.route = planRoute(a, { x: out.x, z: corridorFor(out.z) }, a.room);
         a.spot = null;
+        a.room = null;
         a.mode = "wander";
-        a.route = planRoute(a, { x: a.x + (a.x < 12 ? 1 : -1) * 0.8, z: a.z < 12.4 ? 11.1 : 15.2 });
         a.nextWander = now + 3000 + Math.random() * 4000;
       } else if (a.mode === "idle" && now > a.nextWander) {
         const spots = this.freeSpots();
         const wantsActivity = spots.length && Math.random() < (a.isMain ? 0.3 : 0.6);
         if (wantsActivity) {
           a.spot = spots[Math.floor(Math.random() * spots.length)];
-          a.route = planRoute(a, a.spot);
+          a.route = planRoute(a, a.spot, null, a.spot.room);
           a.mode = "toSpot";
         } else if (a.isMain) {
           const ang = Math.random() * Math.PI * 2;

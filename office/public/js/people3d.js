@@ -424,6 +424,15 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false) => {
     arms[1].rotation.x = -1.15 - type;
     head.rotation.x = 0.08;
     blob.visible = false;
+  } else if (mode === "meeting") {
+    // seated at the meeting table, hands on the table, nodding along
+    body.position.y = 0.1;
+    legs.forEach((l) => { l.rotation.x = -1.45; });
+    arms[0].rotation.x = -0.95;
+    arms[1].rotation.x = -0.95 + Math.max(0, Math.sin(k * 1.3)) * 0.4;
+    head.rotation.x = Math.sin(k * 2.5) * 0.06;
+    head.rotation.y = Math.sin(k * 0.6) * 0.3;
+    blob.visible = false;
   } else if (mode === "lounge" || mode === "beanbag") {
     // relaxed on the sofa / bean bag
     body.position.y = mode === "beanbag" ? -0.1 : 0.02;
