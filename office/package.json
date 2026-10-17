@@ -1,0 +1,13 @@
+{
+  "name": "kantor-hermes-office",
+  "private": true,
+  "description": "Pixel-art office for Hermes agents + Hermes gateway adapter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "three": "0.185.1",
+    "ws": "8.19.0"
+  }
+}

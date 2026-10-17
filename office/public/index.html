@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Digital Office</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Silkscreen&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="tags"></div>
+
+  <header class="hud top">
+    <div class="title">AGENTIC DIGITAL OFFICE</div>
+    <div id="roster" class="roster"></div>
+    <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
+    <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
+    <button id="voice-toggle" class="chip music" title="Agen membacakan balasan">🔊 Suara</button>
+    <button id="music-toggle" class="chip music" title="Jukebox">♪ Musik</button>
+    <div id="conn" class="conn off">● Terputus</div>
+  </header>
+
+  <aside id="agents" class="hud agents hidden">
+    <div class="chat-head">
+      <div class="agents-tabs">
+        <button data-tab="team" class="active">Tim</button>
+        <button data-tab="soul">Soul</button>
+      </div>
+      <button id="agents-close" title="Tutup">✕</button>
+    </div>
+    <div id="agents-status" class="agents-status"></div>
+    <div id="agents-body" class="agents-body"></div>
+  </aside>
+
+  <aside id="jukebox" class="hud jukebox hidden">
+    <div class="jb-head">
+      <span class="jb-title">♪ JUKEBOX</span>
+      <button id="jb-close" title="Sembunyikan">–</button>
+    </div>
+    <div class="jb-track">Title / Asuka City — Digimon World 3 OST</div>
+    <div class="jb-controls">
+      <button id="jb-play">▶ Putar</button>
+      <button id="jb-next" title="Lagu berikutnya">⏭</button>
+      <input id="jb-volume" type="range" min="0" max="100" value="40" aria-label="Volume" />
+    </div>
+  </aside>
+
+  <section class="hud bottom">
+    <div class="panel activity">
+      <h2>AKTIVITAS TERBARU</h2>
+      <ol id="activity"><li class="muted">Belum ada aktivitas.</li></ol>
+    </div>
+    <div class="panel approvals">
+      <h2>PERSETUJUAN</h2>
+      <p id="approvals" class="muted">Tidak ada yang menunggu Anda</p>
+    </div>
+  </section>
+
+  <aside id="chat" class="hud chat hidden">
+    <div class="chat-head">
+      <div>
+        <div id="chat-name" class="chat-name">Hermes</div>
+        <div id="chat-role" class="chat-role">Orchestrator</div>
+      </div>
+      <div class="chat-actions">
+        <button id="voice-test" title="Tes suara">🔊 Tes</button>
+        <button id="chat-close" title="Tutup">✕</button>
+      </div>
+    </div>
+    <div id="chat-log" class="chat-log"></div>
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" rows="2" placeholder="Tulis tugas atau pesan…"></textarea>
+      <button type="submit">Kirim</button>
+    </form>
+  </aside>
+
+  <div class="hint">seret: putar · klik kanan + seret: geser · scroll: zoom · klik karakter: chat</div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+{
+  "hermes": {
+    "hair": "short",
+    "outfit": "blazer",
+    "hairColor": "#4a2c1a",
+    "skin": "#f5c9a0",
+    "top": "#1c7ed6",
+    "shirt": "#ffd43b",
+    "tie": "#ffd43b",
+    "pants": "#343a40",
+    "shoes": "#212529",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "female",
+      "prefer": [],
+      "pitch": 1,
+      "rate": 1
+    }
+  },
+  "haruto-frontend": {
+    "hair": "spiky",
+    "outfit": "hoodie",
+    "accessory": "headset",
+    "hairColor": "#1e1e24",
+    "skin": "#c68b5e",
+    "top": "#228be6",
+    "pants": "#343a40",
+    "shoes": "#f8f9fa",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "pitch": 1.05,
+      "rate": 1.1
+    }
+  },
+  "kenji-backend": {
+    "hair": "short",
+    "outfit": "shirt",
+    "accessory": "glasses",
+    "hairColor": "#2b1a12",
+    "skin": "#a9714b",
+    "top": "#495057",
+    "shirt": "#dee2e6",
+    "pants": "#1c3d5a",
+    "shoes": "#212529",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "pitch": 0.85,
+      "rate": 0.95
+    }
+  },
+  "sakura-uiux": {
+    "hair": "bun",
+    "outfit": "shirt",
+    "hairColor": "#7a3e1d",
+    "skin": "#ffd8b8",
+    "top": "#be4bdb",
+    "shirt": "#fff0f6",
+    "pants": "#2b2f3a",
+    "shoes": "#5c2b2b",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "female",
+      "pitch": 1.2,
+      "rate": 1
+    }
+  },
+  "yui-pm": {
+    "hair": "long",
+    "outfit": "blazer",
+    "hairColor": "#3b2416",
+    "skin": "#e8b48a",
+    "top": "#e64980",
+    "shirt": "#ffffff",
+    "tie": "#a61e4d",
+    "pants": "#2b2f3a",
+    "shoes": "#5c2b2b",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "female",
+      "pitch": 1,
+      "rate": 0.95
+    }
+  },
+  "takumi-qa": {
+    "hair": "short",
+    "outfit": "shirt",
+    "accessory": "glasses",
+    "hairColor": "#5c3a21",
+    "skin": "#f1c7a3",
+    "top": "#2f9e44",
+    "shirt": "#ebfbee",
+    "pants": "#495057",
+    "shoes": "#2b2b2b",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "pitch": 1,
+      "rate": 1
+    }
+  },
+  "akane-security": {
+    "hair": "ponytail",
+    "outfit": "hoodie",
+    "accessory": "headset",
+    "hairColor": "#1e1e24",
+    "skin": "#d9a27a",
+    "top": "#212529",
+    "pants": "#212529",
+    "shoes": "#c92a2a",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "female",
+      "pitch": 0.9,
+      "rate": 1.05
+    }
+  },
+  "daichi-infra": {
+    "hair": "short",
+    "outfit": "blazer",
+    "hairColor": "#868e96",
+    "skin": "#c68b5e",
+    "top": "#1c3d5a",
+    "shirt": "#e7f5ff",
+    "tie": "#fab005",
+    "pants": "#212529",
+    "shoes": "#111111",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "pitch": 0.8,
+      "rate": 0.9
+    }
+  }
+}

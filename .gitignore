@@ -1,0 +1,11 @@
+# Secrets (API key, dashboard login)
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+*.tmp
+
+# Personal music files (copyrighted, not for redistribution) — see office/public/audio/README.md
+office/public/audio/*.mp3

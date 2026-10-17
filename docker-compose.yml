@@ -1,0 +1,53 @@
+# Agentic Digital Office: Hermes Agent (API + dashboard) dan kantor 3D.
+# Semua port hanya dibuka di 127.0.0.1 (komputer ini saja).
+# Rahasia (API_SERVER_KEY, login dashboard) ada di file .env di folder ini.
+name: digital-agent-office
+
+services:
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    ports:
+      - "127.0.0.1:8642:8642"   # API server
+      - "127.0.0.1:9119:9119"   # dashboard
+    volumes:
+      - hermes-data:/opt/data
+    environment:
+      - HERMES_DASHBOARD=1
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${DASH_USER}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${DASH_PASS}
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY=${API_SERVER_KEY}
+
+  office:
+    build: ./office
+    image: digital-agent-office/office:local
+    container_name: office
+    restart: unless-stopped
+    depends_on:
+      - hermes
+    ports:
+      - "127.0.0.1:3000:3000"   # kantor pixel (juga /office)
+    volumes:
+      - office-data:/data/.hermes                              # riwayat chat agen
+      - ./config:/data/config                                  # team.json + people.json (diedit dari panel ⚙ Agen)
+    # Tampilan kantor (office/public) ada di dalam image: setelah mengubahnya,
+    # jalankan `docker compose up -d --build office`.
+    environment:
+      - HERMES_API_URL=http://hermes:8642
+      - HERMES_API_KEY=${API_SERVER_KEY}
+      - HERMES_ADAPTER_PORT=18789
+      - HERMES_MODEL=hermes-agent
+      - HERMES_AGENT_NAME=Hermes
+      - TEAM_FILE=/data/config/team.json
+      - PEOPLE_FILE=/data/config/people.json
+      - HERMES_DASHBOARD_URL=http://hermes:9119                # SOUL.md lewat API dashboard resmi
+      - DASH_USER=${DASH_USER}
+      - DASH_PASS=${DASH_PASS}
+
+volumes:
+  hermes-data:
+  office-data:
