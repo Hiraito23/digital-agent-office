@@ -13,20 +13,31 @@ Agentic Digital Office adalah tim agen AI (dipimpin orkestrator Hermes, anggotan
 | Volume `kantor-hermes_hermes-data` | Konfigurasi, API key, memori, skill Hermes | (di dalam Docker) |
 | Volume `kantor-hermes_office-data` | Riwayat chat tiap agen di kantor | (di dalam Docker) |
 
-Status per hari ini: semua komponen jalan dan terhubung. Agen belum bisa menjawab sampai API key model diisi lewat `hermes setup` (lihat langkah 6 di bagian instalasi).
+Status per hari ini: semua komponen jalan dan terhubung. Agen belum bisa menjawab sampai API key model diisi lewat `hermes setup` (lihat langkah 8 di bagian instalasi).
 
-## Instalasi dari awal
+## Instalasi dari awal (laptop/PC baru)
 
-Yang dibutuhkan hanya Windows 10/11 dengan WSL2 dan Docker Desktop. Hermes dan kantor berjalan di dalam container, jadi tidak perlu memasang Hermes atau Node.js di Ubuntu.
+Yang dibutuhkan: Windows 10/11 dengan WSL2, Docker Desktop, Git, koneksi internet, dan ruang disk kosong sekitar 8 GB (image Hermes sekitar 4,5 GB). Hermes dan kantor berjalan di dalam container, jadi tidak perlu memasang Hermes atau Node.js.
 
 1. **Pasang WSL2.** Buka PowerShell sebagai administrator, jalankan `wsl --install`, lalu restart komputer.
-2. **Pasang Docker Desktop** dari docker.com. Di Settings → General, pastikan "Use the WSL 2 based engine" aktif. Biarkan Docker Desktop menyala setiap kali ingin memakai kantor.
-3. **Siapkan folder proyek** `D:\Coding\kantor-hermes` berisi `docker-compose.yml`, `README.md`, folder `config/` (`team.json`, `people.json`), dan folder `office/` (lihat bagian Struktur file).
-4. **Buat file `.env`** di folder itu dengan tiga baris: `API_SERVER_KEY` (kunci acak minimal 32 karakter), `DASH_USER=admin`, dan `DASH_PASS` (password dashboard). File ini rahasia dan tidak boleh dibagikan.
-5. **Nyalakan semuanya.** Buka PowerShell di folder proyek, jalankan `docker compose up -d --build`. Build pertama butuh beberapa menit karena mengunduh image Hermes.
-6. **Isi API key model (wajib, sekali saja).** Jalankan `docker exec -it hermes hermes setup`, pilih provider (mis. OpenRouter, Anthropic, atau Nous Portal), lalu tempel API key Anda. Setelah itu jalankan `docker compose restart`.
-7. **Buka kantor** di http://localhost:3000/office dan **dashboard Hermes** di http://127.0.0.1:9119 (login `admin` + `DASH_PASS`).
-8. **Uji.** Klik karakter Hermes, kirim pesan "Halo, perkenalkan timmu". Kalau masih muncul "Provider authentication failed", ulangi langkah 6.
+2. **Pasang Docker Desktop** dari docker.com. Di Settings → General, pastikan "Use the WSL 2 based engine" aktif, lalu biarkan Docker Desktop menyala.
+3. **Pasang Git for Windows** dari git-scm.com (pilihan bawaan sudah cukup).
+4. **Ambil proyeknya.** Buka PowerShell di folder tempat menyimpan proyek (misalnya `D:\Coding`), lalu jalankan `git clone https://github.com/Hiraito23/digital-agent-office.git` dan `cd digital-agent-office`.
+5. **Buat file `.env`** dari contohnya dengan `copy .env.example .env`, lalu buka `.env` di Notepad dan isi:
+    - `API_SERVER_KEY`: kunci acak. Buat di PowerShell dengan `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`, lalu tempel hasilnya.
+    - `DASH_USER`: biarkan `admin`.
+    - `DASH_PASS`: password dashboard pilihan Anda (juga dipakai panel ⚙ Agen untuk menyimpan SOUL.md).
+
+    File ini rahasia dan tidak ikut ke GitHub.
+6. **(Opsional) Salin musik.** File MP3 tidak ada di GitHub. Kalau ingin ada musik, salin `asuka-city.mp3` dan `littleroot-town.mp3` ke `office\public\audio\` sebelum langkah 7 (untuk lagu lain lihat `office/public/audio/README.md`). Tanpa ini kantor tetap jalan, hanya tanpa musik.
+7. **Nyalakan.** Di folder proyek jalankan `docker compose up -d --build`. Pertama kali butuh beberapa menit karena mengunduh image Hermes.
+8. **Isi API key model (wajib, sekali per komputer).** Jalankan `docker exec -it hermes hermes setup`, pilih provider (mis. OpenRouter, Anthropic, atau Nous Portal), lalu tempel API key Anda. Setelah selesai jalankan `docker compose restart`.
+9. **Buka kantor** di http://localhost:3000 (sebaiknya di Microsoft Edge agar suara Indonesia tersedia) dan **dashboard Hermes** di http://127.0.0.1:9119 (login `admin` + `DASH_PASS`).
+10. **Uji.** Klik karakter Hermes dan kirim "Halo, perkenalkan timmu". Kalau muncul "Provider authentication failed", ulangi langkah 8.
+
+Data yang ikut dari GitHub: tim agen beserta tampilan dan suaranya (`config/team.json`, `config/people.json`). Yang **tidak** ikut dan dibuat ulang di tiap komputer: `.env`, API key model, SOUL.md, memori, dan riwayat chat (semuanya tersimpan di volume Docker komputer itu).
+
+Mengambil pembaruan terbaru: `git pull`, lalu `docker compose up -d --build`.
 
 ### Perintah harian
 
@@ -37,7 +48,8 @@ Yang dibutuhkan hanya Windows 10/11 dengan WSL2 dan Docker Desktop. Hermes dan k
 | Melihat log | `docker compose logs -f` |
 | Setelah mengganti API key | `docker compose restart` |
 | Menambah, mengubah, menghapus agen | panel **⚙ Agen** di kantor (langsung berlaku) |
-| Setelah mengubah apa pun di `office/` (tampilan, `server.js`, adapter) | `docker compose up -d --build office`, lalu refresh browser |
+| Setelah mengubah apa pun di `office/` (tampilan, server, adapter) | `docker compose up -d --build office`, lalu refresh browser |
+| Mengambil pembaruan dari GitHub | `git pull`, lalu `docker compose up -d --build` |
 
 Kedua container memakai `restart: unless-stopped`, jadi ikut menyala sendiri setiap kali Docker Desktop berjalan.
 
@@ -271,7 +283,7 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Agen baru tidak muncul | Halaman belum menerima pembaruan | Refresh browser; kalau team.json diedit manual, `docker compose restart office` |
 | Simpan SOUL.md gagal | Login dashboard salah atau container hermes mati | Cek `DASH_USER`/`DASH_PASS` di `.env`, lalu `docker compose up -d` |
 | Tampilan lama setelah edit | Image belum di-build ulang, atau cache browser | `docker compose up -d --build office`, lalu Ctrl+F5 |
-| Musik tidak bunyi | Browser butuh interaksi pertama | Klik di mana saja di kantor, atau ♪ Musik → ▶ Putar |
+| Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |
 | Perintah `hermes` tidak dikenal di PowerShell | Hermes ada di dalam container | Pakai `docker exec -it hermes hermes ...` |
 

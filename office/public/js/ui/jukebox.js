@@ -171,6 +171,10 @@ export const initJukebox = () => {
   audio.addEventListener("ended", onEnded);
   audio.addEventListener("timeupdate", renderTime);
   audio.addEventListener("loadedmetadata", renderTime);
+  // MP3s are not in git: tell the user where to put them instead of staying silent.
+  audio.addEventListener("error", () => {
+    el.track.textContent = `File ${PLAYLIST[state.track].src.replace("/audio/", "")} belum ada di office/public/audio (lihat README di folder itu)`;
+  });
 
   // ♪ Musik shows/hides the panel; the music keeps playing either way.
   el.toggle.addEventListener("click", () => el.panel.classList.toggle("hidden"));
