@@ -18,11 +18,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 #tags { position: fixed; inset: 0; pointer-events: none; }
 .tag {
   position: absolute; transform: translate(-50%, -100%);
-  font-family: "Silkscreen", var(--pixel); font-size: 11px; line-height: 1;
-  padding: 3px 6px 2px; background: var(--ink); color: #fff; border: 2px solid #fff;
+  font-family: "Silkscreen", var(--pixel); font-size: 11px; line-height: 1; text-align: center;
+  padding: 3px 7px 3px; background: var(--ink); color: #fff; border: 2px solid #fff;
   white-space: nowrap; box-shadow: 2px 2px 0 rgba(0,0,0,.35);
 }
-.tag .role { color: var(--blue); margin-left: 4px; }
+/* name on the first line, job title below it */
+.tag .name { display: block; }
+.tag .role { display: block; margin-top: 2px; font-family: var(--pixel); font-size: 10px; color: var(--blue); }
+.tag .role:empty { display: none; }
 .tag.main { border-color: var(--accent); }
 .bubble {
   position: absolute; transform: translate(-50%, -100%); max-width: 240px;
@@ -115,7 +118,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .agent-form code { color: var(--text); }
 .tag.speaking { border-color: var(--accent); }
-.tag.speaking::after { content: " ♪"; color: var(--accent); }
+.tag.speaking .name::after { content: " ♪"; color: var(--accent); }
 
 .chip.music.playing { border-color: var(--accent); color: var(--accent); }
 

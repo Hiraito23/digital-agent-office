@@ -4,6 +4,7 @@
 // has said something recently, a bubble above it.
 
 const BUBBLE_MAX_CHARS = 110;
+const TAG_HEIGHT = 30; // px: name line + job title line + padding
 
 // Speech bubbles show plain text: drop code blocks and markdown symbols.
 const toBubbleText = (text) => {
@@ -30,7 +31,8 @@ export class NameTags {
     for (const { agent, x, y } of tags) {
       seen.add(agent.id);
       const node = this.nodeFor(agent);
-      const label = `${agent.activityIcon ? `${agent.activityIcon} ` : ""}${agent.name}<span class="role">${agent.role || ""}</span>`;
+      const icon = agent.activityIcon ? `${agent.activityIcon} ` : "";
+      const label = `<span class="name">${icon}${agent.name}</span><span class="role">${agent.role || ""}</span>`;
       if (node.tag.innerHTML !== label) node.tag.innerHTML = label;
       node.tag.classList.toggle("speaking", Boolean(agent.speaking));
       const top = y - 4;
@@ -42,7 +44,7 @@ export class NameTags {
         if (node.bubble.textContent !== bubble.text) node.bubble.textContent = bubble.text;
         node.bubble.style.display = "block";
         node.bubble.style.left = `${x}px`;
-        node.bubble.style.top = `${top - 26}px`;
+        node.bubble.style.top = `${top - TAG_HEIGHT - 8}px`; // above the two-line tag
       } else {
         node.bubble.style.display = "none";
       }
