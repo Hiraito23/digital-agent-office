@@ -167,6 +167,10 @@ Server API Hermes **mengabaikan tool yang dikirim klien** bersama permintaan cha
 - `server/hermes-setup.js`: mendaftarkan server itu ke Hermes lewat API dashboard (`POST /api/mcp/servers`, nama `office-team`, URL `http://office:3000/mcp`, bearer = API key) saat kantor menyala dan memeriksanya tiap 5 menit, jadi clone baru atau Hermes yang dibuat ulang tidak butuh langkah manual. Cek dengan `docker exec hermes hermes mcp list`.
 - `ORCHESTRATOR_SYSTEM_PROMPT` dan `teamContext()` di adapter menyuruh Hermes memakai `team_delegate` (bukan `delegate_task` bawaan) dan melarangnya mengaku sudah mendelegasikan tanpa memanggil tool. Adapter tidak lagi mengirim `tools` ke Hermes. Balasan Hermes yang berisi paragraf sela identik berurutan dirapikan (`dedupeParagraphs`).
 
+**Jalan pintas deterministik.** Model yang lemah kadang tetap tidak memanggil `team_delegate`. Karena itu `chat.send` ke Hermes lebih dulu menjalankan `detectDelegation()` di adapter: pesan berbentuk perintah ("suruh|minta|perintahkan|tugaskan|panggil" + satu atau lebih nama agen + tugas) diteruskan langsung lewat `delegationShortcut()` ke `execDelegateTask` untuk tiap agen (paralel), dan hasilnya dilaporkan di chat Hermes serta disimpan di riwayatnya seperti giliran biasa. Pesan lain tetap ke model Hermes.
+
+**Verifikasi file.** Model yang lemah juga sering menulis "menyimpan ke docs/x.md" tanpa memanggil `write_file`. `expectedFiles()` menemukan nama file di permintaan (hanya bila ada kata simpan/buat/tulis, dan nama polos seperti `react.js` hanya dihitung bila konteksnya menyuruh menyimpan), `ensureFilesSaved()` memeriksa keberadaannya di `/workspace` (yang terlihat baca-saja oleh kantor), menyuruh agen satu kali lagi untuk benar-benar menyimpannya, dan menambahkan peringatan bila tetap tidak ada. Dipakai di `execDelegateTask` (delegasi) dan di chat biasa dengan agen non-orkestrator.
+
 Batasan: model gratis kadang tetap tidak memanggil tool; model yang lebih kuat lebih andal.
 
 ## Fakta Wikipedia dan obrolan di tab Kantor

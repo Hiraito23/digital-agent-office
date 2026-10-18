@@ -787,7 +787,7 @@ async function execDelegateTask(args) {
     }, null, hermesEventForwarder(targetId, sessionKey));
     recordUsage(targetId, result);
     clearApprovalsFor(sessionKey);
-    responseText = result.textContent;
+    responseText = await ensureFilesSaved({ agentId: targetId, baseMessages: messages, userMessage: message, replyText: result.textContent, model, sessionKey });
 
     // Persist to sub-agent history (the summary points at this reply by its time)
     const replyAt = Date.now();
@@ -813,6 +813,93 @@ async function execDelegateTask(args) {
   }
 
   return JSON.stringify({ ok: true, agent_id: targetId, response: responseText });
+}
+
+// A weak model often says "Menyimpan ke docs/x.md..." and pastes the content in the chat without ever
+// calling the file tool. When a request names files to save, the office checks that they exist in
+// the project folder (it can see /workspace read-only); if not, the agent is told once to really
+// save them, and the reply carries a warning if it still did not.
+const FILE_TOKEN = /(?:^|[\s"'`(])((?:[\w.-]+\/)*[\w.-]+\.(?:md|html?|json|txt|css|jsx?|tsx?|svg|py|csv|ya?ml|sql|sh))(?=$|[\s"'`),.;:!?])/gi;
+
+function expectedFiles(userMessage) {
+  if (!/(simpan|simpen|buat(?:kan)?|bikin|tulis|save|create|write|hasilkan)/i.test(userMessage)) return [];
+  const base = activeProject?.path || "/workspace/hasil-agen";
+  const out = new Set();
+  const text = String(userMessage);
+  for (const m of text.matchAll(FILE_TOKEN)) {
+    const token = m[1];
+    if (token.includes("..") || /^(?:node|react|next|vue|express|three|chart|d3|jquery)\.js$/i.test(token)) continue;
+    // a bare name ("react.js", "app.ts") only counts when the text says to save/write it
+    if (!token.includes("/") && !/(file|berkas|simpan|simpen|save|tulis|write|bernama|named)\W*(?:\w+\W+){0,3}$/i.test(text.slice(Math.max(0, m.index - 40), m.index + 1))) continue;
+    if (token.startsWith("/")) { if (token.startsWith("/workspace/")) out.add(token); } else out.add(`${base}/${token.replace(/^\.\//, "")}`);
+  }
+  return [...out];
+}
+
+// baseMessages: the messages the agent got (system, history, the user's request). Returns the reply, extended.
+async function ensureFilesSaved({ agentId, baseMessages, userMessage, replyText, model, sessionKey }) {
+  const missing = () => expectedFiles(userMessage).filter((f) => !fs.existsSync(f));
+  let gone = missing();
+  if (!gone.length) return replyText;
+  const reminder = `Sistem: file berikut BELUM ada di disk, jadi kamu belum benar-benar menyimpannya (menulis isi file di jawaban tidak menyimpan apa pun):\n${gone.map((f) => `- ${f}`).join("\n")}\nSimpan sekarang dengan tool write_file (atau perintah terminal) ke path lengkap di atas, lalu konfirmasi path-nya dengan satu kalimat. Jangan menulis ulang isi file di jawaban.`;
+  let extra = "";
+  try {
+    const retry = await streamOneTurn([...baseMessages, { role: "assistant", content: replyText }, { role: "user", content: reminder }],
+      model, [], null, null, hermesEventForwarder(agentId, sessionKey));
+    recordUsage(agentId, retry);
+    extra = String(retry.textContent || "").trim();
+  } catch { /* the warning below says it */ }
+  gone = missing();
+  const warning = gone.length ? `\n\n⚠ File ini belum tersimpan di folder proyek: ${gone.join(", ")}. Minta agennya menyimpan ulang atau salin isinya dari chat.` : "";
+  return `${replyText}${extra ? `\n\n${extra}` : ""}${warning}`;
+}
+
+// "Suruh Sakura ...", "minta Haruto dan Kenji untuk ...": a clear order to named agents is handed
+// to them by the office itself, so it does not depend on the (often weak) orchestrator model
+// calling team_delegate, which it sometimes skips while claiming it did. Returns null for
+// everything else, which goes to Hermes as usual.
+function detectDelegation(text) {
+  const members = [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID);
+  if (!members.length) return null;
+  const order = /^\s*(?:tolong\s+)?(?:suruh(?:lah)?|minta(?:lah)?|perintahkan|tugaskan|beri(?:kan)?\s+tugas\s+(?:ke|kepada)|kasih\s+tugas\s+(?:ke|kepada)|panggil)\s+([\s\S]+)$/i.exec(text);
+  if (!order) return null;
+  let rest = order[1];
+  const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const names = members.map((a) => a.name).sort((x, y) => y.length - x.length).map(escape).join("|");
+  const lead = new RegExp(`^(?:si\\s+)?@?(${names})(?![\\p{L}\\d])\\s*(?:,|&|dan|serta|sama)?\\s*`, "iu");
+  const found = [];
+  for (;;) {
+    const hit = lead.exec(rest);
+    if (!hit) break;
+    const agent = members.find((a) => a.name.toLowerCase() === hit[1].toLowerCase());
+    if (agent && !found.includes(agent)) found.push(agent);
+    rest = rest.slice(hit[0].length);
+  }
+  rest = rest.replace(/^(?:(?:untuk|agar|supaya|kepada|ke)\s+|[:-]\s*)/i, "").trim();
+  if (!found.length || rest.length < 3) return null;
+  return { agents: found, message: `${rest}\n\n(Permintaan asli pengguna lewat Hermes: "${text.slice(0, 500)}")` };
+}
+
+// Runs such an order: every named agent works on it (visible in the office), then the replies are
+// reported in Hermes' chat. Saved in Hermes' history like a normal turn.
+async function delegationShortcut({ sessionKey, userMessage, plan, emitDelta }) {
+  const history = getHistory(sessionKey);
+  history.push({ role: "user", content: userMessage, at: Date.now() });
+  saveHistoryToDisk();
+  emitDelta(`Baik, saya suruh ${plan.agents.map((a) => a.name).join(", ")} mengerjakannya…`);
+  const results = await Promise.all(plan.agents.map(async (agent) => {
+    let out;
+    try { out = JSON.parse(await execDelegateTask({ agent_id: agent.id, message: plan.message })); } catch (err) { out = { ok: false, error: sanitizeErrorMessage(err) }; }
+    return { agent, out };
+  }));
+  const finalText = results
+    .map(({ agent, out }) => (out.ok ? `**${agent.name}** selesai:\n${out.response || "(jawaban kosong)"}` : `⚠ ${agent.name} gagal: ${out.error ?? "kesalahan tidak diketahui"}`))
+    .join("\n\n");
+  const replyAt = Date.now();
+  history.push({ role: "assistant", content: finalText, at: replyAt });
+  saveHistoryToDisk();
+  recordSummary({ agentId: AGENT_ID, task: userMessage, text: finalText, msgAt: replyAt });
+  return finalText;
 }
 
 function execListTeam() {
@@ -1179,11 +1266,26 @@ async function handleMethod(method, params, id, sendEvent) {
           // as the MCP server office-team (team-mcp.js), so nothing is sent here.
           const tools = [];
 
-          const finalText = await runAgenticLoop({
-            sessionKey, agentId: sessionAgentId, userMessage,
-            model, tools, emitDelta: onTextDelta,
-            abortCheck: () => aborted, sendEvent,
-          });
+          const plan = isOrchestrator ? detectDelegation(userMessage) : null;
+          let finalText = plan
+            ? await delegationShortcut({ sessionKey, userMessage, plan, emitDelta: onTextDelta })
+            : await runAgenticLoop({
+              sessionKey, agentId: sessionAgentId, userMessage,
+              model, tools, emitDelta: onTextDelta,
+              abortCheck: () => aborted, sendEvent,
+            });
+          // an agent that was asked to save files but did not: make it do so (or warn)
+          if (!plan && !isOrchestrator && !aborted && expectedFiles(userMessage).some((f) => !fs.existsSync(f))) {
+            const history = getHistory(sessionKey);
+            const systemMsg = agent?.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
+            const base = [...systemMsg, ...forModel(history).slice(-12, -1)];
+            const improved = await ensureFilesSaved({ agentId: sessionAgentId, baseMessages: base, userMessage, replyText: finalText, model, sessionKey });
+            if (improved !== finalText) {
+              finalText = improved;
+              const last = history[history.length - 1];
+              if (last?.role === "assistant") { last.content = improved; saveHistoryToDisk(); }
+            }
+          }
 
           if (aborted) {
             emitChat("aborted", {});
