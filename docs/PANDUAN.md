@@ -153,7 +153,7 @@ Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di 
 
 Agen bisa membaca dan menulis kode di proyek Anda. Folder `PROJECTS_DIR` di `.env` (misalnya `D:/Coding`) di-mount ke container Hermes sebagai `/workspace`.
 
-1. Pilih proyek di dropdown **📁 Proyek** di header kantor. Daftarnya berisi folder di `PROJECTS_DIR` beserta repo git satu tingkat di bawahnya (misalnya `Kalla/oase-tanjung`), lengkap dengan branch aktifnya.
+1. Pilih proyek di dropdown **📁 Proyek** di header kantor. Daftarnya hanya berisi repo git: folder di `PROJECTS_DIR` yang punya git, plus repo git satu tingkat di bawahnya (misalnya `Kalla/oase-tanjung`), lengkap dengan branch aktifnya. Folder tanpa git tidak muncul; untuk project baru, jalankan `git init` di foldernya dulu.
 2. Beri tugas ke Hermes atau langsung ke agen, misalnya "Tambahkan halaman daftar pelanggan sesuai struktur folder yang ada". Semua agen, termasuk yang didelegasikan Hermes, otomatis tahu folder proyeknya.
 3. Cek hasilnya di folder proyek dengan `git status`, `git log`, dan `git diff`.
 

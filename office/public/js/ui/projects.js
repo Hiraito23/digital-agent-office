@@ -1,9 +1,9 @@
-// 📁 Project picker in the header. Lists the folders the agents may work on
-// (PROJECTS_DIR from .env, mounted as /workspace) and sets the active one via
-// /api/projects/active. The adapter then gives every agent the project folder
-// and the git branch rules. The list refreshes whenever the picker is opened.
+// 📁 Project picker in the header. Lists the git repos the agents may work on
+// (inside PROJECTS_DIR from .env, mounted as /workspace) and sets the active
+// one via /api/projects/active. The adapter then gives every agent the project
+// folder and the git branch rules. The list refreshes whenever the picker is opened.
 
-const label = (p) => `📁 ${p.name}${p.git ? ` · ${p.branch}` : " · bukan git"}`;
+const label = (p) => `📁 ${p.name} · ${p.branch}`;
 
 export const initProjectPicker = ({ onChange }) => {
   const select = document.getElementById("project-select");

@@ -47,15 +47,18 @@ const subfolders = (dir) => {
   }
 };
 
-// Projects = top-level folders, plus git repos one level deeper (so a folder
-// that groups repos, like "Kalla/oase-tanjung", shows each repo).
+// Projects = git repos only: top-level folders that are repos, plus repos one
+// level deeper (so a folder that groups repos, like "Kalla/oase-tanjung",
+// shows each repo). Agents need git to work on their own branch.
 const listProjects = () => {
   const projects = [];
   for (const top of subfolders(WORKSPACE_DIR)) {
     const topDir = path.join(WORKSPACE_DIR, top);
     const info = gitInfo(topDir);
-    projects.push({ name: top, ...info });
-    if (info.git) continue;
+    if (info.git) {
+      projects.push({ name: top, ...info });
+      continue;
+    }
     for (const child of subfolders(topDir)) {
       const childInfo = gitInfo(path.join(topDir, child));
       if (childInfo.git) projects.push({ name: `${top}/${child}`, ...childInfo });
@@ -85,8 +88,11 @@ const createProjectsApi = ({ team }) => {
 
   return async (req, res, urlPath) => {
     if (urlPath === "/api/projects" && req.method === "GET") {
-      const active = readOffice().activeProject ?? null;
-      return send(res, 200, { root: WORKSPACE_DIR, active, projects: listProjects() });
+      const projects = listProjects();
+      const saved = readOffice().activeProject ?? null;
+      // A saved folder that is gone or no longer a git repo is not active.
+      const active = projects.some((p) => p.name === saved) ? saved : null;
+      return send(res, 200, { root: WORKSPACE_DIR, active, projects });
     }
     if (urlPath === "/api/projects/active" && req.method === "PUT") {
       const body = await readBody(req);
