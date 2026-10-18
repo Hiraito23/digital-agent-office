@@ -30,7 +30,7 @@ export class World {
     this.scene.fog = new THREE.Fog("#a8dcff", 50, 100);
 
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 200);
-    this.camera.position.set(CENTER.x + 19, 21, CENTER.z + 19);
+    this.camera.position.set(CENTER.x + 23, 27, CENTER.z + 23);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.target.set(CENTER.x, 0.4, CENTER.z + 0.5);
@@ -133,7 +133,7 @@ export class World {
 
   // One desk + chair per agent: Hermes first, then the team in a stable order.
   assignDesks(order) {
-    const seats = this.office.setDesks(order.length);
+    const seats = this.office.setDesks(order.map((id) => ({ id, name: this.agents.get(id).name })));
     order.forEach((id, i) => {
       const a = this.agents.get(id);
       const seat = seats[i] ?? null;
@@ -141,9 +141,18 @@ export class World {
       a.seat = seat;
       if (moved && (a.mode === "sitting" || a.mode === "toSeat")) {
         a.mode = "toSeat";
-        a.route = planRoute(a, seat);
+        a.route = this.seatRoute(a, null);
       }
     });
+  }
+
+  // Route to the agent's own desk. Private offices are entered through their
+  // door and then along the door column, so nobody walks through the desk.
+  seatRoute(a, fromRoom) {
+    const seat = a.seat;
+    const route = planRoute(a, seat, fromRoom, seat.room);
+    if (seat.viaX != null) route.splice(route.length - 1, 0, { x: seat.viaX, z: seat.z });
+    return route;
   }
 
   // Free activity spots (sofa, arcade, coffee, ...) that no agent is using or walking to.
@@ -166,11 +175,14 @@ export class World {
     for (const [id, place] of places) {
       const a = this.agents.get(id);
       if (!a || !place) continue;
-      const from = a.mode === "activity" ? a.room : null; // inside a room: leave through its door
+      // inside a room (an activity, or the desk in a private office): leave through its door
+      const fromDesk = a.mode === "sitting" && a.seat?.room;
+      const from = a.mode === "activity" ? a.room : fromDesk ? a.seat.room : null;
       a.spot = null;
       a.meeting = place;
       a.room = null;
       a.route = planRoute(a, place, from, MEETING.room);
+      if (fromDesk && a.seat.viaX != null) a.route.unshift({ x: a.seat.viaX, z: a.seat.z }); // step out from behind the desk
       a.mode = "toMeeting";
     }
   }
@@ -211,13 +223,20 @@ export class World {
     if (a.meeting) return; // stays in the meeting room until the meeting ends
     if (status === "working" && a.seat && a.mode !== "sitting") {
       this.leaveSpot(a); // drop the sofa/arcade/coffee and go to work
-      a.route = planRoute(a, a.seat, a.leavingRoom);
+      a.route = this.seatRoute(a, a.leavingRoom);
       a.mode = "toSeat";
     }
     if (status !== "working" && a.mode === "sitting") {
-      a.mode = "idle";
       a.nextWander = performance.now() + 2500;
-      a.route = [{ x: a.seat.x, z: a.seat.z + 0.6 }];
+      if (a.seat.room) {
+        // out of the private office into the corridor
+        const exit = doorOf(a.seat.room);
+        a.route = [{ x: a.seat.viaX ?? exit.inside.x, z: a.seat.z }, ...planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room)];
+        a.mode = "wander";
+      } else {
+        a.mode = "idle";
+        a.route = [{ x: a.seat.x, z: a.seat.z + 0.6 }];
+      }
     }
   }
 

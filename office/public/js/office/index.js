@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { addDecor } from "./decor.js";
 import { box, mat, rand } from "./helpers.js";
-import { DESK_SLOTS, GATE, N, OFFICE, PORTAL, isPath, seatOf } from "./layout.js";
+import { DESK_SLOTS, GATE, N, OFFICE, PORTAL, PRIVATE_OFFICES, isPath, seatOf } from "./layout.js";
 import { C, makeBush, makeCabinet, makeChair, makeCooler, makeDesk, makeLamp, makePine, makePlanter, makeRack, makeRoundTree } from "./props.js";
 import { addRooms } from "./rooms.js";
 import { floorTexture, groundTexture, outerGrassTexture, screenTexture, windowTexture } from "./textures.js";
@@ -80,27 +80,44 @@ export const buildOffice = (scene) => {
   const screenTex = screenTexture();
   const deskGroup = new THREE.Group();
   scene.add(deskGroup);
-  let deskCount = -1;
+  let deskKey = "";
   let deskSeats = [];
-  const setDesks = (count) => {
-    if (count === deskCount) return deskSeats;
-    deskCount = count;
-    deskGroup.clear();
-    const slots = DESK_SLOTS.slice(0, Math.min(count, DESK_SLOTS.length));
-    slots.forEach((slot, i) => {
-      const d = makeDesk(screenTex, i);
-      d.position.set(slot.x, top, slot.z);
-      deskGroup.add(d);
-      const seat = seatOf(slot);
-      const c = makeChair();
-      c.position.set(seat.x, top, seat.z);
-      deskGroup.add(c);
-    });
+  // people: [{ id, name }] in desk order (Hermes first). Private offices are
+  // filled first and their door sign shows the owner; the rest get open desks.
+  const setDesks = (people) => {
+    const key = people.map((p) => `${p.id}:${p.name}`).join("|");
+    if (key === deskKey) return deskSeats;
+    deskKey = key;
+    const slots = DESK_SLOTS.slice(0, Math.min(people.length, DESK_SLOTS.length));
+    PRIVATE_OFFICES.forEach((room, i) => rooms.setLabel(room.id, people[i] ? `RUANG ${people[i].name.toUpperCase()}` : `${room.name} (KOSONG)`));
     deskSeats = slots.map(seatOf);
     return deskSeats;
   };
+  // Every desk is furnished from the start: the private offices plus the open
+  // hot desks in the main hall (used when there are more agents than offices).
+  DESK_SLOTS.forEach((slot, i) => {
+    const d = makeDesk(screenTex, i);
+    d.position.set(slot.x, top, slot.z);
+    deskGroup.add(d);
+    const seat = seatOf(slot);
+    const c = makeChair();
+    c.position.set(seat.x, top, seat.z);
+    deskGroup.add(c);
+  });
 
-  addRooms(scene, top);
+  const rooms = addRooms(scene, top);
+
+  // furniture of the private offices: cabinet in the corner, a plant by the door
+  PRIVATE_OFFICES.forEach((room, i) => {
+    const back = room.door.outside.z > room.door.inside.z;
+    const cab = makeCabinet();
+    cab.position.set(room.x1 - 0.4, top, back ? room.z0 + 0.4 : room.z1 - 0.45);
+    scene.add(cab);
+    const plant = makePlanter(300 + i);
+    plant.scale.setScalar(0.7);
+    plant.position.set(room.x1 - 0.45, top, back ? room.z1 - 0.5 : room.z0 + 0.5);
+    scene.add(plant);
+  });
   addDecor(scene, top, animated);
 
   // server corner + floating crystal
@@ -163,7 +180,9 @@ export const buildOffice = (scene) => {
   scene.add(cooler);
 
   // lamps (only a few cast real light to stay fast)
-  [[23.6, 11, true], [12.7, 18.6, true], [4.6, 21.6, false], [11, 22.6, false], [16, 22.6, true], [21, 22.6, false], [27.6, 17, false], [27.6, 11, false], [27.6, 5, false]]
+  const outsideX = OFFICE.x1 + 3.6;
+  [[39.4, 18.4, true], [12.7, 18.6, true], [4.6, 21.6, false], [11, 22.6, false], [16, 22.6, true], [21, 22.6, false], [31, 22.6, false],
+    [outsideX, 17, false], [outsideX, 11, false], [outsideX, 5, false]]
     .forEach(([x, z, light]) => {
       const l = makeLamp(light);
       l.position.set(x, x < OFFICE.x1 && z < OFFICE.z1 && x > OFFICE.x0 ? top : 0, z);
@@ -171,7 +190,7 @@ export const buildOffice = (scene) => {
     });
 
   // planters and bushes outside the railing
-  [[8.5, 1], [11.2, 2], [17, 3], [20.5, 4]].forEach(([x, k]) => {
+  [[8.5, 1], [11.2, 2], [17, 3], [20.5, 4], [26, 5], [29.5, 6], [33, 7], [37, 8]].forEach(([x, k]) => {
     const p = makePlanter(40 + k);
     p.position.set(x, 0, OFFICE.z1 + 0.35);
     scene.add(p);
@@ -186,7 +205,7 @@ export const buildOffice = (scene) => {
   const r = rand(4242);
   for (let j = -4; j < N + 4; j += 1) {
     for (let i = -4; i < N + 4; i += 1) {
-      const nearOffice = i >= 2 && i <= 28 && j >= 1 && j <= 23;
+      const nearOffice = i >= OFFICE.x0 - 4 && i <= OFFICE.x1 + 4 && j >= OFFICE.z0 - 4 && j <= OFFICE.z1 + 4;
       if (nearOffice || isPath(i, j)) continue;
       if (r() > 0.3) continue;
       const kind = r();
@@ -197,7 +216,7 @@ export const buildOffice = (scene) => {
       scene.add(tree);
     }
   }
-  for (const [x, z] of [[4.2, 21], [25, 23.6], [28.6, 20], [2.4, 12], [28.6, 8], [13, 23.6]]) {
+  for (const [x, z] of [[4.2, 21], [25, 23.6], [OFFICE.x1 + 4.6, 20], [2.4, 12], [OFFICE.x1 + 4.6, 8], [13, 23.6], [35, 23.6]]) {
     const b = makeBush(x * 10 + z);
     b.position.set(x, 0, z);
     scene.add(b);

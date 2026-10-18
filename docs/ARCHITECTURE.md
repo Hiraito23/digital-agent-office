@@ -107,6 +107,7 @@ Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke propert
 | Ingin | Ubah |
 | --- | --- |
 | Menambah atau memindah ruangan | `ROOMS` di `office/layout.js` (bentuk, dinding, celah pintu, titik pintu, jenis lantai) |
+| Menambah ruang pribadi | `WING` di `office/layout.js` (lebar sayap / ukuran ruang); `PRIVATE_OFFICES` dibuat otomatis, meja pribadi mengisi `DESK_SLOTS` lebih dulu, papan nama lewat `setDesks()` di `office/index.js` |
 | Menambah properti yang bisa dipakai agen | Model di `office/decor.js`, titik di `ACTIVITY_SPOTS` (`office/layout.js`), pose baru di `characters/animation.js` |
 | Menambah kostum | Entri baru di `COSTUMES` (`characters/costumes.js`) + id-nya di daftar `COSTUMES` di `server/agents-api.js` |
 | Menambah gaya rambut | `addHair` di `characters/head.js` + pilihan di `ui/agents-panel.js` dan `server/agents-api.js` |

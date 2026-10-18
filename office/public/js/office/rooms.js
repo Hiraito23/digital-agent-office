@@ -6,7 +6,9 @@ import { ACTIVITY_SPOTS, ROOMS } from "./layout.js";
 import { makeChair } from "./props.js";
 import { signTexture } from "./textures.js";
 
+// Returns setLabel(roomId, text): the private offices show their owner's name.
 export const addRooms = (scene, top) => {
+  const signs = new Map(); // private office id -> sign material
   const glass = new THREE.MeshLambertMaterial({ color: "#cfe8ff", transparent: true, opacity: 0.28, depthWrite: false });
   const frame = mat("#46557f");
   const H = 1.25;
@@ -43,11 +45,20 @@ export const addRooms = (scene, top) => {
     if (room.door) {
       const wall = room.walls.find((w) => w.gaps?.length);
       const [g0, g1] = wall.gaps[0];
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), new THREE.MeshBasicMaterial({ map: signTexture(room.name), side: THREE.DoubleSide }));
+      // two single-sided faces sharing one material: readable from both sides, never mirrored
+      const signMat = new THREE.MeshBasicMaterial({ map: signTexture(room.name) });
+      const sign = new THREE.Group();
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), signMat);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.2), signMat);
+      front.position.z = 0.005;
+      back.position.z = -0.005;
+      back.rotation.y = Math.PI;
+      sign.add(front, back);
       const towardWork = room.door.outside.z > room.door.inside.z ? 1 : -1;
-      sign.position.set((g0 + g1) / 2, top + H + 0.42, wall.at + towardWork * 0.07);
+      sign.position.set(room.private ? room.x0 + 2 : (g0 + g1) / 2, top + H + 0.42, wall.at + towardWork * 0.07);
       if (towardWork < 0) sign.rotation.y = Math.PI;
       scene.add(sign);
+      if (room.private) signs.set(room.id, signMat);
     } else {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshBasicMaterial({ map: signTexture(room.name), transparent: true }));
       sign.rotation.x = -Math.PI / 2;
@@ -70,4 +81,16 @@ export const addRooms = (scene, top) => {
     chair.rotation.y = spot.heading === 0 ? Math.PI : 0; // backrest behind the sitter
     scene.add(chair);
   }
+
+  const labels = new Map();
+  return {
+    setLabel(roomId, text) {
+      const material = signs.get(roomId);
+      if (!material || labels.get(roomId) === text) return;
+      labels.set(roomId, text);
+      material.map?.dispose();
+      material.map = signTexture(text);
+      material.needsUpdate = true;
+    },
+  };
 };
