@@ -28,6 +28,7 @@ config/                 data agen (di-mount ke container office, bisa ditulis)
   team.json             daftar agen + persona (nama, peran, instruksi, batasan)
   people.json           tampilan + suara per agen (rambut, warna, kostum, voice)
   layout.json           posisi furnitur dari 🛠 Layout (belum ada = defaultLayout() di furniture.js)
+  skills/<nama>/SKILL.md  skill bawaan tim (di-mount ke Hermes di /opt/data/skills/tim; dimuat agen sesuai kebutuhan)
 docs/                   PANDUAN.md (pemakaian), ARCHITECTURE.md (dokumen ini)
 office/                 image Docker "office"
   Dockerfile, package.json

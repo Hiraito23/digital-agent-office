@@ -50,7 +50,7 @@ Yang dibutuhkan: Windows 10/11 dengan WSL2, Docker Desktop, Git, koneksi interne
 9. **Buka kantor** di http://localhost:3000 (sebaiknya di Microsoft Edge agar suara Indonesia tersedia) dan **dashboard Hermes** di http://127.0.0.1:9119 (login `admin` + `DASH_PASS`).
 10. **Uji.** Klik karakter Hermes dan kirim "Halo, perkenalkan timmu". Kalau muncul "Provider authentication failed", lihat bagian Pemecahan masalah.
 
-Data yang ikut dari GitHub: tim agen beserta tampilan dan suaranya (`config/team.json`, `config/people.json`). Yang **tidak** ikut dan dibuat ulang di tiap komputer: `.env`, API key model, SOUL.md, memori, dan riwayat chat (semuanya tersimpan di volume Docker komputer itu).
+Data yang ikut dari GitHub: tim agen beserta soul, tampilan, dan suaranya (`config/team.json`, `config/people.json`), skill tim (`config/skills/`), dan layout furnitur bila Anda sudah mengubahnya (`config/layout.json`). Yang **tidak** ikut dan dibuat ulang di tiap komputer: `.env`, API key model, SOUL.md, memori, dan riwayat chat (semuanya tersimpan di volume Docker komputer itu).
 
 Mengambil pembaruan terbaru: `git pull`, lalu `docker compose up -d --build`.
 
@@ -353,22 +353,31 @@ Buat folder berisi `SKILL.md` dengan bagian: frontmatter (`name`, `description`,
 
 Agen juga bisa membuat dan memperbaiki skill sendiri lewat tool `skill_manage`, misalnya setelah Anda bilang "simpan cara kerja tadi sebagai skill". Untuk mereview dulu sebelum disimpan, aktifkan `skills.write_approval: true` di `config.yaml`, lalu pakai `/skills pending`, `/skills approve <id>`, atau `/skills reject <id>`.
 
-### Skill yang disarankan per peran
+### Tim bawaan: soul dan skill per peran
 
-Cari dengan `hermes skills search <kata kunci>` lalu pilih yang paling cocok.
+Clone baru langsung berisi tim lengkap, tanpa membuat agen satu per satu. Yang ikut dari GitHub:
 
-| Agen | Peran | Kata kunci pencarian | Skill buatan sendiri yang berguna |
+- **Soul (persona)** tiap agen di `config/team.json`: misi peran, alur kerja bertahap, standar kualitas, kriteria "selesai", format serah-terima, dan gaya bicara. Tiap soul memuat prinsip kerja yang sama (baca dulu sebelum mengubah, langkah kecil, verifikasi sebelum menyatakan selesai, laporan jujur) ditambah detail khas perannya.
+- **Skill tim** di `config/skills/<nama>/SKILL.md`: detail panjang (template, checklist, struktur folder) yang dimuat agen hanya saat dibutuhkan, sehingga hemat token. `docker-compose.yml` memasangnya ke Hermes (`/opt/data/skills/tim`), jadi otomatis terpasang di setiap komputer tanpa perintah tambahan. Cek dengan `docker exec hermes hermes skills list` (kategori `tim`).
+
+| Agen | Peran | Skill bawaan (selain skill bersama) | Isi singkat |
 | --- | --- | --- | --- |
-| Hermes | Orkestrator | planning, project management | Cara membagi tugas ke tim dan format laporan akhir |
-| Naruto | Frontend Developer | react, nextjs, tailwind | Struktur folder dan pola komponen proyek |
-| Luffy | Backend Developer | nestjs, express, api | Standar endpoint, DTO, dan validasi |
-| Sakura | UI/UX Designer | figma, design system, ux | Checklist aksesibilitas dan design token |
-| Yui | Product Manager | planning, prd, user story | Template PRD dan user story |
-| Takumi | QA Engineer | testing, playwright, jest | Checklist regresi dan format laporan bug |
-| Akane | Cyber Security Engineer | security, owasp, audit | Checklist review keamanan |
-| Daichi | Infra & Database Engineer | docker, mysql, ci | Prosedur migrasi database dan deploy |
+| Semua | Semua | `tim-alur-kerja-dan-serah-terima` | urutan kerja antar agen, format serah-terima, lokasi file, aturan git, kapan bertanya |
+| Haruto | Frontend Developer | `frontend-struktur-dan-komponen` | struktur folder frontend, urutan membuat fitur, pola Axios dan hook, checklist state UI |
+| Kenji | Backend Developer | `backend-modul-nestjs-dan-kontrak-api` | struktur modul NestJS, template kontrak API, format error, checklist keamanan dan performa |
+| Sakura | UI/UX Designer | `uiux-handoff-dan-aksesibilitas` | pemetaan token ke Tailwind/Ant Design, daftar state, template handoff, checklist WCAG AA |
+| Yui | Product Manager | `pm-prd-prioritas-dan-laporan` | template PRD, user story Given/When/Then, MoSCoW/RICE, Definition of Done, format laporan |
+| Takumi | QA Engineer | `qa-test-plan-dan-laporan-bug` | struktur tes, template test plan, laporan bug dan severity, checklist regresi |
+| Akane | Cyber Security Engineer | `security-review-owasp` | checklist OWASP/ASVS, template temuan, pemetaan severity, aturan main |
+| Daichi | Infra & Database Engineer | `infra-database-migrasi-dan-backup` | struktur infra, migrasi aman (expand-migrate-contract), backup dan uji restore, Docker Compose |
 
-**Catatan skill per agen:** semua agen di kantor berbagi satu mesin Hermes. Kalau suatu saat butuh skill, memori, atau model yang benar-benar terpisah per agen, langkahnya adalah membuat profil Hermes per agen (`hermes profile create`), masing-masing dengan port API sendiri, lalu mengarahkan agen itu ke profilnya. Ini perubahan lanjutan pada adapter.
+Setiap soul menyebut skill miliknya, jadi agen tahu skill mana yang dimuat untuk pekerjaan apa. Skill sendiri bersifat global di Hermes (semua agen bisa membacanya); pemetaan per peran dilakukan lewat soul.
+
+**Mengubah atau menambah.** Edit langsung berkas `config/skills/<nama>/SKILL.md` (berlaku pada tugas berikutnya, tanpa restart) atau buat folder skill baru dengan format yang sama. Soul diubah lewat panel **⚙ Agen** (berlaku langsung); batas panjang instruksi 4.000 karakter, jadi taruh detail panjang di skill. Agen yang membuat skill lewat `skill_manage` menaruhnya di `/opt/data/skills`, bukan di repo; salin ke `config/skills/` bila ingin ikut ke GitHub.
+
+**Skill tambahan dari hub.** Cari dengan `hermes skills search <kata kunci>` (misalnya react, nestjs, owasp, playwright), `inspect` dulu, lalu `install`. Skill dari hub tersimpan di volume Hermes dan tidak ikut GitHub.
+
+**Catatan skill per agen:** semua agen di kantor berbagi satu mesin Hermes. Kalau suatu saat butuh skill, memori, atau model yang benar-benar terpisah per agen, langkahnya adalah membuat profil Hermes per agen (`hermes profile create`), masing-masing dengan port dan konfigurasi sendiri.
 
 ## Suara per agen
 
@@ -430,6 +439,7 @@ Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu s
 | `config/team.json` | Daftar agen dan persona (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → `docker compose restart office` |
 | `docs/PANDUAN.md` | Panduan ini | – |
 | `config/people.json` | Tampilan karakter dan suara (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → refresh browser |
+| `config/skills/<nama>/SKILL.md` | Skill bawaan tim (dimuat agen sesuai kebutuhan; dipasang ke Hermes lewat `docker-compose.yml`) | Berlaku di tugas berikutnya; skill baru: `docker compose up -d` bila folder `config/skills` baru dibuat |
 | `config/layout.json` | Posisi furnitur (diedit dengan 🛠 Layout; belum ada = layout bawaan) | Otomatis dari mode Layout; hapus file ini = kembali ke bawaan |
 | `office/server/` | Server web, API panel ⚙ Agen + SOUL.md, proxy WebSocket, adapter Hermes (Claw3D, MIT) | `docker compose up -d --build office` |
 | `office/public/js/office/` | Scene kantor: denah `layout.js` (ruangan, meja, titik kegiatan), dinding, dekorasi, properti, tekstur | `docker compose up -d --build office` |
@@ -461,6 +471,7 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Agen mengulang pesan error lama padahal modelnya sudah diganti | Balasan error tersimpan di riwayat chat dan ikut dibaca model | Kosongkan riwayatnya: hentikan `office`, isi `clawd3d-history.json` di volume `office-data` dengan `{}`, lalu nyalakan lagi |
 | Furnitur tidak mau ditaruh (jejak merah) | Di luar lantai, menabrak dinding, menutup pintu, atau menimpa benda lain | Baca alasan di atas panel 🛠 Layout, lalu geser sedikit atau putar bendanya |
 | Tata letak jadi berantakan | Salah pindah banyak benda | **Ctrl+Z** berulang, atau **Kembalikan ke bawaan** di panel 🛠 Layout |
+| Agen menaruh file di `/opt/data` dan tidak muncul di folder proyek, atau "Write denied ... outside HERMES_WRITE_SAFE_ROOT" | Tool tulis Hermes hanya boleh menulis di `HERMES_WRITE_SAFE_ROOT`; bawaan image hanya `/opt/data` | Pastikan `docker-compose.yml` punya `HERMES_WRITE_SAFE_ROOT=/opt/data:/workspace` di service `hermes`, lalu `docker compose up -d` |
 | Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |
 | Agen diam lama tanpa membalas | Hermes menunggu persetujuan perintah | Jawab di panel PERSETUJUAN (kanan bawah) |

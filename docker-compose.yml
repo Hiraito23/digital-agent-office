@@ -14,6 +14,8 @@ services:
       - "127.0.0.1:9119:9119"   # dashboard
     volumes:
       - hermes-data:/opt/data
+      # Skill bawaan tim (config/skills/<nama>/SKILL.md): terpasang otomatis di Hermes, termasuk di clone baru.
+      - ./config/skills:/opt/data/skills/tim
       # Folder proyek yang boleh dikerjakan agen (baca + tulis). Atur PROJECTS_DIR di .env.
       - ${PROJECTS_DIR:-./projects}:/workspace
     environment:
@@ -23,6 +25,9 @@ services:
       - API_SERVER_ENABLED=true
       - API_SERVER_HOST=0.0.0.0
       - API_SERVER_KEY=${API_SERVER_KEY}
+      # Tool tulis file Hermes (write_file/patch) hanya boleh menulis di folder ini. Bawaan image: hanya
+      # /opt/data (di dalam container), sehingga hasil agen tidak pernah masuk ke folder proyek.
+      - HERMES_WRITE_SAFE_ROOT=/opt/data:/workspace
 
   office:
     build: ./office
