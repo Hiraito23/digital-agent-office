@@ -82,28 +82,36 @@ export const buildOffice = (scene) => {
   scene.add(deskGroup);
   let deskKey = "";
   let deskSeats = [];
+  const addDesk = (group, slot, i) => {
+    const d = makeDesk(screenTex, i);
+    d.position.set(slot.x, top, slot.z);
+    group.add(d);
+    const seat = seatOf(slot);
+    const c = makeChair();
+    c.position.set(seat.x, top, seat.z);
+    group.add(c);
+  };
+  // Every private office is furnished from the start.
+  DESK_SLOTS.filter((s) => s.room).forEach((slot, i) => addDesk(scene, slot, i));
   // people: [{ id, name }] in desk order (Hermes first). Private offices are
-  // filled first and their door sign shows the owner; the rest get open desks.
+  // filled first and their door sign shows the owner. Open desks in the main
+  // hall only appear for agents beyond the number of private offices.
+  let openCount = 0;
   const setDesks = (people) => {
     const key = people.map((p) => `${p.id}:${p.name}`).join("|");
     if (key === deskKey) return deskSeats;
     deskKey = key;
     const slots = DESK_SLOTS.slice(0, Math.min(people.length, DESK_SLOTS.length));
     PRIVATE_OFFICES.forEach((room, i) => rooms.setLabel(room.id, people[i] ? `RUANG ${people[i].name.toUpperCase()}` : `${room.name} (KOSONG)`));
+    const open = slots.filter((s) => !s.room);
+    if (open.length !== openCount) {
+      openCount = open.length;
+      deskGroup.clear();
+      open.forEach((slot, i) => addDesk(deskGroup, slot, i));
+    }
     deskSeats = slots.map(seatOf);
     return deskSeats;
   };
-  // Every desk is furnished from the start: the private offices plus the open
-  // hot desks in the main hall (used when there are more agents than offices).
-  DESK_SLOTS.forEach((slot, i) => {
-    const d = makeDesk(screenTex, i);
-    d.position.set(slot.x, top, slot.z);
-    deskGroup.add(d);
-    const seat = seatOf(slot);
-    const c = makeChair();
-    c.position.set(seat.x, top, seat.z);
-    deskGroup.add(c);
-  });
 
   const rooms = addRooms(scene, top);
 

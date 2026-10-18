@@ -162,9 +162,9 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
-Kantor punya dua bagian. **Aula utama** (kiri) berisi ruang bersama berdinding kaca dengan pintu dan papan nama: **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server**, **Pantry & Lounge** (kopi, akuarium, sofa), **Ruang Game** (arcade, ping-pong), **Lobby** (portal Hermes dan pintu masuk), dan meja kerja terbuka (*hot desk*). **Sayap ruang pribadi** (kanan) berisi 8 ruang kerja, empat di belakang dan empat di depan koridor; masing-masing punya meja, kursi, rak, tanaman, dan papan nama "RUANG <NAMA AGEN>" di atas pintunya. Agen masuk dan keluar ruangan lewat pintu.
+Kantor punya dua bagian. **Aula utama** (kiri) berisi ruang bersama berdinding kaca dengan pintu dan papan nama: **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server**, **Pantry & Lounge** (kopi, akuarium, sofa), **Ruang Game** (arcade, ping-pong), **Lobby** (portal Hermes dan pintu masuk), dan area tengah yang lapang untuk berjalan. **Sayap ruang pribadi** (kanan) berisi 8 ruang kerja, empat di belakang dan empat di depan koridor; masing-masing punya meja, kursi, rak, tanaman, dan papan nama "RUANG <NAMA AGEN>" di atas pintunya. Agen masuk dan keluar ruangan lewat pintu.
 
-**Satu agen satu ruang:** Hermes mendapat ruang pertama, lalu anggota tim diurutkan menurut id. Saat mendapat tugas, agen berjalan ke ruangnya sendiri, duduk, dan mengetik; setelah selesai ia keluar ke koridor. Ruang yang belum terpakai bertanda "(KOSONG)". Kalau agen lebih dari 8, agen berikutnya memakai meja terbuka di aula utama (10 meja). Menambah atau menghapus agen di panel ⚙ Agen langsung memperbarui papan nama.
+**Satu agen satu ruang:** Hermes mendapat ruang pertama, lalu anggota tim diurutkan menurut id. Saat mendapat tugas, agen berjalan ke ruangnya sendiri, duduk, dan mengetik; setelah selesai ia keluar ke koridor. Ruang yang belum terpakai bertanda "(KOSONG)". Kalau agen lebih dari 8, meja terbuka baru muncul di aula utama untuk agen berikutnya (maksimal 10 meja). Menambah atau menghapus agen di panel ⚙ Agen langsung memperbarui papan nama.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 
