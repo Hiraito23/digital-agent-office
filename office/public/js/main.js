@@ -1,7 +1,7 @@
 // Entry point of the office UI. It wires the pieces together:
 //   world/      3D scene, camera and agent movement (World)
 //   net/        WebSocket client for the Hermes gateway (Gateway)
-//   ui/         name tags, agent panel, project picker, jukebox and voices
+//   ui/         name tags, agent panel, project picker, approvals, jukebox and voices
 // and owns the app state shared between them: roster, agent status,
 // chat history per agent and the activity feed.
 import { World } from "./world/world.js";
@@ -11,6 +11,7 @@ import { VoiceBox } from "./ui/voice.js";
 import { NameTags } from "./ui/name-tags.js";
 import { initAgentPanel } from "./ui/agents-panel.js";
 import { initProjectPicker } from "./ui/projects.js";
+import { initApprovals } from "./ui/approvals.js";
 
 const jukebox = initJukebox();
 
@@ -60,6 +61,7 @@ reloadLooks();
 
 initAgentPanel({
   voice,
+  loadToolsets: () => gw.request("tools.catalog"),
   onChanged: async ({ removed } = {}) => {
     await reloadLooks();
     if (gw.connected) await refreshAgents().catch(() => {});
@@ -197,6 +199,7 @@ gw.addEventListener("chat", (e) => {
     if (text && text !== "…") say(agentId, text, 8000);
   } else if (p.state === "final") {
     liveRuns.delete(p.runId);
+    nameTags.setTool(agentId, null);
     setAgentStatus(agentId, "done");
     say(agentId, text || "Selesai!", 7000);
     voice.speak(agentId, text);
@@ -204,6 +207,7 @@ gw.addEventListener("chat", (e) => {
     pushChat(agentId, { role: "assistant", content: text }, p.runId);
   } else if (p.state === "error" || p.state === "aborted") {
     liveRuns.delete(p.runId);
+    nameTags.setTool(agentId, null);
     setAgentStatus(agentId, p.state === "error" ? "error" : "idle");
     const msg = p.errorMessage || "dibatalkan";
     say(agentId, `⚠ ${msg}`, 8000);
@@ -211,6 +215,34 @@ gw.addEventListener("chat", (e) => {
     pushChat(agentId, { role: "error", content: msg }, p.runId);
   }
   if (selected === agentId && p.state === "delta") renderLiveRun(p.runId, text);
+});
+
+// Hermes tools (terminal, file, web, browser, ...) run inside the hermes
+// container; the adapter reports each one so the office can show it.
+gw.addEventListener("tool", (e) => {
+  const { agentId, tool, emoji, label, status: state } = e.detail;
+  if (state === "running") {
+    nameTags.setTool(agentId, emoji);
+    const detail = label && label !== tool ? `: ${label.replace(/\s+/g, " ").slice(0, 70)}` : "";
+    say(agentId, `${emoji} ${label || tool}`, 6000);
+    logActivity(`${nameOf(agentId)} ${emoji} ${tool}${detail}`);
+  } else {
+    nameTags.setTool(agentId, null);
+  }
+});
+
+// PERSETUJUAN: risky commands wait here for your answer.
+initApprovals({
+  gw,
+  nameOf,
+  onRequest: (a) => {
+    say(a.agentId, "⚠ Menunggu persetujuan Anda", 10000);
+    logActivity(`${nameOf(a.agentId)} menunggu persetujuan: ${(a.command || a.description).slice(0, 60)}`, "err");
+  },
+  onResolved: (a, choice, err) => {
+    if (err) logActivity(`Persetujuan gagal: ${err.message}`, "err");
+    else logActivity(`Anda ${choice === "deny" ? "menolak" : "mengizinkan"} perintah ${nameOf(a?.agentId)}`, choice === "deny" ? "" : "ok");
+  },
 });
 
 // --- chat panel -------------------------------------------------------------

@@ -1,5 +1,6 @@
-// "⚙ Agen" panel: add, edit and remove agents, and edit the shared SOUL.md.
-// Talks to /api/agents and /api/soul (office/agents-api.js).
+// "⚙ Agen" panel: add, edit and remove agents, edit the shared SOUL.md and
+// list the Hermes toolsets. Talks to /api/agents and /api/soul
+// (office/agents-api.js); the toolsets come from the gateway (tools.catalog).
 import { COSTUMES } from "../characters/costumes.js";
 
 const HAIR = [["short", "Pendek"], ["long", "Panjang"], ["bob", "Bob"], ["ponytail", "Kuncir kuda"], ["bun", "Sanggul"], ["spiky", "Jabrik"], ["cap", "Topi"]];
@@ -47,7 +48,7 @@ const api = async (method, url, body) => {
   return data;
 };
 
-export const initAgentPanel = ({ voice, onChanged }) => {
+export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
   const panel = document.getElementById("agents");
   const body = document.getElementById("agents-body");
   const tabs = panel.querySelectorAll("[data-tab]");
@@ -223,11 +224,37 @@ export const initAgentPanel = ({ voice, onChanged }) => {
     };
   };
 
+  // ---- 🧰 Tools (read-only list of Hermes toolsets) -------------------------
+
+  const showTools = async () => {
+    body.innerHTML = `<p class="muted">Memuat daftar tools Hermes…</p>`;
+    let toolsets;
+    try {
+      ({ toolsets } = await loadToolsets());
+    } catch (err) {
+      body.innerHTML = `<p class="agents-status err">${esc(err.message)}</p>`;
+      return;
+    }
+    const dashboard = `${location.protocol}//${location.hostname}:9119`;
+    const stateOf = (t) => (!t.enabled ? "nonaktif" : t.configured ? "aktif" : "aktif, perlu kunci/konfigurasi");
+    const sorted = [...toolsets].sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name));
+    body.innerHTML = `
+      <p class="muted">Semua agen memakai tools Hermes ini langsung di container <code>hermes</code> (folder proyek ada di <code>/workspace</code>). Saat agen memakai tool, ikonnya muncul di label nama dan di Aktivitas Terbaru. Perintah berisiko menunggu izin Anda di panel PERSETUJUAN.</p>
+      <p class="muted">Aktifkan, nonaktifkan, atau isi kunci API tools di <a href="${dashboard}" target="_blank" rel="noopener">dashboard Hermes</a>, lalu jalankan <code>docker compose restart hermes</code>.</p>
+      <ul class="toolset-list">${sorted.map((t) => `
+        <li class="${t.enabled ? "" : "off"} ${t.enabled && !t.configured ? "unconfigured" : ""}">
+          <div class="ts-head"><b>${esc(t.label)}</b><span class="ts-state">${stateOf(t)}</span></div>
+          ${t.description ? `<p>${esc(t.description)}</p>` : ""}
+          ${t.tools.length ? `<small>${t.tools.map(esc).join(", ")}</small>` : ""}
+        </li>`).join("")}
+      </ul>`;
+  };
+
   const show = (next) => {
     tab = next;
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
     status.textContent = "";
-    (tab === "soul" ? showSoul : showTeam)();
+    ({ soul: showSoul, tools: showTools }[tab] ?? showTeam)();
   };
   tabs.forEach((t) => { t.onclick = () => show(t.dataset.tab); });
 

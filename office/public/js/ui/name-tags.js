@@ -17,6 +17,13 @@ export class NameTags {
     this.container = container;
     this.nodes = new Map(); // agentId -> { tag, bubble }
     this.bubbles = new Map(); // agentId -> { text, until }
+    this.tools = new Map(); // agentId -> emoji of the Hermes tool in use
+  }
+
+  // Show the emoji of the tool an agent is running (null clears it).
+  setTool(agentId, emoji) {
+    if (emoji) this.tools.set(agentId, emoji);
+    else this.tools.delete(agentId);
   }
 
   // Show a bubble above an agent for `ms` milliseconds.
@@ -31,10 +38,12 @@ export class NameTags {
     for (const { agent, x, y } of tags) {
       seen.add(agent.id);
       const node = this.nodeFor(agent);
-      const icon = agent.activityIcon ? `${agent.activityIcon} ` : "";
+      const tool = this.tools.get(agent.id);
+      const icon = tool ? `${tool} ` : agent.activityIcon ? `${agent.activityIcon} ` : "";
       const label = `<span class="name">${icon}${agent.name}</span><span class="role">${agent.role || ""}</span>`;
       if (node.tag.innerHTML !== label) node.tag.innerHTML = label;
       node.tag.classList.toggle("speaking", Boolean(agent.speaking));
+      node.tag.classList.toggle("tooling", Boolean(tool));
       const top = y - 4;
       node.tag.style.left = `${x}px`;
       node.tag.style.top = `${top}px`;

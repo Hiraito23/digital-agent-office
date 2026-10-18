@@ -477,7 +477,11 @@ async function completeOneTurn(messages, model, tools) {
  * Stream one LLM turn.
  * @returns {{ textContent: string, toolCalls: Array<{id,name,args}>, finishReason: string }}
  */
-async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck) {
+// Hermes runs its own tools (terminal, file, web, ...) server-side and reports
+// them as named SSE events next to the OpenAI chunks; onEvent receives those.
+const HERMES_EVENTS = new Set(["hermes.tool.progress", "approval.request"]);
+
+async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, onEvent) {
   const body = { model, messages, stream: true };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
 
@@ -494,6 +498,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck) {
   /** @type {Record<number, {id: string, name: string, argsStr: string}>} */
   const toolCallAccum = {};
   let buffer = "";
+  let currentEvent = "";
 
   await new Promise((resolve, reject) => {
     res.on("data", (chunk) => {
@@ -503,8 +508,14 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck) {
       buffer = lines.pop() ?? "";
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || trimmed === "data: [DONE]") continue;
+        if (!trimmed) { currentEvent = ""; continue; }
+        if (trimmed.startsWith("event:")) { currentEvent = trimmed.slice(6).trim(); continue; }
+        if (trimmed === "data: [DONE]") continue;
         if (!trimmed.startsWith("data: ")) continue;
+        if (HERMES_EVENTS.has(currentEvent)) {
+          try { if (onEvent) onEvent(currentEvent, JSON.parse(trimmed.slice(6))); } catch { /* ignore malformed */ }
+          continue;
+        }
         try {
           const data = JSON.parse(trimmed.slice(6));
           const choice = data?.choices?.[0];
@@ -561,6 +572,71 @@ function broadcastEvent(frame) {
   for (const fn of activeSendEventFns) {
     try { fn(frame); } catch { /* ignore */ }
   }
+}
+
+// Approvals Hermes is waiting on (a risky terminal command, ...), keyed by
+// "<run_id>:<request_id>". The office shows them in the PERSETUJUAN panel.
+const pendingApprovals = new Map();
+const approvalKey = (runId, requestId) => `${runId}:${requestId || ""}`;
+
+// Forwards Hermes tool/approval events to the office, tagged with the agent.
+function hermesEventForwarder(agentId, sessionKey) {
+  return (name, data) => {
+    if (name === "hermes.tool.progress") {
+      broadcastEvent({ type: "event", event: "tool", payload: {
+        agentId, sessionKey, tool: data.tool || "", emoji: data.emoji || "🔧",
+        label: typeof data.label === "string" ? data.label.slice(0, 200) : "",
+        toolCallId: data.toolCallId || "", status: data.status || "running",
+      } });
+    } else if (name === "approval.request" && data.run_id) {
+      const approval = {
+        id: approvalKey(data.run_id, data.request_id), agentId, sessionKey,
+        runId: data.run_id, requestId: data.request_id || "",
+        command: typeof data.command === "string" ? data.command.slice(0, 2000) : "",
+        description: typeof data.description === "string" ? data.description.slice(0, 500) : "",
+        choices: Array.isArray(data.choices) ? data.choices : ["once", "deny"],
+        createdAt: Date.now(),
+      };
+      pendingApprovals.set(approval.id, approval);
+      broadcastEvent({ type: "event", event: "approval", payload: { state: "requested", approval } });
+    }
+  };
+}
+
+// Drop approvals of a run that ended (Hermes answers 409 for them anyway).
+function clearApprovalsFor(sessionKey) {
+  for (const [key, a] of pendingApprovals) {
+    if (a.sessionKey !== sessionKey) continue;
+    pendingApprovals.delete(key);
+    broadcastEvent({ type: "event", event: "approval", payload: { state: "resolved", id: key, choice: "expired" } });
+  }
+}
+
+async function resolveApproval(id, choice) {
+  const approval = pendingApprovals.get(id);
+  if (!approval) throw new Error("persetujuan tidak ditemukan atau sudah selesai");
+  if (!approval.choices.includes(choice)) throw new Error(`pilihan tidak valid: ${choice}`);
+  const body = { choice };
+  if (approval.requestId) body.request_id = approval.requestId;
+  const res = await hermesPost(`/v1/runs/${encodeURIComponent(approval.runId)}/approval`, body);
+  const payload = await readJsonBody(res).catch(() => ({}));
+  pendingApprovals.delete(id);
+  broadcastEvent({ type: "event", event: "approval", payload: { state: "resolved", id, choice } });
+  if (res.statusCode >= 400) throw new Error(extractOpenAiStyleError(payload, `Hermes API HTTP ${res.statusCode}`));
+  return payload;
+}
+
+// Toolsets Hermes has for the API server (web, terminal, file, browser, ...).
+async function fetchToolsets() {
+  const res = await hermesGet("/v1/toolsets");
+  const payload = await readJsonBody(res);
+  if (res.statusCode >= 400) throw new Error(extractOpenAiStyleError(payload, `Hermes API HTTP ${res.statusCode}`));
+  const list = Array.isArray(payload) ? payload : payload.data ?? payload.toolsets ?? [];
+  return list.map((t) => ({
+    name: t.name, label: t.label || t.name, description: t.description || "",
+    enabled: t.enabled !== false, configured: t.configured !== false,
+    tools: Array.isArray(t.tools) ? t.tools.map((x) => (typeof x === "string" ? x : x?.name)).filter(Boolean) : [],
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -637,7 +713,8 @@ async function execDelegateTask(args) {
     const result = await streamOneTurn(messages, model, [], (partial) => {
       responseText = partial;
       emitSub("delta", { message: { role: "assistant", content: partial } });
-    }, null);
+    }, null, hermesEventForwarder(targetId, sessionKey));
+    clearApprovalsFor(sessionKey);
     responseText = result.textContent;
 
     // Persist to sub-agent history
@@ -772,8 +849,9 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
   while (round < MAX_TOOL_ROUNDS) {
     round++;
     const { textContent, toolCalls, finishReason } = await streamOneTurn(
-      messages, model, tools, emitDelta, abortCheck
+      messages, model, tools, emitDelta, abortCheck, hermesEventForwarder(agentId, sessionKey)
     );
+    clearApprovalsFor(sessionKey);
 
     if (finishReason === "tool_calls" && toolCalls.length > 0) {
       // Inform user that tools are being executed (brief status text)
@@ -1067,8 +1145,27 @@ async function handleMethod(method, params, id, sendEvent) {
     case "exec.approvals.set":
       return resOk(id, { hash: "hermes-approvals" });
 
-    case "exec.approval.resolve":
-      return resOk(id, { ok: true });
+    case "exec.approval.resolve": {
+      try {
+        const result = await resolveApproval(String(p.id || ""), String(p.choice || p.decision || ""));
+        return resOk(id, { ok: true, result });
+      } catch (err) {
+        return resErr(id, "approval_failed", sanitizeErrorMessage(err));
+      }
+    }
+
+    case "exec.approvals.pending":
+      return resOk(id, { approvals: [...pendingApprovals.values()] });
+
+    // --- Hermes toolsets (read-only; configure in the Hermes dashboard) ------
+
+    case "tools.catalog": {
+      try {
+        return resOk(id, { toolsets: await fetchToolsets() });
+      } catch (err) {
+        return resErr(id, "tools_failed", sanitizeErrorMessage(err));
+      }
+    }
 
     // --- Status & heartbeat -------------------------------------------------
 
@@ -1227,11 +1324,12 @@ function startAdapter() {
               "chat.send","chat.abort","chat.history","agent.wait",
               "status","config.get","config.set","config.patch",
               "agents.files.get","agents.files.set",
-              "exec.approvals.get","exec.approvals.set","exec.approval.resolve",
+              "exec.approvals.get","exec.approvals.set","exec.approval.resolve","exec.approvals.pending",
+              "tools.catalog",
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron"] },
+              events: ["chat","presence","heartbeat","cron","tool","approval"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },

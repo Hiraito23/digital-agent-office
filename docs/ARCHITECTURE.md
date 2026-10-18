@@ -63,8 +63,9 @@ office/                 image Docker "office"
         parts.js        potongan dasar (box, cone, material)
       ui/
         name-tags.js    label nama + gelembung kata (DOM)
-        agents-panel.js panel ⚙ Agen (tambah/ubah/hapus agen, SOUL.md)
+        agents-panel.js panel ⚙ Agen (tambah/ubah/hapus agen, SOUL.md, 🧰 Tools)
         projects.js     dropdown 📁 Proyek (proyek yang dikerjakan agen)
+        approvals.js    panel PERSETUJUAN (izin perintah berisiko dari Hermes)
         jukebox.js      musik latar (playlist, ulang, sisa waktu)
         voice.js        suara agen (Web Speech API)
 ```
@@ -79,6 +80,15 @@ office/                 image Docker "office"
 ## Proyek
 
 `PROJECTS_DIR` dari `.env` di-mount ke kedua container sebagai `/workspace`: baca-tulis di `hermes` (tempat tools agen berjalan), hanya-baca di `office` (untuk daftar proyek). Proyek aktif disimpan di `config/office.json` (tidak di-commit). `server/projects.js` meneruskannya ke adapter lewat `team.setProject()`, lalu adapter menambahkan folder proyek dan aturan branch git ke prompt sistem setiap agen (`withProjectContext` di `hermes-gateway-adapter.js`).
+
+## Tools Hermes
+
+Tools (terminal, file, web, browser, memori, skill, ...) dijalankan oleh Hermes sendiri di container `hermes`, bukan oleh kantor. Saat streaming `/v1/chat/completions`, Hermes mengirim event SSE bernama di samping chunk OpenAI biasa:
+
+- `hermes.tool.progress` (`running` / `completed`): `streamOneTurn` di adapter meneruskannya sebagai event `tool` `{ agentId, tool, emoji, label, status }`. `main.js` menampilkan ikonnya di label nama (`NameTags.setTool`) dan mencatatnya di Aktivitas Terbaru.
+- `approval.request`: adapter menyimpannya di `pendingApprovals` dan meneruskannya sebagai event `approval`. `ui/approvals.js` menampilkan tombol pilihan; jawabannya lewat metode `exec.approval.resolve`, yang diteruskan adapter ke `POST /v1/runs/{run_id}/approval` `{ choice, request_id }`. Tab baru mengambil yang masih menunggu lewat `exec.approvals.pending`.
+
+Tab 🧰 Tools di panel ⚙ Agen memakai metode `tools.catalog` (adapter memanggil `GET /v1/toolsets`). Daftarnya hanya-baca, karena konfigurasi toolset diatur di dashboard Hermes.
 
 ## Siklus hidup agen di World
 
