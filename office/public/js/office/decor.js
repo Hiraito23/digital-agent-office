@@ -16,9 +16,9 @@ export const addDecor = (scene, top, animated) => {
     ctx.fillStyle = "#e03131"; ctx.fillRect(20, 26, 3, 3);
   });
   const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.0), new THREE.MeshBasicMaterial({ map: boardTex }));
-  board.position.set(10.8, top + 1.05, OFFICE.z0 + 0.012);
+  board.position.set(11, top + 1.05, OFFICE.z0 + 0.012);
   scene.add(board);
-  scene.add(box(2.3, 0.06, 0.06, mat("#868e96"), 10.8, top + 0.52, OFFICE.z0 + 0.04, false));
+  scene.add(box(2.3, 0.06, 0.06, mat("#868e96"), 11, top + 0.52, OFFICE.z0 + 0.04, false));
 
   // --- neon sign (back wall) ---
   const neonTex = canvasTexture(128, 20, (ctx) => {
@@ -28,7 +28,7 @@ export const addDecor = (scene, top, animated) => {
     ctx.fillStyle = "#74c0fc"; ctx.fillText("OFFICE", 92, 10);
   });
   const neon = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.5), new THREE.MeshBasicMaterial({ map: neonTex }));
-  neon.position.set(15.6, top + 1.45, OFFICE.z0 + 0.012);
+  neon.position.set(18, top + 1.45, OFFICE.z0 + 0.012);
   scene.add(neon);
   animated.push((t) => { neon.material.color.setScalar(Math.floor(t / 2600) % 7 === 0 && (t % 2600) < 160 ? 0.55 : 1); });
 
@@ -40,6 +40,6 @@ export const addDecor = (scene, top, animated) => {
   });
   const clock = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: clockTex }));
   clock.rotation.y = Math.PI / 2;
-  clock.position.set(OFFICE.x0 + 0.012, top + 1.35, 12.6);
+  clock.position.set(OFFICE.x0 + 0.012, top + 1.35, 16);
   scene.add(clock);
 };

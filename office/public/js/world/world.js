@@ -9,6 +9,8 @@ import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
 import { corridorFor, doorOf, planRoute } from "./routing.js";
+import { Environment } from "./environment.js";
+import { makeConversation } from "./chatter.js";
 
 // Pixel modes: render at a fraction of the CSS resolution, upscale crisply.
 export const PIXEL_MODES = [
@@ -30,7 +32,7 @@ export class World {
     this.scene.fog = new THREE.Fog("#a8dcff", 50, 100);
 
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 200);
-    this.camera.position.set(CENTER.x + 23, 27, CENTER.z + 23);
+    this.camera.position.set(CENTER.x + 17, 20, CENTER.z + 17);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.target.set(CENTER.x, 0.4, CENTER.z + 0.5);
@@ -44,16 +46,17 @@ export class World {
     this.controls.update();
 
     // lighting: sky/ground fill + sun with shadows
-    this.scene.add(new THREE.HemisphereLight("#e3f2ff", "#4e7a34", 1.1));
+    this.hemi = new THREE.HemisphereLight("#e3f2ff", "#4e7a34", 1.1);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight("#fff4dc", 1.6);
     sun.position.set(CENTER.x + 10, 22, CENTER.z + 6);
     sun.target.position.set(CENTER.x, 0, CENTER.z);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -26;
-    sun.shadow.camera.right = 26;
-    sun.shadow.camera.top = 26;
-    sun.shadow.camera.bottom = -26;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -18;
+    sun.shadow.camera.right = 18;
+    sun.shadow.camera.top = 18;
+    sun.shadow.camera.bottom = -18;
     sun.shadow.camera.far = 60;
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.02;
@@ -61,10 +64,16 @@ export class World {
 
     this.office = buildOffice(this.scene, layout);
     this.office.furniture.onChange = () => this.refreshDesks(); // a moved desk moves its seat
+    // sky: time of day and weather drive the lights, background, fog, lamps and windows
+    this.environment = new Environment({ scene: this.scene, camera: this.camera, sun, hemi: this.hemi, office: this.office, center: CENTER });
     this.agents = new Map();
     this.appearances = {};
     this.raycaster = new THREE.Raycaster();
     this.pixelMode = 1;
+    // small talk between idle agents (world/chatter.js); main.js fills in the callbacks
+    this.chatter = { active: null, nextAt: performance.now() + 9000, recent: [] };
+    this.onSay = null; // (agentId, text, ms) -> speech bubble
+    this.onChatter = null; // ({ from, to, text }) -> the chat box's Kantor tab
     this.resize();
   }
 
@@ -195,7 +204,7 @@ export class World {
     for (const a of this.agents.values()) {
       if (!a.meeting) continue;
       a.meeting = null;
-      const exit = doorOf(MEETING.room);
+      const exit = doorOf(MEETING.room) ?? { outside: { x: 12.5, z: 12.8 } }; // an open zone: leave towards the hall
       a.route = a.mode === "meeting" || a.mode === "toMeeting"
         ? planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.mode === "meeting" ? MEETING.room : null)
         : a.route;
@@ -228,22 +237,25 @@ export class World {
       a.route = this.seatRoute(a, a.leavingRoom);
       a.mode = "toSeat";
     }
-    if (status !== "working" && a.mode === "sitting") {
-      a.nextWander = performance.now() + 2500;
-      const exit = a.seat.room ? doorOf(a.seat.room) : null;
-      if (exit) {
-        // out of the room into the corridor
-        a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
-        a.mode = "wander";
-      } else {
-        a.mode = "idle";
-        a.route = [{ x: a.seat.x, z: a.seat.z + 0.6 }];
-      }
+    // standing up again is handled in update(): the agent stays seated a few seconds, even after a short task
+  }
+
+  // Leaves the desk after work: out of the room through its door, or one step back in the hall.
+  standUp(a, now) {
+    a.nextWander = now + 2500;
+    const exit = a.seat.room ? doorOf(a.seat.room) : null;
+    if (exit) {
+      a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
+      a.mode = "wander";
+    } else {
+      a.mode = "idle";
+      a.route = [{ x: a.seat.x, z: a.seat.z + (a.seat.heading === 0 ? -0.6 : 0.6) }];
     }
   }
 
   update(dt, now) {
     this.office.update(now);
+    this.environment.update(dt, now);
     for (const a of this.agents.values()) {
       let moving = false;
       if (a.route.length) {
@@ -251,14 +263,15 @@ export class World {
         const dx = target.x - a.x;
         const dz = target.z - a.z;
         const dist = Math.hypot(dx, dz);
-        const step = (dt / 1000) * 1.9;
+        const step = (dt / 1000) * (a.mode === "toSeat" ? 3.4 : 1.9); // an agent with work to do hurries to the computer
         if (dist <= step) {
           a.x = target.x;
           a.z = target.z;
           a.route.shift();
-          if (!a.route.length && a.mode === "toSeat") a.mode = "sitting";
+          if (!a.route.length && a.mode === "toSeat") { a.mode = "sitting"; a.seatedAt = now; }
           if (!a.route.length && a.mode === "toMeeting") { a.mode = "meeting"; a.room = MEETING.room; }
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
+          if (!a.route.length && a.mode === "toChat") a.mode = "chat";
           if (!a.route.length && a.mode === "toSpot") {
             a.room = a.spot.room ?? null;
             a.mode = "activity";
@@ -279,6 +292,8 @@ export class World {
         a.room = null;
         a.mode = "wander";
         a.nextWander = now + 3000 + Math.random() * 4000;
+      } else if (a.mode === "sitting" && a.status !== "working" && now - (a.seatedAt ?? 0) > 3000) {
+        this.standUp(a, now); // the task is over (it stayed at least 3 s so the typing is seen)
       } else if (a.mode === "idle" && now > a.nextWander) {
         const spots = this.freeSpots();
         const wantsActivity = spots.length && Math.random() < (a.isMain ? 0.3 : 0.6);
@@ -307,6 +322,7 @@ export class World {
       let targetHeading = a.heading;
       if (sitting) targetHeading = a.seat?.heading ?? Math.PI; // facing the desk
       else if (inMeeting) targetHeading = a.meeting.heading;
+      else if (a.mode === "chat" && !moving && a.chatPartner) targetHeading = Math.atan2(a.chatPartner.x - a.x, a.chatPartner.z - a.z); // face the other agent
       else if (atSpot) targetHeading = a.spot.heading;
       else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
       let diff = targetHeading - a.model.rotation.y;
@@ -316,8 +332,66 @@ export class World {
       a.model.position.set(a.x, this.office.floorTop, a.z);
       const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? a.spot.pose : "idle";
       a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? a.spot.icon : "";
-      animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking));
+      animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking || a.chatSpeaking));
     }
+    this.updateChatter(now);
+  }
+
+  // Small talk: two idle agents meet in the hall and swap a few lines (bubbles above their heads).
+  updateChatter(now) {
+    const c = this.chatter;
+    if (c.active) { this.stepChat(c.active, now); return; }
+    if (now < c.nextAt || this.meetingOn || document.hidden) return;
+    const free = [...this.agents.values()].filter((a) => (a.mode === "idle" || a.mode === "wander") && !a.room && !a.speaking && a.status !== "working" && !a.meeting);
+    if (free.length < 2) { c.nextAt = now + 5000; return; }
+    const a = free[Math.floor(Math.random() * free.length)];
+    const near = free.filter((x) => x !== a).sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 3);
+    const b = near[Math.floor(Math.random() * near.length)];
+    // meet at the walking point nearest to the middle between them
+    const mx = (a.x + b.x) / 2;
+    const mz = (a.z + b.z) / 2;
+    const [rx, rz] = WANDER.slice().sort((p, q) => Math.hypot(p[0] - mx, p[1] - mz) - Math.hypot(q[0] - mx, q[1] - mz))[0];
+    const lines = makeConversation(a, b, { weather: this.environment?.weatherId, period: this.environment?.periodName() }, c.recent);
+    const place = (agent, x, partner) => { agent.route = planRoute(agent, { x, z: rz }); agent.mode = "toChat"; agent.chatPartner = partner; agent.chatSpeaking = false; };
+    place(a, rx - 0.5, b);
+    place(b, rx + 0.5, a);
+    c.active = { a, b, lines, i: 0, state: "approach", startedAt: now, nextLineAt: 0 };
+  }
+
+  stepChat(ch, now) {
+    // someone left (went to work, joined a meeting) or it took too long: stop
+    const here = (x) => this.agents.get(x.id) === x && (x.mode === "toChat" || x.mode === "chat");
+    if (!here(ch.a) || !here(ch.b) || now - ch.startedAt > 90000) { this.endChat(now); return; }
+    if (ch.state === "approach") {
+      if (ch.a.mode === "chat" && ch.b.mode === "chat") { ch.state = "talk"; ch.nextLineAt = now + 500; }
+      return;
+    }
+    if (now < ch.nextLineAt) return;
+    // with voices on, wait until the last line has been spoken (but never longer than 12 s)
+    if ((ch.a.speaking || ch.b.speaking) && now < ch.nextLineAt + 12000) return;
+    ch.a.chatSpeaking = false;
+    ch.b.chatSpeaking = false;
+    if (ch.i >= ch.lines.length) { this.endChat(now); return; }
+    const line = ch.lines[ch.i];
+    ch.i += 1;
+    line.who.chatSpeaking = true;
+    const other = line.who === ch.a ? ch.b : ch.a;
+    const ms = 1800 + line.text.length * 55;
+    this.onSay?.(line.who.id, line.text, ms + 500);
+    this.onChatter?.({ from: line.who.id, to: other.id, text: line.text, news: line.news });
+    ch.nextLineAt = now + ms;
+  }
+
+  endChat(now) {
+    const c = this.chatter;
+    const ch = c.active;
+    c.active = null;
+    for (const x of [ch.a, ch.b]) {
+      x.chatSpeaking = false;
+      x.chatPartner = null;
+      if (x.mode === "toChat" || x.mode === "chat") { x.mode = "idle"; x.nextWander = now + 2000 + Math.random() * 3000; }
+    }
+    c.nextAt = now + 14000 + Math.random() * 16000;
   }
 
   render() {

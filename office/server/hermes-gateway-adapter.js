@@ -79,26 +79,19 @@ const MAX_TOOL_ROUNDS = 8;
 // Orchestrator system prompt
 // ---------------------------------------------------------------------------
 
-const ORCHESTRATOR_SYSTEM_PROMPT = `You are ${HERMES_AGENT_NAME}, an AI orchestrator managing a team of sub-agents in a virtual 3D office.
+const ORCHESTRATOR_SYSTEM_PROMPT = `Kamu adalah ${HERMES_AGENT_NAME}, orkestrator tim di kantor virtual 3D. Anggota tim adalah agen kantor sungguhan (Haruto, Kenji, Sakura, Yui, Takumi, Akane, Daichi, dan lainnya) yang tampil sebagai karakter di kantor. Kamu menyuruh mereka dengan tool tim kantor (server MCP "office-team"):
 
-You have tools to build and manage your team autonomously:
+- team_list: daftar anggota tim beserta agent_id-nya.
+- team_delegate(agent_id, task, wait_seconds): beri tugas ke seorang anggota; hasilnya dikembalikan ke kamu.
+- team_result(task_id): ambil hasil tugas yang belum selesai ketika team_delegate kembali.
+- team_context(agent_id): baca percakapan terbaru anggota untuk tahu apa yang sedang ia kerjakan.
 
-- **spawn_agent**: Create a new specialist agent with a name, role, instructions, and settings (wipe/continuity/boundaries).
-- **delegate_task**: Send a task to a specific agent and receive their response.
-- **list_team**: See all current team members and their IDs, names, and roles.
-- **configure_agent**: Update an agent's name, role/title, instructions, or settings.
-- **dismiss_agent**: Remove an agent from the team.
-- **read_agent_context**: Read the recent conversation history of another agent to understand what they are currently working on, what they have already done, or what their status is. Use this for coordination — before delegating a task, check if the agent already has relevant context.
+ATURAN PENTING:
+1. Untuk menyuruh anggota tim SELALU panggil team_delegate. Jangan memakai delegate_task bawaan untuk itu (itu hanya membuat pembantu anonim yang tidak terlihat di kantor).
+2. Jangan pernah bilang sudah mendelegasikan atau meminta seseorang kalau kamu belum benar-benar memanggil team_delegate di giliran ini. Pengguna melihat anggota itu bekerja di kantor, jadi klaim palsu langsung ketahuan.
+3. Kalau pengguna menanyakan kenapa seseorang belum bekerja, cek dengan team_context dan, bila memang belum ada tugasnya, panggil team_delegate sekarang.
 
-When given a goal:
-1. Analyse what specialist roles are needed.
-2. spawn_agent for each specialist.
-3. delegate_task to assign work and coordinate.
-4. Use read_agent_context to check what an agent has done or is doing before re-delegating.
-5. Synthesise results into a final answer for the user.
-
-Each spawned agent will appear as an animated character in the 3D office — walking when active, standing when idle.
-Be concise in your responses to the user; do the heavy lifting via tool calls.`;
+Saat diberi tujuan: (1) tentukan peran yang dibutuhkan, (2) team_delegate ke tiap peran dengan tugas yang lengkap (tujuan, konteks, hasil yang diharapkan), (3) bila hasil belum selesai gunakan team_result, (4) rangkum hasilnya untuk pengguna. Jawab singkat; pekerjaan beratnya dilakukan anggota tim.`;
 
 // ---------------------------------------------------------------------------
 // Team management tools definition (OpenAI tool-calling format)
@@ -534,6 +527,18 @@ const HERMES_EVENTS = new Set(["hermes.tool.progress", "approval.request"]);
 // Silence on the stream for this long = the provider stalled (tools report progress events meanwhile).
 const STREAM_IDLE_MS = Number(process.env.HERMES_STREAM_IDLE_MS) || 180_000;
 
+// Hermes may say the same interim sentence before every tool round ("Saya akan ..." three times):
+// keep only one of identical paragraphs that follow each other.
+function dedupeParagraphs(text) {
+  const parts = String(text || "").split(/\n{2,}/);
+  const out = [];
+  for (const part of parts) {
+    if (out.length && out[out.length - 1].trim() === part.trim()) continue;
+    out.push(part);
+  }
+  return out.join("\n\n");
+}
+
 async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, onEvent, idleMs = STREAM_IDLE_MS) {
   const body = { model, messages, stream: true };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
@@ -604,6 +609,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
     res.on("error", reject);
   });
 
+  textContent = dedupeParagraphs(textContent);
   const toolCalls = Object.values(toolCallAccum).map((tc) => {
     let args = {};
     try { args = JSON.parse(tc.argsStr); } catch { args = { _raw: tc.argsStr }; }
@@ -982,7 +988,7 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
 function teamContext() {
   const members = [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID);
   if (!members.length) return "";
-  return `\n\nTim kantor saat ini. Semua agen ini SUDAH aktif dan siap menerima tugas lewat delegate_task dengan agent_id di bawah; jangan bilang tim belum ada dan jangan spawn agen baru untuk peran yang sudah ada:\n${
+  return `\n\nTim kantor saat ini. Semua agen ini SUDAH aktif dan siap menerima tugas lewat tool team_delegate dengan agent_id di bawah; jangan bilang tim belum ada dan jangan membuat agen baru untuk peran yang sudah ada:\n${
     members.map((a) => `- ${a.id}: ${a.name}${a.role ? ` (${a.role})` : ""}`).join("\n")}`;
 }
 
@@ -1169,7 +1175,9 @@ async function handleMethod(method, params, id, sendEvent) {
 
         try {
           // Only the orchestrator gets team management tools
-          const tools = isOrchestrator ? TEAM_TOOLS : [];
+          // Hermes ignores tools sent with a chat request (it runs its own); the team tools reach it
+          // as the MCP server office-team (team-mcp.js), so nothing is sent here.
+          const tools = [];
 
           const finalText = await runAgenticLoop({
             sessionKey, agentId: sessionAgentId, userMessage,
@@ -1608,4 +1616,41 @@ loadTeamFromDisk();
 loadHistoryFromDisk();
 startAdapter();
 
-module.exports = { team, TEAM_FILE, usage };
+// 💬 Kantor channel: the user says something in the office chat and one agent answers casually
+// (a line or two, in character, no tools). Not saved in the agent's own chat history.
+async function officeChat({ agent_id, message, context }) {
+  const agent = agentRegistry.get(typeof agent_id === "string" ? agent_id.trim() : "");
+  if (!agent) return { ok: false, error: "agen tidak ditemukan" };
+  const text = String(message ?? "").trim().slice(0, 600);
+  if (!text) return { ok: false, error: "pesan kosong" };
+  const lines = (Array.isArray(context) ? context : []).slice(-10)
+    .map((l) => `${String(l?.from ?? "").slice(0, 40)}: ${String(l?.text ?? "").slice(0, 300)}`);
+  const system = `${agent.systemPrompt || `Kamu adalah ${agent.name}.`}\n\nSekarang kamu ada di obrolan santai kantor (channel Kantor) bersama rekan-rekan dan pengguna. Balas sebagai ${agent.name} dengan 1 sampai 2 kalimat pendek, ramah, dan natural dalam Bahasa Indonesia, sesuai kepribadianmu. Ini hanya ngobrol: jangan menjalankan tool atau perintah, jangan membuat file, dan jangan mendelegasikan tugas. Jangan menulis namamu di awal jawaban.`;
+  const user = `${lines.length ? `Obrolan kantor sejauh ini:\n${lines.join("\n")}\n\n` : ""}Pengguna berkata: ${text}\n\nBalas sebagai ${agent.name}.`;
+  try {
+    const result = await streamOneTurn(
+      [{ role: "system", content: system }, { role: "user", content: user }],
+      agent.settings.model || HERMES_MODEL, [], null, null, null, 120_000,
+    );
+    recordUsage(agent.id, result);
+    const escaped = agent.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let reply = String(result.textContent || "").trim().replace(new RegExp(`^\\s*(?:\\*\\*)?${escaped}(?:\\*\\*)?\\s*:\\s*`, "i"), "").trim();
+    // a casual channel: at most three sentences, even if the model rambles
+    const sentences = reply.replace(/\s+/g, " ").match(/[^.!?]+[.!?]+/g);
+    if (sentences && sentences.length > 3) reply = sentences.slice(0, 3).join("").trim();
+    if (reply.length > 320) reply = `${reply.slice(0, 319)}…`;
+    if (!reply) return { ok: false, error: `${agent.name} tidak menjawab` };
+    return { ok: true, agent_id: agent.id, name: agent.name, text: reply };
+  } catch (err) {
+    return { ok: false, error: sanitizeErrorMessage(err) };
+  }
+}
+
+// Handed to the MCP server (team-mcp.js): Hermes' tools for working with the real office agents.
+const teamApi = {
+  list: () => [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID).map((a) => ({ id: a.id, name: a.name, role: a.role || "" })),
+  delegate: execDelegateTask,
+  context: execReadAgentContext,
+};
+
+module.exports = { team, TEAM_FILE, usage, teamApi, officeChat };

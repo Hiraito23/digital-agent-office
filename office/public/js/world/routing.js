@@ -4,9 +4,12 @@
 // their door (ROOMS[].door in layout.js).
 import { ROOMS } from "../office/layout.js";
 
-export const corridorFor = (z) => (z < 12.4 ? 11.1 : 14.3);
-export const AISLE_LEFT = 7;
-export const AISLE_RIGHT = 21.6;
+// Three east-west lanes: north of the desks, between the two desk rows, and south of them.
+// Agents walk along a lane and switch lanes through the side aisles at both ends.
+export const LANES = [11, 16, 21];
+export const corridorFor = (z) => LANES.reduce((best, lane) => (Math.abs(lane - z) < Math.abs(best - z) ? lane : best), LANES[0]);
+export const AISLE_LEFT = 9.4;
+export const AISLE_RIGHT = 26.6;
 
 // Work-area route: detour around the desk rows using two corridors and the side aisles.
 export const corridorRoute = (from, to) => {

@@ -5,7 +5,7 @@
 // Changes are saved automatically on the server (/api/layout -> config/layout.json) and
 // can be undone. Desks keep their agent, activity spots (sofa, arcade, ...) move along.
 import * as THREE from "three";
-import { CATALOG, CATALOG_ORDER, worldRects } from "../office/furniture.js";
+import { CATALOG, CATALOG_ORDER, LAYOUT_VERSION, worldRects } from "../office/furniture.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const MAX_UNDO = 60;
@@ -16,7 +16,8 @@ export const loadLayout = async () => {
     const res = await fetch("/api/layout", { cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
-    return Array.isArray(data.items) ? data.items : null;
+    // a layout saved for an older floor plan does not fit this one: use the default
+    return Array.isArray(data.items) && data.version === LAYOUT_VERSION ? data.items : null;
   } catch {
     return null;
   }
@@ -89,7 +90,7 @@ export const initLayoutEditor = ({ world, canvas }) => {
   const save = async () => {
     saveTimer = null;
     try {
-      const res = await fetch("/api/layout", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: furn.toJSON() }) });
+      const res = await fetch("/api/layout", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: LAYOUT_VERSION, items: furn.toJSON() }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
       setStatus("Tersimpan ✓", "ok");
     } catch (err) {

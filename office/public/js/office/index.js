@@ -106,7 +106,7 @@ export const buildOffice = (scene, layout) => {
     new THREE.MeshLambertMaterial({ color: "#74c0fc", emissive: "#1c7ed6", emissiveIntensity: 0.8, flatShading: true }),
   );
   crystal.scale.set(1, 1.6, 1);
-  crystal.position.set(21.85, 2.25, OFFICE.z0 + 1.6);
+  crystal.position.set(24.5, 2.25, OFFICE.z0 + 1.6);
   scene.add(crystal);
   const crystalLight = new THREE.PointLight("#74c0fc", 1.2, 5, 1.5);
   crystalLight.position.copy(crystal.position);
@@ -144,18 +144,22 @@ export const buildOffice = (scene, layout) => {
     glow.material.opacity = 0.12 + (Math.sin(t / 400) + 1) * 0.06;
   });
 
-  // lamps (only a few cast real light to stay fast)
+  // lamps (only a few cast real light to stay fast); their lights are returned so the sky can switch them on at night
+  const lampLights = [];
   const outsideX = OFFICE.x1 + 3.6;
-  [[39.4, 18.4, true], [12.7, 18.6, true], [4.6, 21.6, false], [11, 22.6, false], [16, 22.6, true], [21, 22.6, false], [31, 22.6, false],
-    [outsideX, 17, false], [outsideX, 11, false], [outsideX, 5, false]]
+  const outsideZ = OFFICE.z1 + 3.6;
+  [[OFFICE.x1 - 0.7, OFFICE.z1 - 0.7, true], [OFFICE.x0 + 0.7, OFFICE.z1 - 0.7, true],
+    [10, outsideZ, false], [14, outsideZ, true], [22, outsideZ, true], [26, outsideZ, false],
+    [outsideX, 12, false], [outsideX, 20, false], [outsideX, 28, false], [OFFICE.x0 - 3.6, 14, false], [OFFICE.x0 - 3.6, 22, false]]
     .forEach(([x, z, light]) => {
       const l = makeLamp(light);
       l.position.set(x, x < OFFICE.x1 && z < OFFICE.z1 && x > OFFICE.x0 ? top : 0, z);
       scene.add(l);
+      l.traverse((o) => { if (o.isPointLight) lampLights.push(o); });
     });
 
   // planters and bushes outside the railing
-  [[8.5, 1], [11.2, 2], [17, 3], [20.5, 4], [26, 5], [29.5, 6], [33, 7], [37, 8]].forEach(([x, k]) => {
+  [[9, 1], [12, 2], [22, 3], [25.5, 4]].forEach(([x, k]) => {
     const p = makePlanter(40 + k);
     p.position.set(x, 0, OFFICE.z1 + 0.35);
     scene.add(p);
@@ -172,20 +176,21 @@ export const buildOffice = (scene, layout) => {
     for (let i = -4; i < N + 4; i += 1) {
       const nearOffice = i >= OFFICE.x0 - 4 && i <= OFFICE.x1 + 4 && j >= OFFICE.z0 - 4 && j <= OFFICE.z1 + 4;
       if (nearOffice || isPath(i, j)) continue;
-      if (r() > 0.3) continue;
+      if (r() > 0.16) continue; // a lighter garden keeps the scene cheap to draw
       const kind = r();
       const scale = 0.85 + r() * 0.45;
       const tree = kind < 0.45 ? makePine(scale) : kind < 0.85 ? makeRoundTree(scale, Math.floor(r() * 1e6)) : makeBush(Math.floor(r() * 1e6));
       tree.position.set(i + 0.2 + r() * 0.6, 0, j + 0.2 + r() * 0.6);
       tree.rotation.y = r() * Math.PI * 2;
+      tree.traverse((o) => { o.castShadow = false; }); // garden plants do not need shadows
       scene.add(tree);
     }
   }
-  for (const [x, z] of [[4.2, 21], [25, 23.6], [OFFICE.x1 + 4.6, 20], [2.4, 12], [OFFICE.x1 + 4.6, 8], [13, 23.6], [35, 23.6]]) {
+  for (const [x, z] of [[5, 31], [OFFICE.x1 + 4.6, 31], [OFFICE.x1 + 4.6, 14], [2.4, 16], [OFFICE.x1 + 4.6, 6], [12, 32.4], [26, 32.4]]) {
     const b = makeBush(x * 10 + z);
     b.position.set(x, 0, z);
     scene.add(b);
   }
 
-  return { update: (t) => animated.forEach((fn) => fn(t)), floorTop: top, setDesks: furniture.setDesks, furniture };
+  return { update: (t) => animated.forEach((fn) => fn(t)), floorTop: top, setDesks: furniture.setDesks, furniture, windowMat: winMat, lampLights };
 };

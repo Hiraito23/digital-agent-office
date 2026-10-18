@@ -61,7 +61,7 @@ export const addRooms = (scene, top) => {
     } else {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshBasicMaterial({ map: signTexture(room.name), transparent: true }));
       sign.rotation.x = -Math.PI / 2;
-      sign.position.set((room.x0 + room.x1) / 2, top + 0.015, room.z1 - 0.45);
+      sign.position.set(room.sign?.x ?? (room.x0 + room.x1) / 2, top + 0.015, room.sign?.z ?? room.z1 - 0.45);
       scene.add(sign);
     }
   }

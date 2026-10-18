@@ -22,10 +22,11 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 | Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Naruto kerjakan frontend, Luffy API-nya, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
 | Rapat membahas project | **💬 Rapat** → isi topik, centang peserta (maks. 5), pilih jumlah putaran → **Mulai rapat**. Notulen masuk ke 📋 RINGKASAN (lihat [Rapat tim](#rapat-tim-rapat)) |
 | Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
-| Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
+| Ngobrol dengan satu agen | Pilih agennya di kotak chat kiri bawah (select **Ke**), atau klik karakternya / namanya di header, lalu ketik pesan |
+| Mengubah suasana kantor | Tombol **🕒 Waktu** (otomatis, pagi, siang, sore, malam) dan **☀ Cuaca** (cerah, berawan, hujan, badai, kabut) di header |
 | Memindah atau menambah furnitur kantor | **🛠 Layout** → klik benda lalu seret (lihat [Mengatur layout kantor](#mengatur-layout-kantor--layout)) |
 
-**Riwayat dan ringkasan.** Riwayat chat tiap agen disimpan di server (volume `office-data`), termasuk pesan yang baru dikirim dan balasan yang gagal, jadi tetap ada setelah halaman di-refresh. Kalau di-refresh saat agen masih bekerja, balasannya tetap masuk. Panel **📋 RINGKASAN** di kiri berisi ringkasan singkat setiap kali agen selesai menjawab (siapa, kapan, tugasnya, inti jawabannya); klik salah satunya untuk membuka chat agen itu langsung di pesan yang diringkas (pesan dan pertanyaannya disorot), atau klik **–** untuk menyembunyikan panel. Centang kotak di setiap ringkasan setelah Anda membacanya (bertanda **Dibaca** dan tampil redup; yang belum bertanda **Baru**). Hanya Anda yang menandai, jumlah yang belum dibaca tampil di judul panel, dan **Tampilkan yang belum dibaca saja** menyaring daftarnya. Tanda baca disimpan di server, jadi tetap ada setelah refresh atau di tab lain.
+**Riwayat dan ringkasan.** Riwayat chat tiap agen disimpan di server (volume `office-data`), termasuk pesan yang baru dikirim dan balasan yang gagal, jadi tetap ada setelah halaman di-refresh. Kalau di-refresh saat agen masih bekerja, balasannya tetap masuk. Panel **📋 RINGKASAN** di kanan atas berisi ringkasan singkat setiap kali agen selesai menjawab (siapa, kapan, tugasnya, inti jawabannya); klik salah satunya untuk membuka chat agen itu langsung di pesan yang diringkas (pesan dan pertanyaannya disorot), atau klik **–** untuk menyembunyikan panel. Centang kotak di setiap ringkasan setelah Anda membacanya (bertanda **Dibaca** dan tampil redup; yang belum bertanda **Baru**). Hanya Anda yang menandai, jumlah yang belum dibaca tampil di judul panel, dan **Tampilkan yang belum dibaca saja** menyaring daftarnya. Tanda baca disimpan di server, jadi tetap ada setelah refresh atau di tab lain.
 
 Agen diminta menjawab singkat (maksimal sekitar 5 kalimat atau 5 poin), kecuali Anda meminta detail. Model gratis kadang tetap menjawab panjang; model yang lebih kuat lebih patuh.
 
@@ -146,11 +147,11 @@ flowchart LR
 2. **Adapter menentukan siapa yang menjawab.** Pesan ke Hermes diproses dengan kemampuan orkestrator; pesan ke anggota tim (Naruto, Luffy, Sakura, Yui, Takumi, Akane, Daichi) memakai persona mereka dari `team.json`, ditambah folder proyek aktif dan aturan git.
 3. **Adapter memanggil Hermes Agent** (`/v1/chat/completions` di port 8642). Hermes menambahkan identitas `SOUL.md`, memori, dan skill, lalu menjalankan tools (terminal, file, web, ...) di container `hermes`.
 4. **Hermes meminta model AI** di provider yang Anda pilih lewat `hermes model`. Di sinilah biaya token terjadi (gratis untuk model `:free`).
-5. **Jawaban mengalir balik** sebagai event `delta` (sedang menulis) lalu `final` (selesai), ditambah event tool dan permintaan persetujuan. Kantor memakai event ini untuk: karakter berjalan ke meja dan duduk mengetik, menampilkan gelembung kata dan ikon tool, membacakan balasan dengan suara agen, mencatat di Aktivitas Terbaru, lalu kembali bersantai setelah selesai.
+5. **Jawaban mengalir balik** sebagai event `delta` (sedang menulis) lalu `final` (selesai), ditambah event tool dan permintaan persetujuan. Kantor memakai event ini untuk: karakter berjalan ke meja dan duduk mengetik, menampilkan gelembung kata dan ikon tool, menampilkan balasan di kotak chat (tidak dibacakan), mencatat di tab Log, lalu kembali bersantai setelah selesai.
 
 ### Hermes sebagai orkestrator
 
-Hermes punya enam alat tim yang tidak dimiliki agen lain: `spawn_agent` (merekrut agen baru), `delegate_task` (memberi tugas ke anggota tim), `list_team`, `configure_agent`, `dismiss_agent`, dan `read_agent_context` (membaca pekerjaan anggota lain). Jadi cukup beri Hermes tujuan besar, misalnya "buat fitur login". Hermes membaginya ke Yui (kebutuhan), Sakura (desain), Naruto (frontend), Luffy (backend), dan Takumi (test), lalu merangkum hasilnya. Setiap delegasi terlihat di kantor sebagai karakter yang mulai bekerja.
+Hermes menyuruh anggota tim lewat **server MCP `office-team`**, yang dijalankan kantor sendiri dan **didaftarkan otomatis ke Hermes** saat kantor menyala (tanpa langkah manual di clone baru). Alatnya: `team_list` (daftar anggota dan id-nya), `team_delegate` (memberi tugas ke seorang anggota dan menunggu hasilnya), `team_result` (mengambil hasil tugas yang belum selesai), dan `team_context` (membaca percakapan terbaru seorang anggota). Jadi cukup beri Hermes tujuan besar, misalnya "buat fitur login". Hermes membaginya ke Yui (kebutuhan), Sakura (desain), Haruto (frontend), Kenji (backend), dan Takumi (test), lalu merangkum hasilnya. Setiap delegasi dikerjakan oleh agen kantor yang sebenarnya, persis seperti kalau Anda chat dengannya: ia terlihat bekerja di kantor (progress bar di bawah namanya), dan tugas serta jawabannya tersimpan di chat agen itu dan di Ringkasan. Kalau agennya belum selesai dalam 100 detik, Hermes mendapat `task_id` dan mengambil hasilnya nanti dengan `team_result`.
 
 Agen yang direkrut Hermes saat chat hanya hidup sampai container `office` restart. Agen tetap dibuat lewat panel **⚙ Agen** (tersimpan di `config/team.json`).
 
@@ -198,9 +199,9 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
-Kantor punya dua bagian. **Aula utama** (kiri) berisi ruang bersama berdinding kaca dengan pintu dan papan nama: **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server**, **Pantry & Lounge** (kopi, akuarium, sofa), **Ruang Game** (arcade, ping-pong), **Lobby** (portal Hermes dan pintu masuk), dan area tengah yang lapang untuk berjalan. **Sayap ruang pribadi** (kanan) berisi 8 ruang kerja, empat di belakang dan empat di depan koridor; masing-masing simetris: pintu dan meja di tengah (meja menghadap pintu), dua lemari di sudut, dan papan nama "RUANG <NAMA AGEN>" di atas pintunya. Agen masuk dan keluar ruangan lewat pintu.
+Kantor adalah **satu ruangan terbuka berbentuk persegi** (20 x 20 tile) tanpa dinding sekat dan tanpa pintu, dikelilingi taman kecil. Zona-zonanya hanya dibedakan oleh warna lantai dan papan nama di lantai: **Ruang Rapat** (kiri atas: meja rapat, whiteboard, rak buku), **Ruang Server** (kanan atas: rak server), **Pantry & Lounge** (kiri bawah: kopi, akuarium, sofa), **Ruang Game** (kanan bawah: arcade, ping-pong), dan **Lobby** (bawah tengah: portal Hermes dan pintu pagar masuk). Di tengah ada dua baris meja kerja dan tiga lorong jalan.
 
-**Satu agen satu ruang:** Hermes mendapat ruang pertama, lalu anggota tim diurutkan menurut id. Saat mendapat tugas, agen berjalan ke ruangnya sendiri, duduk, dan mengetik; setelah selesai ia keluar ke koridor. Ruang yang belum terpakai bertanda "(KOSONG)". Kalau agen lebih dari 8, meja terbuka baru muncul di aula utama untuk agen berikutnya (maksimal 10 meja). Menambah atau menghapus agen di panel ⚙ Agen langsung memperbarui papan nama.
+**Satu agen satu meja:** Hermes mendapat meja pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **langsung berlari ke mejanya**, duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol. Layout bawaan punya 10 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Agen berjalan lewat tiga lorong (utara, tengah, selatan) dan berpindah lorong lewat lorong samping.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 
@@ -217,6 +218,53 @@ Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label n
 | Meja ping-pong | Main ping-pong | 🏓 |
 
 Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di sudut. Satu properti hanya dipakai satu agen dalam satu waktu; kegiatan berlangsung sekitar 9 sampai 18 detik. Posisi semua furnitur ini bisa diubah lewat **🛠 Layout**.
+
+## Kotak chat (gaya MMORPG)
+
+Kotak chat ada di **kiri bawah**, seperti di game MMORPG. Tampilannya memakai bingkai emas-perunggu. Susunan layar: judul dan tombol di header (kanan atas), panel **👥 TIM** di kiri (daftar semua agen dengan titik status; klik untuk memilih agen), **📋 RINGKASAN** di kanan atas, dan **PERSETUJUAN** di kanan bawah. Semua panel mengikuti tinggi header yang sebenarnya, jadi tidak saling menutupi walau header membungkus jadi beberapa baris di layar sempit.
+
+| Bagian | Fungsi |
+| --- | --- |
+| **Ke** (select) | Memilih agen yang diajak bicara. Berganti agen langsung memuat riwayatnya. Di kolom pesan, tekan **Tab** (atau **Shift+Tab**) untuk berpindah agen seperti mengganti target bisik di MMO |
+| Kolom pesan | Ketik pesan atau tugas. **Enter** mengirim, **Shift+Enter** baris baru. Tekan **Enter** di mana saja untuk langsung menulis |
+| Tab **💬 Pesan** | Percakapan dengan agen yang dipilih dalam bentuk **bubble chat**: pesan Anda di kanan (biru muda), balasan agen di kiri dengan avatar berwarna (tiap agen punya warna sendiri), lengkap dengan jam |
+| Tab **📢 Kantor** | Obrolan antar agen saat santai, juga sebagai bubble (kedua pembicara bergantian di kiri dan kanan; topik dari internet menampilkan 📰/📚 sumbernya), dan balasan dari agen yang sedang tidak Anda ajak bicara sebagai "bisikan" (klik bubble-nya untuk membuka percakapan). Angka merah di tab menunjukkan pesan baru. **Anda juga bisa menulis di sini**: lihat di bawah |
+| Tab **📜 Log** | Catatan sistem (tetap berupa baris teks): tool yang dipakai agen, persetujuan, proyek aktif, koneksi |
+| Tombol **–** | Mengecilkan kotak chat jadi hanya baris tab (diingat per browser) |
+| Tepi atas kotak | **Tarik ke atas atau bawah** untuk mengatur tinggi kotak chat (ada garis penanda di tepinya). Klik dua kali tepi itu untuk kembali ke tinggi awal. Tinggi diingat per browser |
+
+**Menulis di tab Kantor.** Tab ini adalah saluran obrolan kantor: kalau Anda menulis di sini, **satu agen pasti menjawab** (select "Ke" disembunyikan karena penerimanya bukan satu orang). Agen yang menjawab dipilih begini: yang **Anda sebut namanya** ("Kenji, ...", "@Sakura ..."); kalau tidak ada nama, agen yang terakhir bicara di tab ini (biar nyambung); kalau tidak ada, agen acak yang sedang tidak bekerja. Ia membalas dalam satu sampai tiga kalimat santai sesuai kepribadiannya dan mengetahui beberapa baris terakhir obrolan kantor. Ini hanya ngobrol: agen tidak menjalankan tool atau membuat file, dan percakapannya tidak masuk ke riwayat chat pribadi agen. Setiap pesan memakai satu panggilan model (tercatat di 📊 Pemakaian). Untuk memberi tugas, pakai tab **💬 Pesan**.
+
+Klik di ringkasan (📋 RINGKASAN) membuka percakapan agen itu dan menyorot balasannya, seperti sebelumnya. Kotak chat selalu punya penerima: Hermes secara bawaan.
+
+## Obrolan antar agen saat santai
+
+Agar kantor tidak kaku, dua agen yang sedang santai (berdiri atau berjalan di aula, tidak sedang bekerja atau rapat) kadang saling mendekat, berhadapan, lalu bergantian bicara lewat gelembung kata (3 sampai 5 kalimat), dengan jeda 15 sampai 30 detik antar obrolan. Topiknya sangat beragam (200+ obrolan siap pakai, dan tidak diulang dalam waktu dekat): kuliner, wisata, musik, film dan buku, budaya developer, kebiasaan sehat, nostalgia, fakta menarik, tebak-tebakan, "pilih mana", kehidupan kantor, candaan khas peran (PM dengan developer, QA dengan developer, security dengan developer, dan seterusnya), obrolan tentang cuaca, waktu, dan hari dalam seminggu, serta **fakta menarik dari internet** dan **berita yang sedang tren** (lihat di bawah). Setiap kalimat juga tercatat di tab **📢 Kantor**.
+
+**Obrolan berita.** Kantor mengambil headline terbaru dari feed publik Google News Indonesia (teknologi, sains, olahraga, hiburan, bisnis) setiap 30 menit, lewat server kantor (`/api/news`), tanpa mengirim data apa pun tentang Anda. Sekitar satu dari lima obrolan membahas satu headline ("Eh Sakura, udah baca berita ini? ..."), dengan tanggapan yang sesuai topiknya. Headline tentang kecelakaan, bencana, kriminal, politik, kematian, dan sejenisnya disaring supaya obrolan tetap ringan. Kalau tidak ada internet, agen memakai topik biasa. Daftar kata yang disaring ada di `BLOCKED` di `office/server/news.js`.
+
+**Fakta menarik dari Wikipedia.** Supaya topiknya tidak itu-itu saja, kantor mengumpulkan fakta dari Wikipedia Indonesia sebanyak-banyaknya dan menyimpannya dalam kumpulan yang terus bertambah (disimpan di volume `office-data`, jadi tidak hilang saat restart). Saat pertama menyala server mengumpulkan sekitar 220 fakta dalam beberapa menit, lalu menambah tiap 30 menit, sampai maksimal 1.500. Sumbernya puluhan kategori (candi, hewan, planet, penemuan, rekor dunia, fenomena alam, teknologi, permainan video, makanan, tarian, gunung, pulau, dan seterusnya) beserta subkategorinya; kalimat pertama artikel diambil sebagai fakta. Biografi, desa/kecamatan, daftar, definisi matematika yang kering, serta topik sedih, kekerasan, atau politik dilewati, dan fakta yang mengandung kata seperti terbesar, tertua, endemik, rekor, atau satu-satunya diprioritaskan. Sekitar 30% obrolan memakai fakta ini ("Tahu nggak, Sakura? ..."), dengan 📚 Wikipedia di bubble-nya. Setelah terkumpul banyak, obrolan hampir tidak pernah mengulang. Cek jumlahnya di `http://localhost:3000/api/facts?limit=5`.
+
+Obrolan ini tidak memanggil model AI (kalimat dan polanya ada di `office/public/js/world/chatter.js`; fakta dan berita diambil dari internet), jadi tidak memakai token dan tidak mengubah riwayat chat agen. Obrolan berhenti sendiri bila salah satu agen mendapat tugas atau ada rapat. Tambah topik baru dengan menambah baris di `GENERIC`, `BY_ROLE`, `WEATHER`, atau `PERIOD` di berkas itu. Animasi hanya berjalan saat tab browser terlihat.
+
+## Waktu dan cuaca
+
+Tombol **🕒 Waktu** dan **☀ Cuaca** di header mengubah suasana kantor. Tiap klik berpindah ke pilihan berikutnya, dan pilihannya diingat per browser.
+
+| Tombol | Pilihan | Efek |
+| --- | --- | --- |
+| 🕒 Waktu | **Otomatis** (mengikuti jam komputer; labelnya menampilkan bagian hari saat ini) | Langit, matahari/bulan, dan cahaya bergeser mulus sepanjang hari |
+| | **Pagi** (±07.15) | Cahaya hangat keemasan, langit biru muda |
+| | **Siang** (±12.30, mode terang) | Terang penuh, bayangan pendek |
+| | **Sore** (±17.30) | Cahaya jingga, bayangan panjang, langit senja |
+| | **Malam** (±22.00, mode malam) | Langit gelap berbintang, bulan, lampu taman dan jendela menyala |
+| ☀ Cuaca | **Cerah**, **Berawan**, **Hujan**, **Badai** (hujan deras + kilat), **Kabut** | Awan bergerak, hujan turun, cahaya meredup dan langit mengabu, kabut menebal. Cuaca bisa digabung dengan waktu mana pun |
+
+Berpindah waktu secara manual memutar jam dengan cepat (seperti time-lapse) menuju waktu tujuan. Pada mode Otomatis perpindahan mengikuti jam asli, jadi pagi, sore, dan malam terjadi sesuai jam komputer.
+
+## Progress bar tugas
+
+Saat agen mengerjakan tugas, di **bawah label namanya** muncul progress bar dengan keterangan waktu berjalan dan tool yang sedang dipakai (mis. "0:42 · terminal"). Bar-nya adalah **perkiraan**, karena model AI tidak melaporkan persentase asli: bar naik perlahan seiring waktu dan melompat setiap agen memakai tool, tetapi berhenti di sekitar 94% sampai tugas benar-benar selesai. Setelah selesai bar penuh berwarna hijau ("Selesai ✓ 1:05") dan hilang beberapa detik kemudian; kalau gagal menjadi merah ("Gagal ✕"). Agen yang sedang bekerja juga ditandai titik kuning di nama header dan bingkai label kuning. Agen yang didelegasikan Hermes mendapat bar sendiri.
 
 ## Mengatur layout kantor (🛠 Layout)
 
@@ -235,15 +283,15 @@ Mode edit seperti *build mode* di The Sims: klik **🛠 Layout** di header untuk
 | Kembali ke tata letak awal | **Kembalikan ke bawaan** (bisa diurungkan dengan Ctrl+Z) |
 | Selesai | **✓ Selesai**, tombol ✕, atau klik **🛠 Layout** lagi |
 
-**Hijau atau merah.** Selama benda dipegang, jejaknya di lantai berwarna hijau kalau tempatnya bebas dan merah kalau terhalang: di luar lantai kantor, menabrak dinding kaca, menutup pintu atau jalan masuk (termasuk lingkaran panggil di lobi), atau menimpa benda lain (karpet boleh berada di bawah benda lain). Alasannya tampil di bagian atas panel. Benda yang dilepas di tempat merah kembali ke posisi semula.
+**Hijau atau merah.** Selama benda dipegang, jejaknya di lantai berwarna hijau kalau tempatnya bebas dan merah kalau terhalang: di luar lantai kantor, menutup jalan masuk atau lingkaran panggil di lobi, atau menimpa benda lain (karpet boleh berada di bawah benda lain). Alasannya tampil di bagian atas panel. Benda yang dilepas di tempat merah kembali ke posisi semula.
 
-**Yang ikut berpindah.** Titik duduk agen mengikuti bendanya: sofa, bean bag, pantry, akuarium, rak buku, mesin arcade, meja ping-pong, rak server, dan kursi meja rapat. Agen yang sedang santai langsung memakai posisi baru, dan Ruang Rapat memakai kursi di meja rapat di mana pun ia berada. **Meja kerja** adalah tempat duduk milik agen: meja pertama di daftar milik Hermes, dan seterusnya (urutan sama dengan agen). Memindah meja memindahkan kursinya, dan agen yang sedang duduk berjalan ke tempat barunya. Papan nama ruang pribadi mengikuti pemilik meja yang ada di dalamnya, jadi ruang tanpa meja bertuliskan "(KOSONG)".
+**Yang ikut berpindah.** Titik duduk agen mengikuti bendanya: sofa, bean bag, pantry, akuarium, rak buku, mesin arcade, meja ping-pong, rak server, dan kursi meja rapat. Agen yang sedang santai langsung memakai posisi baru, dan rapat memakai kursi di meja rapat di mana pun ia berada. **Meja kerja** adalah tempat duduk milik agen: meja pertama di daftar milik Hermes, dan seterusnya (urutan sama dengan agen). Memindah meja memindahkan kursinya, dan agen yang sedang duduk berjalan ke tempat barunya.
 
 **Menambah agen.** Setiap agen butuh satu meja. Kalau agen lebih banyak daripada meja, sisanya otomatis mendapat meja terbuka di aula (seperti sebelumnya). Tambah meja kerja dari katalog kalau ingin menempatkannya sendiri.
 
 Batas dan catatan:
 
-- Yang bisa diubah hanya furnitur. Dinding, pintu, dan ukuran ruangan tetap (diatur di `ROOMS` di `office/layout.js`).
+- Yang bisa diubah hanya furnitur. Ukuran lantai dan zona (warna lantai dan papan nama) tetap, diatur di `OFFICE` dan `ROOMS` di `office/layout.js`. Layout yang tersimpan untuk denah lama (versi lebih rendah) otomatis diabaikan dan diganti layout bawaan.
 - Hanya ada satu meja rapat; tombolnya nonaktif selama sudah ada satu. Rapat memakai maksimal 5 kursi/posisi di meja itu dan selalu dihitung di Ruang Rapat.
 - Whiteboard, papan neon, jam dinding, jendela, lampu, taman, dan lingkaran panggil adalah bagian bangunan dan tidak bisa dipindah.
 - Layout disimpan di `config/layout.json` (ikut ke GitHub seperti `team.json`; file ini baru ada setelah Anda mengubah sesuatu). Tab browser lain baru menampilkan perubahan setelah di-refresh.
@@ -282,7 +330,7 @@ Tombol **Salin notulen** dan **Unduh .md** menyimpan notulen + transkrip. **■ 
 Semua agen memakai tools bawaan Hermes, yang berjalan di container `hermes`: terminal, operasi file (baca, tulis, patch, cari), eksekusi kode, browser otomatis, pencarian web, memori, skill, cron, todo, pembuatan gambar, analisis gambar, dan lainnya. Kantor menampilkan pemakaiannya:
 
 - **Label nama**: saat agen memakai tool, ikon tool (misalnya 💻 terminal atau 📁 file) muncul di depan namanya dan gelembung kata menampilkan perintahnya.
-- **Aktivitas Terbaru**: setiap pemanggilan tool tercatat, misalnya "Takumi 💻 terminal: npm test".
+- **Log** (tab ke-3 di kotak chat): setiap pemanggilan tool tercatat, misalnya "Takumi 💻 terminal: npm test".
 - **Panel PERSETUJUAN** (kanan bawah): perintah yang dianggap berisiko oleh Hermes (misalnya menghapus folder) menunggu izin Anda. Pilih **Izinkan sekali**, **Izinkan sesi ini**, **Selalu izinkan**, atau **Tolak**. Agen menunggu sampai Anda menjawab.
 - **⚙ Agen → 🧰 Tools**: daftar toolset Hermes beserta statusnya (aktif, nonaktif, atau perlu kunci API). Daftar ini hanya untuk dilihat. Untuk mengaktifkan, menonaktifkan, atau mengisi kunci API tool (misalnya pencarian web atau pembuatan gambar), buka dashboard Hermes di http://localhost:9119, lalu jalankan `docker compose restart hermes`.
 
@@ -381,15 +429,15 @@ Setiap soul menyebut skill miliknya, jadi agen tahu skill mana yang dimuat untuk
 
 ## Suara per agen
 
-Setiap agen membacakan balasannya dengan suaranya sendiri, memakai suara bawaan browser (Web Speech API): gratis dan tidak butuh API key. Suara terbaik didapat dengan membuka kantor di **Microsoft Edge**, yang menyediakan suara neural Microsoft "Online (Natural)" seperti Gadis (wanita) dan Ardi (pria) untuk semua halaman web.
+Setiap agen punya suara sendiri yang **hanya dipakai saat agen berinteraksi satu sama lain**: obrolan santai antar agen dan rapat tim. Balasan agen atas pesan atau tugas dari Anda **tidak dibacakan** (hanya tampil di kotak chat dan gelembung kata). Suaranya memakai suara bawaan browser (Web Speech API): gratis dan tidak butuh API key. Suara terbaik didapat dengan membuka kantor di **Microsoft Edge**, yang menyediakan suara neural Microsoft "Online (Natural)" seperti Gadis (wanita) dan Ardi (pria) untuk semua halaman web.
 
 ### Cara pakai
 
-- **🔊 Suara** di kanan atas: menyalakan atau mematikan suara. Pilihan ini diingat browser.
-- **🔊 Tes** di panel chat: memperdengarkan suara agen yang sedang dipilih. Arahkan kursor ke tombol itu untuk melihat nama suara yang dipakai.
-- Yang dibacakan hanya kalimat-kalimat awal balasan (maks. sekitar 240 karakter). Kode dan link dilewati, teks lengkap tetap di chat.
+- **🔊 Suara** di kanan atas: menyalakan atau mematikan suara agen (obrolan antar agen dan rapat). Pilihan ini diingat browser.
+- Tombol **🔊** di kotak chat: memperdengarkan suara agen yang sedang dipilih. Arahkan kursor ke tombol itu untuk melihat nama suara yang dipakai.
+- Obrolan antar agen menunggu satu kalimat selesai diucapkan sebelum kalimat berikutnya. Pada rapat yang dibacakan hanya kalimat-kalimat awal tiap giliran (maks. sekitar 240 karakter); kode dan link dilewati, teks lengkap tetap di panel rapat.
 - Saat agen bicara, kepalanya mengangguk, tangannya bergerak, labelnya bertanda ♪, dan volume musik otomatis turun.
-- Kalau browser tidak punya suara Indonesia, muncul petunjuk di Aktivitas Terbaru. Kantor tidak memakai suara bahasa lain agar tidak terdengar berlogat asing.
+- Kalau browser tidak punya suara Indonesia, muncul petunjuk di tab Log. Kantor tidak memakai suara bahasa lain agar tidak terdengar berlogat asing.
 
 ### Mengatur suara tiap agen
 
@@ -445,8 +493,8 @@ Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu s
 | `office/public/js/office/` | Scene kantor: denah `layout.js` (ruangan, meja, titik kegiatan), dinding, dekorasi, properti, tekstur | `docker compose up -d --build office` |
 | `office/public/js/characters/` | Karakter voxel: rambut, wajah, kostum, animasi | `docker compose up -d --build office` |
 | `office/public/js/world/` | Kamera, cahaya, perilaku dan jalur jalan agen | `docker compose up -d --build office` |
-| `office/public/js/ui/` | Label nama, panel ⚙ Agen, proyek, persetujuan, jukebox, suara | `docker compose up -d --build office` |
-| `office/public/js/main.js` | Titik masuk UI: menyambungkan semua modul, chat, aktivitas | `docker compose up -d --build office` |
+| `office/public/js/ui/` | Label nama + progress bar, panel ⚙ Agen, proyek, persetujuan, jukebox, suara, 🛠 Layout, tombol waktu/cuaca | `docker compose up -d --build office` |
+| `office/public/js/main.js` | Titik masuk UI: menyambungkan semua modul, kotak chat (tab Pesan/Kantor/Log), log aktivitas | `docker compose up -d --build office` |
 
 Kostum (menggantikan rambut dan pakaian, warna kulit dan kacamata tetap): Tema Pokémon = Tikus Listrik, Kadal Api, Kura Air, Kodok Daun, Rubah Cokelat; Tema Digimon = Dino Oranye, Serigala Bertanduk, Naga Biru, Bayi Bersayap; Tema Anime = Ninja Oranye, Seragam Pelaut, Gakuran Sekolah, Petarung Gi, Bajak Laut Topi Jerami, Penyihir (kostum anime tetap memakai rambut, plus seragam dan atribut seperti ikat kepala atau topi). Desainnya voxel orisinal yang terinspirasi tema, tanpa nama atau logo resmi.
 
@@ -469,9 +517,10 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Model yang dipilih di panel ⚙ Agen tidak dipakai (semua agen memakai model default) | `direct_model_requests` belum aktif di Hermes (config ada di volume, tidak ikut GitHub) | Jalankan langkah 4 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai), lalu `docker compose restart hermes` |
 | Sudah isi kredit tapi masih "Billing or credits exhausted" | Kredensial Nous masih tercatat *exhausted* | `docker exec hermes hermes auth reset nous`, lalu cek saldo di portal |
 | Agen mengulang pesan error lama padahal modelnya sudah diganti | Balasan error tersimpan di riwayat chat dan ikut dibaca model | Kosongkan riwayatnya: hentikan `office`, isi `clawd3d-history.json` di volume `office-data` dengan `{}`, lalu nyalakan lagi |
-| Furnitur tidak mau ditaruh (jejak merah) | Di luar lantai, menabrak dinding, menutup pintu, atau menimpa benda lain | Baca alasan di atas panel 🛠 Layout, lalu geser sedikit atau putar bendanya |
+| Furnitur tidak mau ditaruh (jejak merah) | Di luar lantai, menutup jalan masuk atau lingkaran panggil, atau menimpa benda lain | Baca alasan di atas panel 🛠 Layout, lalu geser sedikit atau putar bendanya |
 | Tata letak jadi berantakan | Salah pindah banyak benda | **Ctrl+Z** berulang, atau **Kembalikan ke bawaan** di panel 🛠 Layout |
 | Agen menaruh file di `/opt/data` dan tidak muncul di folder proyek, atau "Write denied ... outside HERMES_WRITE_SAFE_ROOT" | Tool tulis Hermes hanya boleh menulis di `HERMES_WRITE_SAFE_ROOT`; bawaan image hanya `/opt/data` | Pastikan `docker-compose.yml` punya `HERMES_WRITE_SAFE_ROOT=/opt/data:/workspace` di service `hermes`, lalu `docker compose up -d` |
+| Hermes bilang "sudah delegate" tapi agen lain tidak bekerja | Server MCP `office-team` belum terdaftar di Hermes, atau model yang dipakai Hermes terlalu lemah untuk memanggil tool | `docker exec hermes hermes mcp list` harus menampilkan `office-team` (kantor mendaftarkannya otomatis ±4 detik setelah menyala; `docker compose restart office` untuk mengulang). Model gratis kadang tetap tidak memanggil tool: pakai model yang lebih kuat untuk Hermes (`hermes config set model.default ...`) atau chat langsung ke agennya |
 | Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |
 | Agen diam lama tanpa membalas | Hermes menunggu persetujuan perintah | Jawab di panel PERSETUJUAN (kanan bawah) |

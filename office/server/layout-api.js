@@ -53,14 +53,21 @@ const createLayoutApi = ({ file }) => async (req, res) => {
   try {
     if (req.method === "GET") {
       let items = null;
-      try { items = JSON.parse(fs.readFileSync(file, "utf8")).items ?? null; } catch { /* no saved layout */ }
-      return send(res, 200, { items });
+      let version = null;
+      try {
+        const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+        items = saved.items ?? null;
+        version = saved.version ?? 1;
+      } catch { /* no saved layout */ }
+      return send(res, 200, { items, version });
     }
     if (req.method === "PUT") {
-      const items = cleanItems((await readBody(req)).items);
+      const body = await readBody(req);
+      const items = cleanItems(body.items);
+      const version = Number.isInteger(body.version) && body.version > 0 ? body.version : 1;
       fs.mkdirSync(path.dirname(file), { recursive: true });
       const tmp = `${file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, `${JSON.stringify({ version: 1, items }, null, 2)}\n`);
+      fs.writeFileSync(tmp, `${JSON.stringify({ version, items }, null, 2)}\n`);
       fs.renameSync(tmp, file);
       return send(res, 200, { ok: true, count: items.length });
     }

@@ -17,17 +17,26 @@
 
   <header class="hud top">
     <div class="title">AGENTIC DIGITAL OFFICE</div>
-    <div id="roster" class="roster"></div>
-    <select id="project-select" class="chip project" title="Proyek yang dikerjakan agen"><option value="">📁 Pilih proyek…</option></select>
-    <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
-    <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
-    <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
-    <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
-    <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
-    <button id="voice-toggle" class="chip music" title="Agen membacakan balasan">🔊 Suara</button>
-    <button id="music-toggle" class="chip music" title="Jukebox">♪ Musik</button>
-    <div id="conn" class="conn off">● Terputus</div>
+    <div class="top-actions">
+      <select id="project-select" class="chip project" title="Proyek yang dikerjakan agen"><option value="">📁 Pilih proyek…</option></select>
+      <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
+      <button id="time-toggle" class="chip" title="Waktu">🕒 Waktu</button>
+      <button id="weather-toggle" class="chip" title="Cuaca">☀ Cerah</button>
+      <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
+      <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
+      <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
+      <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
+      <button id="voice-toggle" class="chip music" title="Suara agen saat saling mengobrol dan rapat (balasan ke pesan Anda tidak dibacakan)">🔊 Suara</button>
+      <button id="music-toggle" class="chip music" title="Jukebox">♪ Musik</button>
+      <div id="conn" class="conn off">● Terputus</div>
+    </div>
   </header>
+
+  <!-- Team list (like an MMO party frame): status of every agent, click to talk -->
+  <aside id="party" class="hud party">
+    <div class="party-title">👥 TIM</div>
+    <div id="roster" class="roster"></div>
+  </aside>
 
   <aside id="agents" class="hud agents hidden">
     <div class="chat-head">
@@ -112,31 +121,32 @@
   </aside>
 
   <section class="hud bottom">
-    <div class="panel activity">
-      <h2>AKTIVITAS TERBARU</h2>
-      <ol id="activity"><li class="muted">Belum ada aktivitas.</li></ol>
-    </div>
     <div class="panel approvals">
       <h2>PERSETUJUAN</h2>
       <div id="approvals"><p class="muted">Tidak ada yang menunggu Anda</p></div>
     </div>
   </section>
 
-  <aside id="chat" class="hud chat hidden">
-    <div class="chat-head">
-      <div>
-        <div id="chat-name" class="chat-name">Hermes</div>
-        <div id="chat-role" class="chat-role">Orchestrator</div>
-      </div>
-      <div class="chat-actions">
-        <button id="voice-test" title="Tes suara">🔊 Tes</button>
-        <button id="chat-close" title="Tutup">✕</button>
-      </div>
+  <!-- Chat box (MMORPG style, bottom-left): choose who to talk to with the select; drag its top edge to change the height -->
+  <aside id="chat" class="hud chat mmo">
+    <div class="mmo-resize y" data-dir="y" title="Tarik ke atas atau bawah untuk mengatur tinggi (klik dua kali = ukuran awal)"></div>
+    <div class="mmo-tabs">
+      <button type="button" class="mmo-tab active" data-tab="pesan" title="Percakapan dengan agen yang dipilih">💬 Pesan</button>
+      <button type="button" class="mmo-tab" data-tab="kantor" title="Obrolan antar agen dan balasan dari agen lain">📢 Kantor<span id="kantor-badge" class="badge" hidden></span></button>
+      <button type="button" class="mmo-tab" data-tab="log" title="Aktivitas dan pemberitahuan sistem">📜 Log</button>
+      <span class="mmo-spacer"></span>
+      <label class="mmo-to" title="Kirim ke siapa (Tab di kolom pesan untuk berganti)"><span>Ke</span><select id="chat-target"></select></label>
+      <button type="button" id="chat-min" class="mmo-min" title="Kecilkan atau besarkan kotak chat">–</button>
     </div>
-    <div id="chat-log" class="chat-log"></div>
+    <div class="mmo-body">
+      <div id="chat-log" class="chat-log"></div>
+      <div id="kantor-log" class="chat-log hidden"></div>
+      <ol id="activity" class="chat-log hidden"></ol>
+    </div>
     <form id="chat-form" class="chat-form">
-      <textarea id="chat-input" rows="2" placeholder="Tulis tugas atau pesan…"></textarea>
-      <button type="submit">Kirim</button>
+      <textarea id="chat-input" rows="1" placeholder="Tulis pesan atau tugas…  (Enter = kirim)"></textarea>
+      <button type="submit" class="mmo-send">Kirim</button>
+      <button type="button" id="voice-test" class="mmo-voice" title="Tes suara">🔊</button>
     </form>
   </aside>
 

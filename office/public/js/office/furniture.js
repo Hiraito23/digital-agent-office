@@ -8,7 +8,10 @@
 // and move with it, so agents keep using whatever the layout looks like now.
 import * as THREE from "three";
 import { box, canvasTexture, cone, mat } from "./helpers.js";
-import { ACTIVITY_SPOTS, MEETING, OFFICE, PORTAL, PRIVATE_OFFICES, ROOMS, roomAt } from "./layout.js";
+import { ACTIVITY_SPOTS, MEETING, OFFICE, PORTAL, ROOMS, roomAt } from "./layout.js";
+
+// Bump this when the floor plan changes: layouts saved for an older plan are ignored.
+export const LAYOUT_VERSION = 2;
 import { C, makeCabinet, makeChair, makeCooler, makeDesk, makeRack } from "./props.js";
 
 // ---------------------------------------------------------------------------
@@ -291,38 +294,33 @@ export const defaultLayout = () => {
   const items = [];
   const add = (type, x, z, r = 0, variant) => items.push({ type, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
 
-  // one desk per private office first: agents take desks in this order
-  PRIVATE_OFFICES.forEach((room, i) => {
-    const back = room.door.outside.z > room.door.inside.z;
-    add("desk", (room.x0 + room.x1) / 2, back ? room.z0 + 1.375 : room.z1 - 1.375, back ? 0 : 2, i);
-  });
-  // a cabinet in both corners of the far wall of every private office
-  PRIVATE_OFFICES.forEach((room) => {
-    const back = room.door.outside.z > room.door.inside.z;
-    for (const x of [room.x0 + 0.45, room.x1 - 0.45]) add("cabinet", x, back ? room.z0 + 0.32 : room.z1 - 0.32, back ? 3 : 1);
-  });
-  // lounge
-  add("rug", 9.6, 17.3);
-  add("sofa", 9.6, 18.55, 1);
-  add("coffee-table", 9.6, 17.3);
-  add("beanbag", 8.4, 16.35, 0, 0);
-  add("beanbag", 10.9, 16.35, 0, 1);
-  add("counter", 6.35, 15.75);
-  add("aquarium", 6.3, 17.6);
-  add("cooler", 11.55, 15.45);
-  add("cabinet", 6.35, 9.5);
-  add("cabinet", 6.35, 10.3);
-  // meeting room and library
-  add("meeting-table", 8.6, 6.6);
-  add("bookshelf", 6.25, 7.1);
-  // server room
-  for (const x of [20.85, 21.85, 22.85]) add("rack", x, 5.45);
-  // game room
-  add("arcade", 23.45, 15.6, 0, 0);
-  add("arcade", 23.45, 16.6, 0, 1);
-  add("pingpong", 20.6, 17.6);
+  // desks: two rows in the middle of the room; agent i takes desk i (Hermes first)
+  const columns = [12.8, 15.4, 18, 20.6, 23.2];
+  columns.forEach((x, i) => add("desk", x, 13.4, 0, i));
+  columns.forEach((x, i) => add("desk", x, 17.8, 0, i + 5));
+  // cabinets along the west wall
+  add("cabinet", 8.35, 15.4);
+  add("cabinet", 8.35, 16.2);
+  // meeting zone (north-west) and library
+  add("meeting-table", 11, 10.1);
+  add("bookshelf", 8.25, 9.4);
+  // server zone (north-east)
+  for (const x of [23.5, 24.5, 25.5]) add("rack", x, 8.45);
+  // lounge (south-west)
+  add("rug", 11, 26);
+  add("sofa", 11, 27.25, 1);
+  add("coffee-table", 11, 26);
+  add("beanbag", 9.75, 25.05, 0, 0);
+  add("beanbag", 12.25, 25.05, 0, 1);
+  add("counter", 8.35, 23.6);
+  add("aquarium", 8.3, 25.7);
+  add("cooler", 13.55, 22.75);
+  // game zone (south-east)
+  add("arcade", 27.45, 23.6, 0, 0);
+  add("arcade", 27.45, 24.6, 0, 1);
+  add("pingpong", 24.6, 26.4);
   // big plants
-  for (const [x, z] of [[19.5, 5.5], [39.5, 18.5], [11.5, 18.55], [12.5, 15.5], [17.5, 15.5]]) add("plant", x, z);
+  for (const [x, z] of [[21.2, 8.6], [27.5, 12.5], [13.7, 12.5], [8.6, 20.4], [27.4, 19.6]]) add("plant", x, z);
   return withIds(items);
 };
 
@@ -457,9 +455,6 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
     autoDesks.clear();
     const extra = Math.max(0, people.length - desks.length);
     if (extra && makeAutoDesk) makeAutoDesk(autoDesks, extra).forEach((seat, k) => { seats[desks.length + k] = seat; });
-    const owner = new Map(); // private office -> owner name
-    seats.forEach((seat, i) => { if (seat?.room && !owner.has(seat.room)) owner.set(seat.room, people[i].name); });
-    PRIVATE_OFFICES.forEach((room) => rooms.setLabel(room.id, owner.has(room.id) ? `RUANG ${owner.get(room.id).toUpperCase()}` : `${room.name} (KOSONG)`));
     return seats;
   };
 

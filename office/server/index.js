@@ -3,6 +3,10 @@
 //
 //   browser ──HTTP──▶ /api/projects  projects.js     (📁 project picker)
 //                     /api/layout   layout-api.js   (🛠 saved furniture layout)
+//                     /mcp          team-mcp.js     (MCP server: Hermes delegates to the office agents)
+//                     /api/facts    facts.js        (Wikipedia facts for the agents' small talk)
+//                     /api/office-chat office-chat.js (the Kantor tab: one agent answers the user)
+//                     /api/news     news.js         (trending headlines for the agents' small talk)
 //                     /api/usage    usage.js        (📊 token usage per agent and model)
 //                     /api/*        agents-api.js   (agent panel, SOUL.md)
 //                     /people.json  config/people.json (looks + voices)
@@ -18,6 +22,11 @@ const adapter = require("./hermes-gateway-adapter.js");
 const { createAgentsApi, PEOPLE_FILE } = require("./agents-api.js");
 const { createProjectsApi } = require("./projects.js");
 const { createLayoutApi } = require("./layout-api.js");
+const { createNewsApi } = require("./news.js");
+const { createTeamMcp } = require("./team-mcp.js");
+const { createFactsApi } = require("./facts.js");
+const { createOfficeChatApi } = require("./office-chat.js");
+const { startHermesSetup } = require("./hermes-setup.js");
 const { serveStatic } = require("./static-files.js");
 const { attachWsProxy } = require("./ws-proxy.js");
 
@@ -26,6 +35,13 @@ const ADAPTER_PORT = Number(process.env.HERMES_ADAPTER_PORT || 18789);
 
 const handleAgentsApi = createAgentsApi(adapter);
 const handleProjectsApi = createProjectsApi(adapter);
+// Hermes reaches the office team through this MCP server (team_delegate, ...); see team-mcp.js
+const API_KEY = process.env.HERMES_API_KEY || process.env.API_SERVER_KEY || "";
+const handleMcp = createTeamMcp({ api: adapter.teamApi, authKey: API_KEY });
+startHermesSetup({ key: API_KEY });
+const handleNewsApi = createNewsApi();
+const handleFactsApi = createFactsApi(); // interesting facts from Wikipedia for the agents' small talk
+const handleOfficeChatApi = createOfficeChatApi({ officeChat: adapter.officeChat }); // the Kantor tab of the chat box // trending headlines for the agents' small talk
 // Furniture layout from the 🛠 Layout editor, saved next to people.json in config/.
 const handleLayoutApi = createLayoutApi({ file: process.env.LAYOUT_FILE || path.join(path.dirname(PEOPLE_FILE), "layout.json") });
 
@@ -48,6 +64,10 @@ const server = http.createServer((req, res) => {
   if (urlPath === "/api/usage" && req.method === "GET") return serveUsage(req, res);
   if (urlPath.startsWith("/api/projects")) return handleProjectsApi(req, res, urlPath);
   if (urlPath === "/api/layout") return handleLayoutApi(req, res);
+  if (urlPath === "/api/news") return handleNewsApi(req, res);
+  if (urlPath === "/api/facts") return handleFactsApi(req, res);
+  if (urlPath === "/api/office-chat") return handleOfficeChatApi(req, res);
+  if (urlPath === "/mcp") return handleMcp(req, res);
   if (urlPath.startsWith("/api/")) return handleAgentsApi(req, res, urlPath);
   if (urlPath === "/people.json") return servePeople(res);
   return serveStatic(req, res, urlPath);

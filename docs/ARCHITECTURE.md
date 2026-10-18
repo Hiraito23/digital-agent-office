@@ -42,6 +42,11 @@ office/                 image Docker "office"
     summaries.js        log ringkasan jawaban (panel 📋 RINGKASAN), disimpan di office-data
     meetings.js         rapat tim: giliran bicara peserta + notulen Hermes (panel 💬 Rapat)
     layout-api.js       GET/PUT/DELETE /api/layout: baca, simpan, dan reset config/layout.json
+    team-mcp.js         server MCP office-team: Hermes menugaskan agen kantor (team_delegate, ...)
+    hermes-setup.js     mendaftarkan server MCP itu ke Hermes lewat API dashboard
+    news.js             GET /api/news: headline Google News Indonesia yang disaring (untuk obrolan agen)
+    facts.js            GET /api/facts: kumpulan fakta Wikipedia yang terus bertambah (untuk obrolan agen)
+    office-chat.js      POST /api/office-chat: tab Kantor, satu agen menjawab pengguna
     usage.js            catatan token per hari/agen/model, laporan harian-mingguan-bulanan (panel 📊 Pemakaian), disimpan di office-data
   public/               sisi browser (ES modules, tanpa build step)
     index.html, style.css
@@ -50,12 +55,14 @@ office/                 image Docker "office"
       main.js           titik masuk UI: menyambungkan semua modul + state aplikasi
       net/gateway.js    klien WebSocket ke adapter (request/response + event)
       world/
-        world.js        renderer, kamera, cahaya, agen (meja, kegiatan, gerak)
-        routing.js      jalur jalan: koridor, lorong samping, pintu ruangan
+        world.js        renderer, kamera, cahaya, agen (meja, kegiatan, gerak, obrolan antar agen)
+        environment.js  langit, waktu (pagi/siang/sore/malam) dan cuaca (hujan, kabut, awan, ...)
+        chatter.js      kalimat obrolan antar agen yang santai (tanpa AI)
+        routing.js      jalur jalan: tiga lorong timur-barat (LANES) dan lorong samping
       office/           scene kantor
-        layout.js       DENAH: ukuran kantor, ruangan, dinding, pintu (ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js)
+        layout.js       DENAH: satu ruangan terbuka 20x20 (OFFICE), zona lantai (ROOMS), pagar (GATE), titik jalan (WANDER); ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js
         index.js        merakit seluruh scene (buildOffice)
-        rooms.js        dinding kaca, pintu, papan nama
+        rooms.js        papan nama zona di lantai
         furniture.js    furnitur yang bisa dipindah: katalog, layout bawaan, aturan penempatan, manajer
         decor.js        hiasan dinding (whiteboard, neon, jam)
         props.js        meja, kursi, lampu, pohon, rak server, ...
@@ -69,11 +76,12 @@ office/                 image Docker "office"
         presets.js      tampilan bawaan
         parts.js        potongan dasar (box, cone, material)
       ui/
-        name-tags.js    label nama + gelembung kata (DOM)
+        name-tags.js    label nama + gelembung kata + progress bar tugas (DOM)
+        environment-controls.js  tombol 🕒 Waktu dan ☀ Cuaca di header
         agents-panel.js panel ⚙ Agen (tambah/ubah/hapus agen, SOUL.md, 🧰 Tools)
         projects.js     dropdown 📁 Proyek (proyek yang dikerjakan agen)
         approvals.js    panel PERSETUJUAN (izin perintah berisiko dari Hermes)
-        summaries.js    panel 📋 RINGKASAN di kiri (jawaban yang sudah selesai)
+        summaries.js    panel 📋 RINGKASAN di kanan atas (jawaban yang sudah selesai)
         meeting.js      panel 💬 Rapat (form, transkrip langsung, notulen, unduh .md)
         usage.js        panel 📊 Pemakaian (tab harian/mingguan/bulanan, kartu per agen)
         layout-editor.js  mode 🛠 Layout: pilih, seret, putar, tambah, hapus, urungkan, simpan
@@ -86,7 +94,7 @@ office/                 image Docker "office"
 1. `main.js` mengirim `chat.send` lewat `net/gateway.js`.
 2. `ws-proxy.js` meneruskannya ke adapter. Adapter memilih persona agen dari `config/team.json` dan memanggil API Hermes.
 3. Jawaban kembali sebagai event `chat` (`delta` lalu `final`), di-broadcast ke semua tab. Pesan pengguna langsung disimpan ke riwayat (`clawd3d-history.json`), balasan disimpan saat selesai (balasan gagal diberi `error: true` dan tidak ikut dikirim ke model). Setiap balasan selesai juga dicatat di `office-summaries.json` dan dikirim sebagai event `summary`. Tab yang baru dibuka memanggil `chat.active`, `chat.history`, dan `summaries.list`.
-4. `main.js` memperbarui status agen di `World` (jalan ke meja dan mengetik), menampilkan gelembung kata (`ui/name-tags.js`), membacakan balasan (`ui/voice.js`), dan mencatat ke Aktivitas Terbaru.
+4. `main.js` memperbarui status agen di `World` (jalan ke meja dan mengetik), menampilkan gelembung kata (`ui/name-tags.js`), dan mencatat ke tab Log. Balasan ke pengguna tidak dibacakan; `ui/voice.js` hanya dipakai untuk obrolan antar agen (`world.onChatter` di `main.js`; `stepChat` menunggu `speaking` selesai) dan giliran rapat (`ui/meeting.js`).
 
 ## Proyek
 
@@ -130,25 +138,57 @@ Furnitur adalah data, bukan kode: daftar `{ id, type, x, z, rot, variant? }` (`x
 - `snap(item, x, z)`: grid 0,1 tile, lalu menempel rata ke tepi lantai, dinding, dan tepi benda lain dalam jarak 0,14 tile.
 - `pick(raycaster)`: benda di bawah kursor. `World.groundPoint()` dan `World.pickFurniture()` menyiapkan sinarnya.
 - `syncSpots()`: mengisi `ACTIVITY_SPOTS` dan `MEETING.seats` **di tempat** dari `spots` semua benda. Objek titik dipertahankan menurut id (`<id benda>/<id titik>`), jadi agen yang sedang menuju atau memakai titik itu ikut berpindah. Ruang titik dihitung ulang dengan `roomAt()`.
-- `setDesks(people)`: agen ke-*i* mendapat meja ke-*i* menurut urutan di daftar (meja pertama = Hermes). Kursi memakai `seat` milik katalog (`desk`), ruangnya dari `roomAt()`. Agen yang lebih banyak daripada meja mendapat meja terbuka otomatis (`makeAutoDesk` di `index.js`), dan papan nama ruang pribadi mengikuti pemilik meja di dalamnya.
+- `setDesks(people)`: agen ke-*i* mendapat meja ke-*i* menurut urutan di daftar (meja pertama = Hermes). Kursi memakai `seat` milik katalog (`desk`), ruangnya dari `roomAt()`. Agen yang lebih banyak daripada meja tidak mendapat kursi (tambahkan meja lewat editor).
 - `onChange`: dipanggil setelah perubahan yang final; `World` memakainya untuk `refreshDesks()` sehingga agen yang duduk berjalan ke kursi barunya.
 
 **Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut memutar kamera (`OrbitControls`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
 
 **Server (`server/layout-api.js`).** Hanya memeriksa bentuk dan rentang (maks. 300 benda, id unik, posisi -5 sampai 60, rotasi 0 sampai 3); jenis benda divalidasi browser terhadap katalognya. Berkas ditulis atomik ke `config/layout.json` (`LAYOUT_FILE` bisa menggantinya).
 
-Batasan: dinding dan pintu belum bisa diedit, rapat selalu dianggap berlangsung di `rapat` (satu meja rapat), dan routing agen belum menghindari furnitur.
+Batasan: zona lantai dan ukuran kantor belum bisa diedit dari UI, rapat selalu dianggap berlangsung di zona `rapat` (satu meja rapat), dan routing agen belum menghindari furnitur.
+
+## Waktu, cuaca, obrolan agen, kotak chat, progress bar
+
+**Langit dan cuaca (`world/environment.js`).** Tampilan adalah fungsi dari jam (0 sampai 24): `KEYS` berisi keyframe warna langit (atas dan cakrawala), warna dan intensitas matahari, cahaya hemisfer, `night` (0-1) dan `glow` (halo matahari terbit/terbenam), diinterpolasi per frame. Matahari bergerak di busur 05.8 sampai 18.8 dan bulan di sisa malam (`bodyAt`); intensitas dip sampai 0,12 di 05.8 dan 18.8 agar tukar sumber cahaya tidak terlihat melompat. Satu `DirectionalLight` mengikuti benda langit, kubah langit (`ShaderMaterial` dengan gradasi dan halo) mengikuti kamera, dan ada cakram matahari/bulan serta bintang. `WEATHER` berisi pengali cahaya, derajat abu-abu langit, jumlah dan kegelapan awan, jumlah hujan, dan jarak kabut; faktor-faktornya di-ease tiap frame sehingga pergantian cuaca mulus. Badai menambah kilat (lonjakan cahaya hemisfer) dan hujan miring. Lampu taman (`office.lampLights`) dan jendela (`office.windowMat`) menyala menurut `night`. Mode "otomatis" memakai jam komputer; mode manual menggeser jam maju ke jam tujuan (±7 jam per detik). `main.js` memberi `dt` maksimal 100 ms per frame, jadi pada fps rendah perpindahan terasa lebih lambat.
+
+**Obrolan antar agen (`World.updateChatter`).** Tiap 15 sampai 30 detik, bila ada minimal dua agen berstatus `idle`/`wander` di luar ruangan dan tidak ada rapat, dipilih satu agen dan satu dari tiga agen terdekatnya. Mereka berjalan ke titik `WANDER` terdekat dari titik tengah (mode `toChat` -> `chat`), saling menghadap, lalu `stepChat` mengeluarkan satu baris tiap `1800 + panjang * 55` ms lewat `onSay` (gelembung kata) dan `onChatter` (baris di tab Kantor). Obrolan berhenti bila salah satu agen berpindah mode (mendapat tugas, ikut rapat) atau lewat 90 detik. Kalimat dibuat oleh `makeConversation` di `world/chatter.js` (topik umum, topik khas pasangan peran, dan topik cuaca/waktu dari `Environment`), tanpa memanggil model.
+
+**Kotak chat (`main.js`).** Elemen `#chat` di kiri bawah punya tiga panel: `#chat-log` (Pesan), `#kantor-log` (Kantor, diisi `addOfficeLine`) dan `#activity` (Log, diisi `logActivity`). Select `#chat-target` memilih `selected`; `openChat(id, focus, { quiet })` memuat riwayat sekali per koneksi. Balasan agen yang bukan `selected` dicatat sebagai "bisikan" di tab Kantor. Warna nama per agen dari hash id (`colorOf`). Ukuran kotak diatur lewat variabel CSS `--chat-h` dan `--chat-w` (tiga pegangan `.mmo-resize` di tepinya; disimpan di `localStorage`). Posisi semua panel di bawah header memakai `--panel-top = --top-h + 8px`, dan `--top-h` diisi `ResizeObserver` di `main.js` dari tinggi header yang sebenarnya; daftar agen (`#roster`) ada di panel `#party` di kiri.
+
+**Progress bar (`ui/name-tags.js`).** `startTask`/`taskStep`/`endTask`/`cancelTask` dipanggil `main.js` dari event `chat` (delta pertama, final, error) dan `tool`. Persentase adalah perkiraan: `1 - exp(-(menit * 1,1 + langkah * 0,2))` dibatasi 94% dan tidak pernah turun; hanya `endTask(ok)` yang mengisinya penuh.
+
+**Lantai (`office/textures.js`).** `floorTexture` memakai 20 px per tile dan menggambar lantai tiap zona yang dipotong tepat pada persegi panjang zonanya (`ROOMS`), sehingga batas zona yang berada di koordinat pecahan tetap tepat. Versi denah ada di `LAYOUT_VERSION` (`furniture.js`): layout tersimpan dengan versi lain diabaikan `loadLayout()`.
+
+## Delegasi Hermes ke agen kantor (MCP)
+
+Server API Hermes **mengabaikan tool yang dikirim klien** bersama permintaan chat; ia menjalankan tool-nya sendiri. `delegate_task` bawaannya hanya membuat pembantu anonim di dalam Hermes, jadi dulu "Hermes menyuruh Sakura" tidak pernah sampai ke Sakura di kantor (Hermes hanya mengaku sudah mendelegasikan). Solusinya memakai MCP, yang didukung Hermes:
+
+- `server/team-mcp.js`: server MCP (JSON-RPC 2.0 lewat HTTP) di `POST /mcp` pada server kantor, dilindungi `Authorization: Bearer <API_SERVER_KEY>`. Alatnya `team_list`, `team_delegate`, `team_result`, `team_context`. `team_delegate` memanggil `execDelegateTask` milik adapter, yaitu jalur yang sama dengan chat ke agen itu: persona dan konteks proyeknya dipakai, event `chat` dan `tool` dikirim ke UI (progress bar), riwayat dan ringkasan tersimpan, pemakaian token tercatat. Tugas dijalankan sebagai job: bila belum selesai dalam `wait_seconds` (bawaan 100, maks. 170) hasilnya diambil lewat `team_result`.
+- `server/hermes-setup.js`: mendaftarkan server itu ke Hermes lewat API dashboard (`POST /api/mcp/servers`, nama `office-team`, URL `http://office:3000/mcp`, bearer = API key) saat kantor menyala dan memeriksanya tiap 5 menit, jadi clone baru atau Hermes yang dibuat ulang tidak butuh langkah manual. Cek dengan `docker exec hermes hermes mcp list`.
+- `ORCHESTRATOR_SYSTEM_PROMPT` dan `teamContext()` di adapter menyuruh Hermes memakai `team_delegate` (bukan `delegate_task` bawaan) dan melarangnya mengaku sudah mendelegasikan tanpa memanggil tool. Adapter tidak lagi mengirim `tools` ke Hermes. Balasan Hermes yang berisi paragraf sela identik berurutan dirapikan (`dedupeParagraphs`).
+
+Batasan: model gratis kadang tetap tidak memanggil tool; model yang lebih kuat lebih andal.
+
+## Fakta Wikipedia dan obrolan di tab Kantor
+
+**Fakta (`server/facts.js`).** Kumpulan fakta disimpan di `office-facts.json` (volume `office-data`, maks. 1.500, yang tertua dibuang dulu). `refresh(rounds)` memilih kategori acak dari `CATEGORIES`; `sample()` mengambil anggota kategori lewat API MediaWiki (`list=categorymembers`), kadang turun ke satu subkategori (kedalaman maks. 2), memilih sampai 20 artikel yang belum ada, mengambil pengantarnya (`prop=extracts`), dan `accept()` membuang artikel yang tidak cocok (`BLOCKED` dari `news.js`, `DRY`, `BIO`, `PLACE_STUB`, daftar, disambiguasi). `toFact()` mengambil kalimat pertama tanpa tanda kurung (40 sampai 210 karakter). Artikel yang cocok dengan `FUN` ditandai `fun`. Saat start dikumpulkan sampai `TARGET_FIRST` (220) fakta dalam beberapa putaran, lalu 6 sampel tiap 30 menit; permintaan dibuat berurutan dengan jeda 400 ms dan `User-Agent` yang jelas sesuai aturan Wikimedia. `GET /api/facts?limit=N` mengembalikan sampel acak. Di browser `main.js` memanggil `setFacts()` (tiap 20 menit) dan `makeConversation` memakainya pada ±30% obrolan (lihat `FACT_OPEN`, `FACT_REACT`, `FACT_MID`, `FACT_CLOSE`).
+
+**Tab Kantor (`main.js`, `server/office-chat.js`).** Kalau tab aktif adalah Kantor, pesan tidak dikirim lewat `chat.send` tetapi ke `sendOfficeMessage`: bubble pengguna (`kind: "me"`) ditambahkan, `pickResponder` memilih agen (yang disebut namanya lewat regex `\p{L}`, lalu `lastTalker` dengan peluang 60%, lalu agen acak yang tidak sedang bekerja menurut `nameTags.isWorking`), indikator mengetik ditampilkan, dan `POST /api/office-chat { agent_id, message, context }` dipanggil. Konteks adalah 14 baris terakhir saluran itu (`officeContext`). Di adapter, `officeChat()` memanggil `streamOneTurn` dengan prompt sistem persona agen ditambah aturan "ngobrol santai, 1 sampai 2 kalimat, tanpa tool", memotong jawaban (maks. 3 kalimat, 320 karakter), mencatat pemakaian token, dan tidak menyentuh riwayat chat agen.
+
+## Berita untuk obrolan agen
+
+`server/news.js` (`GET /api/news`) mengambil RSS Google News Indonesia untuk lima topik (teknologi, sains, olahraga, hiburan, bisnis), menyaring headline sensitif (`BLOCKED`), membuang yang terlalu pendek/panjang atau berhuruf kapital semua, dan menyimpannya 30 menit di memori. `main.js` memuatnya tiap 30 menit dan memberikannya ke `setNews()` di `world/chatter.js`, yang membuat obrolan berita di `makeConversation` (pembuka dengan kutipan headline, tanggapan, dua kalimat sesuai topik, penutup). Tidak ada model AI yang dipakai dan tidak ada data pengguna yang dikirim keluar.
 
 ## Siklus hidup agen di World
 
-Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke properti) → `activity` (memakai properti), atau `toSeat` → `sitting` saat sedang bekerja. Status `working` dari gateway selalu memanggil agen ke mejanya. Jalur dihitung oleh `world/routing.js` lewat koridor dan pintu ruangan.
+Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke properti) → `activity` (memakai properti), `toChat` → `chat` (mengobrol dengan agen lain), atau `toSeat` → `sitting` saat sedang bekerja. Status `working` dari gateway selalu memanggil agen ke mejanya (mode `toSeat` berjalan 1,8 kali lebih cepat, jadi terlihat berlari). Setelah status berubah, `update()` menyuruh agen berdiri (`standUp`) bila sudah duduk lebih dari 3 detik (`seatedAt`). Jalur dihitung oleh `world/routing.js` lewat tiga lorong (`LANES`) dan lorong samping.
 
 ## Resep tugas umum
 
 | Ingin | Ubah |
 | --- | --- |
-| Menambah atau memindah ruangan | `ROOMS` di `office/layout.js` (bentuk, dinding, celah pintu, titik pintu, jenis lantai) |
-| Menambah ruang pribadi | `WING` di `office/layout.js` (lebar sayap / ukuran ruang); `PRIVATE_OFFICES` dibuat otomatis, `defaultLayout()` di `office/furniture.js` memberi tiap ruang satu meja dan dua lemari, papan nama lewat `setDesks()` |
+| Mengubah ukuran kantor atau zona lantai | `OFFICE`, `ROOMS`, `GATE`, `PORTAL`, `WANDER` dan `LANES` (`world/routing.js`) di `office/layout.js`; naikkan `LAYOUT_VERSION` di `office/furniture.js` bila posisi furnitur bawaan berubah |
+| Mengubah susunan furnitur bawaan | `defaultLayout()` di `office/furniture.js` (meja berderet di `columns`) |
 | Menambah jenis furnitur | Entri baru di `CATALOG` dan `CATALOG_ORDER` (`office/furniture.js`): `build`, `rects` (jejak tabrakan), `spots` bila dipakai agen; tambahkan ke `defaultLayout()` bila perlu ada sejak awal |
 | Menambah pose untuk properti | Titik (`spots`) di entri katalognya, pose baru di `characters/animation.js` |
 | Menambah kostum | Entri baru di `COSTUMES` (`characters/costumes.js`) + id-nya di daftar `COSTUMES` di `server/agents-api.js` |

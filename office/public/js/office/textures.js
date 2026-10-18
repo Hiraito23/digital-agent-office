@@ -1,7 +1,7 @@
 // Pixel-art textures drawn on a canvas: grass/path ground, room floors,
 // monitor screens, windows and room name signs.
 import { canvasTexture, pixelTexture, rand } from "./helpers.js";
-import { N, OFFICE, isPath, roomAt } from "./layout.js";
+import { N, OFFICE, ROOMS, isPath } from "./layout.js";
 
 export const TPX = 16; // texture pixels per tile
 
@@ -57,47 +57,70 @@ export const FLOOR_STYLES = {
   marble: { base: "#f1f3f5", grout: "#dee2e6", light: "#ffffff", fleck: "#e9c46a" },
 };
 
-export const drawFloorTile = (ctx, ox, oz, style) => {
+// Floor tiles are drawn at FPX pixels per tile (a multiple of 10) so that room borders
+// at tenths of a tile (e.g. a wall at z = 9.6) fall exactly on a pixel.
+export const FPX = 20;
+
+// One tile at (ox, oz), `size` px wide, styled by the room it belongs to. The 16px design is
+// scaled: offsets and lengths are multiplied by size / 16, lines stay one pixel thick.
+export const drawFloorTile = (ctx, ox, oz, style, size = TPX) => {
   const c = FLOOR_STYLES[style];
+  const s = (v) => Math.round((v * size) / 16);
   ctx.fillStyle = c.base;
-  ctx.fillRect(ox, oz, TPX, TPX);
+  ctx.fillRect(ox, oz, size, size);
   if (style === "wood") {
-    // planks: a seam every 4px, staggered joints
+    // planks: a seam every ~4px, staggered joints
     ctx.fillStyle = c.grout;
-    for (let y = 3; y < TPX; y += 4) ctx.fillRect(ox, oz + y, TPX, 1);
-    ctx.fillRect(ox + 5, oz, 1, 3); ctx.fillRect(ox + 11, oz + 4, 1, 3); ctx.fillRect(ox + 3, oz + 8, 1, 3); ctx.fillRect(ox + 13, oz + 12, 1, 3);
+    for (let y = s(3); y < size; y += s(4)) ctx.fillRect(ox, oz + y, size, 1);
+    ctx.fillRect(ox + s(5), oz, 1, s(3)); ctx.fillRect(ox + s(11), oz + s(4), 1, s(3)); ctx.fillRect(ox + s(3), oz + s(8), 1, s(3)); ctx.fillRect(ox + s(13), oz + s(12), 1, s(3));
     ctx.fillStyle = c.light;
-    ctx.fillRect(ox + 1, oz + 1, 4, 1); ctx.fillRect(ox + 7, oz + 9, 4, 1);
+    ctx.fillRect(ox + s(1), oz + s(1), s(4), 1); ctx.fillRect(ox + s(7), oz + s(9), s(4), 1);
     return;
   }
   if (style === "carpet") {
     ctx.fillStyle = c.fleck;
-    for (let k = 0; k < 6; k += 1) ctx.fillRect(ox + ((k * 7) % TPX), oz + ((k * 5 + 3) % TPX), 1, 1);
+    for (let k = 0; k < 6; k += 1) ctx.fillRect(ox + ((k * s(7)) % size), oz + ((k * s(5) + s(3)) % size), 1, 1);
     ctx.fillStyle = c.light;
-    ctx.fillRect(ox + 4, oz + 12, 1, 1); ctx.fillRect(ox + 12, oz + 2, 1, 1);
+    ctx.fillRect(ox + s(4), oz + s(12), 1, 1); ctx.fillRect(ox + s(12), oz + s(2), 1, 1);
     return;
   }
   ctx.fillStyle = c.grout;
-  ctx.fillRect(ox, oz + TPX - 1, TPX, 1);
-  ctx.fillRect(ox + TPX - 1, oz, 1, TPX);
+  ctx.fillRect(ox, oz + size - 1, size, 1);
+  ctx.fillRect(ox + size - 1, oz, 1, size);
   ctx.fillStyle = c.light;
-  ctx.fillRect(ox + 1, oz + 1, 6, 1);
-  ctx.fillRect(ox + 1, oz + 1, 1, 6);
+  ctx.fillRect(ox + 1, oz + 1, s(6), 1);
+  ctx.fillRect(ox + 1, oz + 1, 1, s(6));
   ctx.fillStyle = c.fleck;
-  if (style === "dark") ctx.fillRect(ox + 6, oz + 7, 4, 1);
-  else if (style === "marble") { ctx.fillRect(ox + 3, oz + 11, 5, 1); ctx.fillRect(ox + 8, oz + 4, 1, 1); }
-  else ctx.fillRect(ox + 9, oz + 10, 2, 1);
+  if (style === "dark") ctx.fillRect(ox + s(6), oz + s(7), s(4), 1);
+  else if (style === "marble") { ctx.fillRect(ox + s(3), oz + s(11), s(5), 1); ctx.fillRect(ox + s(8), oz + s(4), 1, 1); }
+  else ctx.fillRect(ox + s(9), oz + s(10), s(2), 1);
 };
 
+// The whole office floor: the hall tiles first, then every room's own floor clipped to the
+// room's exact rectangle, so floors end precisely under the glass walls.
 export const floorTexture = () => {
   const w = OFFICE.x1 - OFFICE.x0;
   const h = OFFICE.z1 - OFFICE.z0;
-  return pixelTexture(w * TPX, h * TPX, (ctx) => {
-    for (let tz = 0; tz < h; tz += 1) {
-      for (let tx = 0; tx < w; tx += 1) {
-        const room = roomAt(OFFICE.x0 + tx + 0.5, OFFICE.z0 + tz + 0.5);
-        drawFloorTile(ctx, tx * TPX, tz * TPX, room?.floor ?? "tile");
-      }
+  return pixelTexture(w * FPX, h * FPX, (ctx) => {
+    const pattern = (style) => {
+      const cv = document.createElement("canvas");
+      cv.width = w * FPX;
+      cv.height = h * FPX;
+      const c = cv.getContext("2d");
+      for (let tz = 0; tz < h; tz += 1) for (let tx = 0; tx < w; tx += 1) drawFloorTile(c, tx * FPX, tz * FPX, style, FPX);
+      return cv;
+    };
+    const cache = new Map();
+    const get = (style) => { if (!cache.has(style)) cache.set(style, pattern(style)); return cache.get(style); };
+    ctx.drawImage(get("tile"), 0, 0);
+    for (const room of ROOMS) {
+      const style = room.floor ?? "tile";
+      if (style === "tile") continue;
+      const x = Math.round((room.x0 - OFFICE.x0) * FPX);
+      const z = Math.round((room.z0 - OFFICE.z0) * FPX);
+      const rw = Math.round((room.x1 - room.x0) * FPX);
+      const rh = Math.round((room.z1 - room.z0) * FPX);
+      ctx.drawImage(get(style), x, z, rw, rh, x, z, rw, rh);
     }
   });
 };
