@@ -28,6 +28,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { createSummaries } = require("./summaries");
 const { WebSocketServer } = require("ws");
 
 function loadDotenvFile(filePath) {
@@ -244,6 +245,12 @@ const activeSendEventFns = new Set();
 // ---------------------------------------------------------------------------
 
 const HISTORY_FILE = path.join(HOME, ".hermes", "clawd3d-history.json");
+// 📋 RINGKASAN: one short summary per finished reply (server/summaries.js).
+const summaries = createSummaries({ file: path.join(HOME, ".hermes", "office-summaries.json"), historyFile: HISTORY_FILE });
+function recordSummary(input) {
+  const entry = summaries.add(input);
+  if (entry) broadcastEvent({ type: "event", event: "summary", payload: entry });
+}
 let persistDebounceTimer = null;
 
 function loadHistoryFromDisk() {
@@ -695,8 +702,11 @@ async function execDelegateTask(args) {
 
   // Build messages for sub-agent
   const systemMsg = agent.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
-  const contextHistory = agent.settings.wipe ? [] : [...history];
+  const contextHistory = agent.settings.wipe ? [] : forModel(history);
   const messages = [...systemMsg, ...contextHistory, { role: "user", content: message }];
+  const keep = agent.settings.continuity !== false;
+  // Saved right away so the request shows in the chat even after a page refresh.
+  if (keep) { history.push({ role: "user", content: message, at: Date.now() }); saveHistoryToDisk(); }
 
   // Emit chat start event for this sub-agent
   const subRunId = randomId();
@@ -718,13 +728,13 @@ async function execDelegateTask(args) {
     responseText = result.textContent;
 
     // Persist to sub-agent history
-    if (agent.settings.continuity !== false) {
-      history.push({ role: "user", content: message });
-      history.push({ role: "assistant", content: responseText });
+    if (keep) {
+      history.push({ role: "assistant", content: responseText, at: Date.now() });
       saveHistoryToDisk();
     }
 
     emitSub("final", { stopReason: "end_turn", message: { role: "assistant", content: responseText } });
+    recordSummary({ agentId: targetId, task: message, text: responseText });
 
     // Presence update for sub-agent session
     broadcastEvent({
@@ -734,6 +744,7 @@ async function execDelegateTask(args) {
     });
   } catch (err) {
     const message = sanitizeErrorMessage(err);
+    if (keep) { history.push({ role: "assistant", content: `⚠ ${message}`, error: true, at: Date.now() }); saveHistoryToDisk(); }
     emitSub("error", { errorMessage: message });
     return JSON.stringify({ ok: false, error: message });
   }
@@ -838,13 +849,18 @@ async function executeToolCall(tc, sendEvent) {
 
 async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, emitDelta, abortCheck, sendEvent }) {
   const agent = agentRegistry.get(agentId);
-  const systemMsg = agent?.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
+  const prompt = agent?.systemPrompt && agentId === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt;
+  const systemMsg = prompt ? [{ role: "system", content: withProjectContext(prompt) }] : [];
   const history = getHistory(sessionKey);
-  const contextHistory = (agent?.settings?.wipe) ? [] : [...history];
+  const contextHistory = (agent?.settings?.wipe) ? [] : forModel(history);
   let messages = [...systemMsg, ...contextHistory, { role: "user", content: userMessage }];
+  const keep = agent?.settings?.continuity !== false;
+  // Saved right away so the request shows in the chat even after a page refresh.
+  if (keep) { history.push({ role: "user", content: userMessage, at: Date.now() }); saveHistoryToDisk(); }
 
   let finalText = "";
   let round = 0;
+  try {
 
   while (round < MAX_TOOL_ROUNDS) {
     round++;
@@ -884,15 +900,35 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
     finalText = textContent;
     break;
   }
-
-  // Persist to history
-  if (agent?.settings?.continuity !== false) {
-    history.push({ role: "user", content: userMessage });
-    history.push({ role: "assistant", content: finalText });
-    saveHistoryToDisk();
+  } catch (err) {
+    if (keep) {
+      history.push({ role: "assistant", content: `⚠ ${sanitizeErrorMessage(err)}`, error: true, at: Date.now() });
+      saveHistoryToDisk();
+    }
+    throw err;
   }
 
+  // Persist to history
+  if (keep) {
+    history.push({ role: "assistant", content: finalText, at: Date.now() });
+    saveHistoryToDisk();
+  }
+  if (!abortCheck?.()) recordSummary({ agentId, task: userMessage, text: finalText });
+
   return finalText;
+}
+
+// The orchestrator's view of the team (so it delegates instead of spawning new agents).
+function teamContext() {
+  const members = [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID);
+  if (!members.length) return "";
+  return `\n\nTim kantor saat ini. Semua agen ini SUDAH aktif dan siap menerima tugas lewat delegate_task dengan agent_id di bawah; jangan bilang tim belum ada dan jangan spawn agen baru untuk peran yang sudah ada:\n${
+    members.map((a) => `- ${a.id}: ${a.name}${a.role ? ` (${a.role})` : ""}`).join("\n")}`;
+}
+
+// History as context for the model: no failed replies, only role + content.
+function forModel(history) {
+  return history.filter((m) => !m.error).map(({ role, content }) => ({ role, content }));
 }
 
 // ---------------------------------------------------------------------------
@@ -1061,8 +1097,9 @@ async function handleMethod(method, params, id, sendEvent) {
           || agent?.settings?.model || HERMES_MODEL;
         let seqCounter = 0;
 
+        // Broadcast (not only this socket) so a refreshed tab keeps receiving the reply.
         const emitChat = (state, extra) => {
-          sendEvent({ type: "event", event: "chat", seq: seqCounter++,
+          broadcastEvent({ type: "event", event: "chat", seq: seqCounter++,
             payload: { runId, sessionKey, state, ...extra } });
         };
 
@@ -1121,6 +1158,13 @@ async function handleMethod(method, params, id, sendEvent) {
       }
       return resOk(id, { ok: true, aborted });
     }
+
+    case "summaries.list":
+      return resOk(id, { summaries: summaries.list(Number(p.limit) || 100) });
+
+    case "chat.active":
+      // Runs still in progress, so a refreshed tab can show who is working.
+      return resOk(id, { runs: [...activeRuns.values()].map((r) => ({ runId: r.runId, sessionKey: r.sessionKey, agentId: r.agentId })) });
 
     case "chat.history": {
       const histKey = typeof p.sessionKey === "string" ? p.sessionKey : MAIN_SESSION_KEY;
@@ -1325,11 +1369,11 @@ function startAdapter() {
               "status","config.get","config.set","config.patch",
               "agents.files.get","agents.files.set",
               "exec.approvals.get","exec.approvals.set","exec.approval.resolve","exec.approvals.pending",
-              "tools.catalog",
+              "tools.catalog","summaries.list","chat.active",
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron","tool","approval"] },
+              events: ["chat","presence","heartbeat","cron","tool","approval","summary"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },
@@ -1437,7 +1481,15 @@ Proyek aktif: "${name}" di folder ${dir} (folder milik pengguna yang di-mount ke
 - Jangan membaca, menampilkan, atau mengubah file rahasia (.env, kunci, kredensial).`;
 };
 
-const withProjectContext = (systemPrompt) => `${systemPrompt}${projectContext()}`;
+// Replies are read in a small chat panel and speech bubbles: keep them short.
+const REPLY_STYLE = `
+
+Gaya jawaban (wajib): jawab dalam Bahasa Indonesia, singkat dan langsung ke inti.
+Maksimal 5 kalimat atau 5 poin pendek. Tanpa pembukaan, basa-basi, atau pengulangan pertanyaan.
+Beri penjelasan panjang, kode lengkap, atau laporan detail hanya kalau pengguna memintanya secara eksplisit;
+untuk pekerjaan di file, cukup laporkan apa yang diubah dan di mana.`;
+
+const withProjectContext = (systemPrompt) => `${systemPrompt}${REPLY_STYLE}${projectContext()}`;
 
 // Live team management (used by the office's agent panel).
 const team = {

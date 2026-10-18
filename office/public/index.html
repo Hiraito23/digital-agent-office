@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agentic Digital Office</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Silkscreen&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Poppins:wght@400;500;600&family=Silkscreen&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
   <script type="importmap">
     { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
@@ -37,6 +37,14 @@
     </div>
     <div id="agents-status" class="agents-status"></div>
     <div id="agents-body" class="agents-body"></div>
+  </aside>
+
+  <aside id="summaries" class="hud summaries">
+    <div class="jb-head">
+      <span class="jb-title">📋 RINGKASAN</span>
+      <button id="summary-toggle" title="Sembunyikan">–</button>
+    </div>
+    <ol id="summary-list" class="summary-list"></ol>
   </aside>
 
   <aside id="jukebox" class="hud jukebox hidden">

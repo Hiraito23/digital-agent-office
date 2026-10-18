@@ -12,6 +12,7 @@ import { NameTags } from "./ui/name-tags.js";
 import { initAgentPanel } from "./ui/agents-panel.js";
 import { initProjectPicker } from "./ui/projects.js";
 import { initApprovals } from "./ui/approvals.js";
+import { initSummaries } from "./ui/summaries.js";
 
 const jukebox = initJukebox();
 
@@ -122,6 +123,7 @@ const agentsById = new Map();
 const status = new Map();
 const chats = new Map(); // agentId -> [{role, content}]
 const liveRuns = new Map(); // runId -> { agentId, text }
+const historyLoaded = new Set(); // agents whose saved chat history is in `chats`
 let selected = null;
 
 const nameOf = (id) => agentsById.get(id)?.name ?? id;
@@ -168,8 +170,18 @@ gw.addEventListener("status", async (e) => {
   connEl.className = `conn ${on ? "on" : "off"}`;
   connEl.textContent = on ? "● Terhubung" : "● Terputus";
   if (on) {
+    historyLoaded.clear();
     await refreshAgents();
     logActivity(`Kantor terhubung — ${agentsById.size} agen hadir`, "ok");
+    summaryPanel.load();
+    // Replies still running on the server (for example after a page refresh).
+    gw.request("chat.active").then((res) => {
+      for (const r of res.runs || []) {
+        if (liveRuns.has(r.runId)) continue;
+        liveRuns.set(r.runId, { agentId: r.agentId, text: "" });
+        setAgentStatus(r.agentId, "working");
+      }
+    }).catch(() => {});
     if (voice.supported && !voiceHintShown) {
       voiceHintShown = true;
       voice.whenReady().then(() => {
@@ -231,6 +243,9 @@ gw.addEventListener("tool", (e) => {
   }
 });
 
+// 📋 RINGKASAN (left): a short summary each time an agent finishes a reply.
+const summaryPanel = initSummaries({ gw, nameOf, onOpen: (id) => openChat(id) });
+
 // PERSETUJUAN: risky commands wait here for your answer.
 initApprovals({
   gw,
@@ -282,12 +297,19 @@ const openChat = async (agentId) => {
   chatRole.textContent = a?.role || (agentId === "hermes" ? "Orchestrator" : "");
   voiceTestBtn.title = `Suara: ${voice.describe(agentId)}`;
   chatEl.classList.remove("hidden");
-  if (!chats.has(agentId) && gw.connected) {
+  // The server keeps the history (it survives refreshes); load it once per
+  // connection and keep any reply that is still streaming on top of it.
+  if (!historyLoaded.has(agentId) && gw.connected) {
     try {
       const res = await gw.request("chat.history", { sessionKey: sessionKeyFor(agentId) });
-      chats.set(agentId, (res.messages || []).filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: String(m.content ?? "") })));
+      const saved = (res.messages || [])
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.error ? "error" : m.role, content: String(m.content ?? "") }));
+      const live = (chats.get(agentId) || []).filter((m) => m.runId && liveRuns.has(m.runId));
+      chats.set(agentId, [...saved, ...live]);
+      historyLoaded.add(agentId);
     } catch {
-      chats.set(agentId, []);
+      if (!chats.has(agentId)) chats.set(agentId, []);
     }
   }
   renderChat();

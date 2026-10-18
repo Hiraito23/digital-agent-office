@@ -37,6 +37,7 @@ office/                 image Docker "office"
     agents-api.js       REST panel ⚙ Agen + SOUL.md lewat dashboard Hermes
     projects.js         daftar proyek di /workspace + proyek aktif (config/office.json)
     hermes-gateway-adapter.js   adapter dari Claw3D (MIT): tim, chat, orkestrasi
+    summaries.js        log ringkasan jawaban (panel 📋 RINGKASAN), disimpan di office-data
   public/               sisi browser (ES modules, tanpa build step)
     index.html, style.css
     audio/              MP3 pribadi (tidak masuk git, lihat audio/README.md)
@@ -66,6 +67,7 @@ office/                 image Docker "office"
         agents-panel.js panel ⚙ Agen (tambah/ubah/hapus agen, SOUL.md, 🧰 Tools)
         projects.js     dropdown 📁 Proyek (proyek yang dikerjakan agen)
         approvals.js    panel PERSETUJUAN (izin perintah berisiko dari Hermes)
+        summaries.js    panel 📋 RINGKASAN di kiri (jawaban yang sudah selesai)
         jukebox.js      musik latar (playlist, ulang, sisa waktu)
         voice.js        suara agen (Web Speech API)
 ```
@@ -74,7 +76,7 @@ office/                 image Docker "office"
 
 1. `main.js` mengirim `chat.send` lewat `net/gateway.js`.
 2. `ws-proxy.js` meneruskannya ke adapter. Adapter memilih persona agen dari `config/team.json` dan memanggil API Hermes.
-3. Jawaban kembali sebagai event `chat` (`delta` lalu `final`).
+3. Jawaban kembali sebagai event `chat` (`delta` lalu `final`), di-broadcast ke semua tab. Pesan pengguna langsung disimpan ke riwayat (`clawd3d-history.json`), balasan disimpan saat selesai (balasan gagal diberi `error: true` dan tidak ikut dikirim ke model). Setiap balasan selesai juga dicatat di `office-summaries.json` dan dikirim sebagai event `summary`. Tab yang baru dibuka memanggil `chat.active`, `chat.history`, dan `summaries.list`.
 4. `main.js` memperbarui status agen di `World` (jalan ke meja dan mengetik), menampilkan gelembung kata (`ui/name-tags.js`), membacakan balasan (`ui/voice.js`), dan mencatat ke Aktivitas Terbaru.
 
 ## Proyek

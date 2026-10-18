@@ -23,7 +23,11 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 | Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
 | Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
 
-Belum ada ruang chat grup tempat semua agen bicara bersamaan; diskusi tim berjalan lewat Hermes sebagai moderator. Riwayat chat tiap agen tersimpan, jadi diskusi bisa dilanjutkan kapan saja.
+Belum ada ruang chat grup tempat semua agen bicara bersamaan; diskusi tim berjalan lewat Hermes sebagai moderator.
+
+**Riwayat dan ringkasan.** Riwayat chat tiap agen disimpan di server (volume `office-data`), termasuk pesan yang baru dikirim dan balasan yang gagal, jadi tetap ada setelah halaman di-refresh. Kalau di-refresh saat agen masih bekerja, balasannya tetap masuk. Panel **📋 RINGKASAN** di kiri berisi ringkasan singkat setiap kali agen selesai menjawab (siapa, kapan, tugasnya, inti jawabannya); klik salah satunya untuk membuka chat lengkap, atau klik **–** untuk menyembunyikan panel.
+
+Agen diminta menjawab singkat (maksimal sekitar 5 kalimat atau 5 poin), kecuali Anda meminta detail. Model gratis kadang tetap menjawab panjang; model yang lebih kuat lebih patuh.
 
 ## Instalasi dari awal (laptop/PC baru)
 
