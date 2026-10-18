@@ -20,6 +20,7 @@
     <div id="roster" class="roster"></div>
     <select id="project-select" class="chip project" title="Proyek yang dikerjakan agen"><option value="">📁 Pilih proyek…</option></select>
     <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
+    <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
     <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
     <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
     <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
@@ -48,6 +49,26 @@
     </div>
     <div id="meeting-status" class="agents-status"></div>
     <div id="meeting-body" class="agents-body"></div>
+  </aside>
+
+  <aside id="layout" class="hud agents layout hidden">
+    <div class="chat-head">
+      <div class="agents-tabs"><b class="lay-title">🛠 Edit Layout</b></div>
+      <button id="layout-close" title="Selesai">✕</button>
+    </div>
+    <div id="layout-status" class="agents-status"></div>
+    <div class="agents-body">
+      <p class="muted lay-hint">Klik benda lalu seret untuk memindah. <kbd>R</kbd> putar · <kbd>Del</kbd> hapus · <kbd>D</kbd> gandakan · <kbd>Ctrl+Z</kbd> urungkan · <kbd>Esc</kbd> batal. Putar kamera dengan menyeret lantai kosong (klik kanan + seret untuk menggeser). Hijau = bisa ditaruh, merah = terhalang.</p>
+      <div id="layout-selected" class="lay-selected"></div>
+      <h4 class="lay-h">Tambah benda</h4>
+      <div id="layout-catalog" class="lay-cat"></div>
+      <div class="lay-tools">
+        <button id="layout-undo" type="button">↶ Urungkan</button>
+        <button id="layout-redo" type="button">↷ Ulangi</button>
+        <button id="layout-reset" type="button" class="danger">Kembalikan ke bawaan</button>
+      </div>
+      <button id="layout-done" type="button" class="primary wide">✓ Selesai</button>
+    </div>
   </aside>
 
   <aside id="usage" class="hud agents usage hidden">

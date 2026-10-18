@@ -1,14 +1,15 @@
 // Builds the whole office scene (ground, floor, walls, railing, desks, rooms,
-// decor, garden) and returns { update, floorTop, setDesks }.
+// decor, garden) and returns { update, floorTop, setDesks, furniture }.
 import * as THREE from "three";
 import { addDecor } from "./decor.js";
+import { createFurniture } from "./furniture.js";
 import { box, mat, rand } from "./helpers.js";
-import { DESK_SLOTS, GATE, N, OFFICE, PORTAL, PRIVATE_OFFICES, isPath, seatOf } from "./layout.js";
-import { C, makeBush, makeCabinet, makeChair, makeCooler, makeDesk, makeLamp, makePine, makePlanter, makeRack, makeRoundTree } from "./props.js";
+import { DESK_SLOTS, GATE, N, OFFICE, PORTAL, isPath, seatOf } from "./layout.js";
+import { C, makeBush, makeChair, makeDesk, makeLamp, makePine, makePlanter, makeRoundTree } from "./props.js";
 import { addRooms } from "./rooms.js";
 import { floorTexture, groundTexture, outerGrassTexture, screenTexture, windowTexture } from "./textures.js";
 
-export const buildOffice = (scene) => {
+export const buildOffice = (scene, layout) => {
   const animated = [];
 
   // outer grass, garden ground, office floor
@@ -76,66 +77,30 @@ export const buildOffice = (scene) => {
   scene.add(box(0.06, 0.04, fd, mat(C.rail), OFFICE.x1, top + 0.56, OFFICE.z0 + fd / 2, false));
   for (let z = OFFICE.z0; z <= OFFICE.z1; z += 1) scene.add(box(0.06, 0.58, 0.06, mat(C.rail), OFFICE.x1, top + 0.29, z));
 
-  // desks and chairs: rebuilt to match the team size (setDesks)
+  // Open desks for agents beyond the number of desks in the layout (furniture.setDesks
+  // rebuilds them whenever the roster or the layout changes).
   const screenTex = screenTexture();
-  const deskGroup = new THREE.Group();
-  scene.add(deskGroup);
-  let deskKey = "";
-  let deskSeats = [];
-  const addDesk = (group, slot, i) => {
-    const d = makeDesk(screenTex, i);
-    d.position.set(slot.x, top, slot.z);
-    if (slot.flip) d.rotation.y = Math.PI; // turned around its corner (front-row offices)
-    group.add(d);
-    const seat = seatOf(slot);
-    const c = makeChair();
-    c.position.set(seat.x, top, seat.z);
-    if (slot.flip) c.rotation.y = Math.PI;
-    group.add(c);
-  };
-  // Every private office is furnished from the start.
-  DESK_SLOTS.filter((s) => s.room).forEach((slot, i) => addDesk(scene, slot, i));
-  // people: [{ id, name }] in desk order (Hermes first). Private offices are
-  // filled first and their door sign shows the owner. Open desks in the main
-  // hall only appear for agents beyond the number of private offices.
-  let openCount = 0;
-  const setDesks = (people) => {
-    const key = people.map((p) => `${p.id}:${p.name}`).join("|");
-    if (key === deskKey) return deskSeats;
-    deskKey = key;
-    const slots = DESK_SLOTS.slice(0, Math.min(people.length, DESK_SLOTS.length));
-    PRIVATE_OFFICES.forEach((room, i) => rooms.setLabel(room.id, people[i] ? `RUANG ${people[i].name.toUpperCase()}` : `${room.name} (KOSONG)`));
-    const open = slots.filter((s) => !s.room);
-    if (open.length !== openCount) {
-      openCount = open.length;
-      deskGroup.clear();
-      open.forEach((slot, i) => addDesk(deskGroup, slot, i));
-    }
-    deskSeats = slots.map(seatOf);
-    return deskSeats;
+  const addAutoDesk = (group, count) => {
+    const slots = DESK_SLOTS.filter((s) => !s.room).slice(0, count);
+    slots.forEach((slot, i) => {
+      const d = makeDesk(screenTex, i);
+      d.position.set(slot.x, top, slot.z);
+      group.add(d);
+      const seat = seatOf(slot);
+      const c = makeChair();
+      c.position.set(seat.x, top, seat.z);
+      group.add(c);
+    });
+    return slots.map(seatOf);
   };
 
   const rooms = addRooms(scene, top);
 
-  // furniture of the private offices: a cabinet in both corners of the far wall,
-  // so each room is symmetric around its centred desk and door
-  PRIVATE_OFFICES.forEach((room) => {
-    const back = room.door.outside.z > room.door.inside.z;
-    for (const x of [room.x0 + 0.45, room.x1 - 0.45]) {
-      const cab = makeCabinet();
-      cab.position.set(x, top, back ? room.z0 + 0.32 : room.z1 - 0.32);
-      cab.rotation.y = back ? -Math.PI / 2 : Math.PI / 2; // drawers face the room
-      scene.add(cab);
-    }
-  });
+  // Movable furniture: desks, cabinets, lounge, server racks, game room, ... (furniture.js).
+  const furniture = createFurniture({ scene, top, animated, screenTex, rooms, makeAutoDesk: addAutoDesk, items: layout });
   addDecor(scene, top, animated);
 
   // server corner + floating crystal
-  for (const x of [20.85, 21.85, 22.85]) {
-    const rack = makeRack();
-    rack.position.set(x, top, OFFICE.z0 + 0.45);
-    scene.add(rack);
-  }
   const crystal = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.32, 0),
     new THREE.MeshLambertMaterial({ color: "#74c0fc", emissive: "#1c7ed6", emissiveIntensity: 0.8, flatShading: true }),
@@ -178,16 +143,6 @@ export const buildOffice = (scene) => {
     runes.rotation.y = t / 1500;
     glow.material.opacity = 0.12 + (Math.sin(t / 400) + 1) * 0.06;
   });
-
-  // cabinets + cooler along the left wall
-  for (const z of [9.5, 10.3]) {
-    const c = makeCabinet();
-    c.position.set(OFFICE.x0 + 0.35, top, z);
-    scene.add(c);
-  }
-  const cooler = makeCooler();
-  cooler.position.set(11.55, top, 15.45);
-  scene.add(cooler);
 
   // lamps (only a few cast real light to stay fast)
   const outsideX = OFFICE.x1 + 3.6;
@@ -232,5 +187,5 @@ export const buildOffice = (scene) => {
     scene.add(b);
   }
 
-  return { update: (t) => animated.forEach((fn) => fn(t)), floorTop: top, setDesks };
+  return { update: (t) => animated.forEach((fn) => fn(t)), floorTop: top, setDesks: furniture.setDesks, furniture };
 };

@@ -15,6 +15,7 @@ import { initApprovals } from "./ui/approvals.js";
 import { initSummaries } from "./ui/summaries.js";
 import { initMeeting } from "./ui/meeting.js";
 import { initUsage } from "./ui/usage.js";
+import { initLayoutEditor, loadLayout } from "./ui/layout-editor.js";
 
 const jukebox = initJukebox();
 
@@ -31,7 +32,9 @@ const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const pixelBtn = document.getElementById("pixel-toggle");
 
-const world = new World(view);
+const world = new World(view, { layout: await loadLayout() });
+// 🛠 Layout: move, rotate, add and delete furniture (build mode).
+const layoutEditor = initLayoutEditor({ world, canvas: view });
 
 // Voices: each agent reads its finished replies aloud (people.json → "voice").
 const voiceBtn = document.getElementById("voice-toggle");
@@ -91,7 +94,7 @@ pixelBtn.addEventListener("click", () => {
 let down = null;
 view.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; });
 view.addEventListener("pointerup", (e) => {
-  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
+  if (down && !layoutEditor.isActive() && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5) {
     const agent = world.hitTest(e.clientX, e.clientY);
     if (agent) openChat(agent.id);
   }

@@ -23,6 +23,7 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 | Rapat membahas project | **💬 Rapat** → isi topik, centang peserta (maks. 5), pilih jumlah putaran → **Mulai rapat**. Notulen masuk ke 📋 RINGKASAN (lihat [Rapat tim](#rapat-tim-rapat)) |
 | Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
 | Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
+| Memindah atau menambah furnitur kantor | **🛠 Layout** → klik benda lalu seret (lihat [Mengatur layout kantor](#mengatur-layout-kantor--layout)) |
 
 **Riwayat dan ringkasan.** Riwayat chat tiap agen disimpan di server (volume `office-data`), termasuk pesan yang baru dikirim dan balasan yang gagal, jadi tetap ada setelah halaman di-refresh. Kalau di-refresh saat agen masih bekerja, balasannya tetap masuk. Panel **📋 RINGKASAN** di kiri berisi ringkasan singkat setiap kali agen selesai menjawab (siapa, kapan, tugasnya, inti jawabannya); klik salah satunya untuk membuka chat agen itu langsung di pesan yang diringkas (pesan dan pertanyaannya disorot), atau klik **–** untuk menyembunyikan panel. Centang kotak di setiap ringkasan setelah Anda membacanya (bertanda **Dibaca** dan tampil redup; yang belum bertanda **Baru**). Hanya Anda yang menandai, jumlah yang belum dibaca tampil di judul panel, dan **Tampilkan yang belum dibaca saja** menyaring daftarnya. Tanda baca disimpan di server, jadi tetap ada setelah refresh atau di tab lain.
 
@@ -215,7 +216,38 @@ Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label n
 | Dua mesin arcade | Main game | 🎮 |
 | Meja ping-pong | Main ping-pong | 🏓 |
 
-Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di sudut. Satu properti hanya dipakai satu agen dalam satu waktu; kegiatan berlangsung sekitar 9 sampai 18 detik.
+Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di sudut. Satu properti hanya dipakai satu agen dalam satu waktu; kegiatan berlangsung sekitar 9 sampai 18 detik. Posisi semua furnitur ini bisa diubah lewat **🛠 Layout**.
+
+## Mengatur layout kantor (🛠 Layout)
+
+Mode edit seperti *build mode* di The Sims: klik **🛠 Layout** di header untuk memindah, memutar, menambah, atau menghapus furnitur. Perubahan tersimpan otomatis dan tetap ada setelah restart.
+
+| Mau | Caranya |
+| --- | --- |
+| Memindah benda | Klik benda, lalu seret ke tempat baru dan lepas. Benda menempel ke grid, dinding, dan benda di sebelahnya |
+| Memutar | Pilih benda lalu tekan **R** (atau tombol **↻ Putar**); tiap tekan memutar 90° |
+| Menambah benda | Klik jenisnya di **Tambah benda**, gerakkan kursor ke lantai (benda mengikuti kursor), lalu **klik** untuk menaruh. **Esc** membatalkan |
+| Menggandakan | Pilih benda lalu **D** (atau **⧉ Gandakan**), lalu klik untuk menaruh salinannya |
+| Mengganti warna atau varian | Pilih benda lalu **🎨 Varian** (bean bag, mesin arcade, dan barang pribadi di meja kerja) |
+| Menghapus | Pilih benda lalu **Del** (atau **🗑 Hapus**) |
+| Urungkan / ulangi | **Ctrl+Z** / **Ctrl+Y** (atau tombol **↶ Urungkan** / **↷ Ulangi**) |
+| Mengatur kamera | Seret lantai kosong untuk memutar, klik kanan + seret untuk menggeser, roda mouse untuk zoom. Seret di atas benda berarti memindah benda |
+| Kembali ke tata letak awal | **Kembalikan ke bawaan** (bisa diurungkan dengan Ctrl+Z) |
+| Selesai | **✓ Selesai**, tombol ✕, atau klik **🛠 Layout** lagi |
+
+**Hijau atau merah.** Selama benda dipegang, jejaknya di lantai berwarna hijau kalau tempatnya bebas dan merah kalau terhalang: di luar lantai kantor, menabrak dinding kaca, menutup pintu atau jalan masuk (termasuk lingkaran panggil di lobi), atau menimpa benda lain (karpet boleh berada di bawah benda lain). Alasannya tampil di bagian atas panel. Benda yang dilepas di tempat merah kembali ke posisi semula.
+
+**Yang ikut berpindah.** Titik duduk agen mengikuti bendanya: sofa, bean bag, pantry, akuarium, rak buku, mesin arcade, meja ping-pong, rak server, dan kursi meja rapat. Agen yang sedang santai langsung memakai posisi baru, dan Ruang Rapat memakai kursi di meja rapat di mana pun ia berada. **Meja kerja** adalah tempat duduk milik agen: meja pertama di daftar milik Hermes, dan seterusnya (urutan sama dengan agen). Memindah meja memindahkan kursinya, dan agen yang sedang duduk berjalan ke tempat barunya. Papan nama ruang pribadi mengikuti pemilik meja yang ada di dalamnya, jadi ruang tanpa meja bertuliskan "(KOSONG)".
+
+**Menambah agen.** Setiap agen butuh satu meja. Kalau agen lebih banyak daripada meja, sisanya otomatis mendapat meja terbuka di aula (seperti sebelumnya). Tambah meja kerja dari katalog kalau ingin menempatkannya sendiri.
+
+Batas dan catatan:
+
+- Yang bisa diubah hanya furnitur. Dinding, pintu, dan ukuran ruangan tetap (diatur di `ROOMS` di `office/layout.js`).
+- Hanya ada satu meja rapat; tombolnya nonaktif selama sudah ada satu. Rapat memakai maksimal 5 kursi/posisi di meja itu dan selalu dihitung di Ruang Rapat.
+- Whiteboard, papan neon, jam dinding, jendela, lampu, taman, dan lingkaran panggil adalah bagian bangunan dan tidak bisa dipindah.
+- Layout disimpan di `config/layout.json` (ikut ke GitHub seperti `team.json`; file ini baru ada setelah Anda mengubah sesuatu). Tab browser lain baru menampilkan perubahan setelah di-refresh.
+- Agen berjalan lurus dari koridor ke tujuannya tanpa mencari jalan memutar, jadi jangan menutup koridor dengan terlalu banyak furnitur.
 
 ## Mengerjakan proyek (📁 Proyek)
 
@@ -398,6 +430,7 @@ Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu s
 | `config/team.json` | Daftar agen dan persona (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → `docker compose restart office` |
 | `docs/PANDUAN.md` | Panduan ini | – |
 | `config/people.json` | Tampilan karakter dan suara (diedit panel ⚙ Agen) | Otomatis dari panel; edit manual → refresh browser |
+| `config/layout.json` | Posisi furnitur (diedit dengan 🛠 Layout; belum ada = layout bawaan) | Otomatis dari mode Layout; hapus file ini = kembali ke bawaan |
 | `office/server/` | Server web, API panel ⚙ Agen + SOUL.md, proxy WebSocket, adapter Hermes (Claw3D, MIT) | `docker compose up -d --build office` |
 | `office/public/js/office/` | Scene kantor: denah `layout.js` (ruangan, meja, titik kegiatan), dinding, dekorasi, properti, tekstur | `docker compose up -d --build office` |
 | `office/public/js/characters/` | Karakter voxel: rambut, wajah, kostum, animasi | `docker compose up -d --build office` |
@@ -426,6 +459,8 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Model yang dipilih di panel ⚙ Agen tidak dipakai (semua agen memakai model default) | `direct_model_requests` belum aktif di Hermes (config ada di volume, tidak ikut GitHub) | Jalankan langkah 4 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai), lalu `docker compose restart hermes` |
 | Sudah isi kredit tapi masih "Billing or credits exhausted" | Kredensial Nous masih tercatat *exhausted* | `docker exec hermes hermes auth reset nous`, lalu cek saldo di portal |
 | Agen mengulang pesan error lama padahal modelnya sudah diganti | Balasan error tersimpan di riwayat chat dan ikut dibaca model | Kosongkan riwayatnya: hentikan `office`, isi `clawd3d-history.json` di volume `office-data` dengan `{}`, lalu nyalakan lagi |
+| Furnitur tidak mau ditaruh (jejak merah) | Di luar lantai, menabrak dinding, menutup pintu, atau menimpa benda lain | Baca alasan di atas panel 🛠 Layout, lalu geser sedikit atau putar bendanya |
+| Tata letak jadi berantakan | Salah pindah banyak benda | **Ctrl+Z** berulang, atau **Kembalikan ke bawaan** di panel 🛠 Layout |
 | Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |
 | Agen diam lama tanpa membalas | Hermes menunggu persetujuan perintah | Jawab di panel PERSETUJUAN (kanan bawah) |

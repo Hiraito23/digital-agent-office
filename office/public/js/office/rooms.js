@@ -1,9 +1,8 @@
-// Rooms: glass partition walls with door gaps, a name sign per room, and the
-// meeting-room furniture. Room shapes come from ROOMS in layout.js.
+// Rooms: glass partition walls with door gaps and a name sign per room.
+// Room shapes come from ROOMS in layout.js; furniture is in furniture.js.
 import * as THREE from "three";
 import { box, mat } from "./helpers.js";
-import { ACTIVITY_SPOTS, ROOMS } from "./layout.js";
-import { makeChair } from "./props.js";
+import { ROOMS } from "./layout.js";
 import { signTexture } from "./textures.js";
 
 // Returns setLabel(roomId, text): the private offices show their owner's name.
@@ -65,21 +64,6 @@ export const addRooms = (scene, top) => {
       sign.position.set((room.x0 + room.x1) / 2, top + 0.015, room.z1 - 0.45);
       scene.add(sign);
     }
-  }
-
-  // meeting room: table + four chairs (seats are ACTIVITY_SPOTS meeting-1..4)
-  const table = new THREE.Group();
-  table.add(box(2.2, 0.06, 1.0, mat("#8d5a2b"), 0, 0.55, 0));
-  for (const [x, z] of [[-1, -0.42], [1, -0.42], [-1, 0.42], [1, 0.42]]) table.add(box(0.06, 0.52, 0.06, mat("#5a3418"), x, 0.26, z));
-  table.add(box(0.5, 0.02, 0.3, mat("#f8f9fa"), -0.3, 0.59, 0.1)); // papers
-  table.add(box(0.36, 0.04, 0.26, mat("#343a40"), 0.5, 0.6, -0.05)); // laptop
-  table.position.set(8.6, top, 6.6);
-  scene.add(table);
-  for (const spot of ACTIVITY_SPOTS.filter((s) => s.pose === "meeting")) {
-    const chair = makeChair();
-    chair.position.set(spot.x, top, spot.z);
-    chair.rotation.y = spot.heading === 0 ? Math.PI : 0; // backrest behind the sitter
-    scene.add(chair);
   }
 
   const labels = new Map();

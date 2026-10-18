@@ -18,7 +18,7 @@ export const PIXEL_MODES = [
 ];
 
 export class World {
-  constructor(canvas) {
+  constructor(canvas, { layout } = {}) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.shadowMap.enabled = true;
@@ -59,7 +59,8 @@ export class World {
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun, sun.target);
 
-    this.office = buildOffice(this.scene);
+    this.office = buildOffice(this.scene, layout);
+    this.office.furniture.onChange = () => this.refreshDesks(); // a moved desk moves its seat
     this.agents = new Map();
     this.appearances = {};
     this.raycaster = new THREE.Raycaster();
@@ -133,6 +134,7 @@ export class World {
 
   // One desk + chair per agent: Hermes first, then the team in a stable order.
   assignDesks(order) {
+    this.deskOrder = order;
     const seats = this.office.setDesks(order.map((id) => ({ id, name: this.agents.get(id).name })));
     order.forEach((id, i) => {
       const a = this.agents.get(id);
@@ -144,6 +146,11 @@ export class World {
         a.route = this.seatRoute(a, null);
       }
     });
+  }
+
+  // Seats changed (a desk was moved in the layout editor): agents walk to their new seat.
+  refreshDesks() {
+    if (this.deskOrder) this.assignDesks(this.deskOrder);
   }
 
   // Route to the agent's own desk (private offices are entered through their door).
@@ -223,9 +230,9 @@ export class World {
     }
     if (status !== "working" && a.mode === "sitting") {
       a.nextWander = performance.now() + 2500;
-      if (a.seat.room) {
-        // out of the private office into the corridor
-        const exit = doorOf(a.seat.room);
+      const exit = a.seat.room ? doorOf(a.seat.room) : null;
+      if (exit) {
+        // out of the room into the corridor
         a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
         a.mode = "wander";
       } else {
@@ -332,6 +339,24 @@ export class World {
       out.push({ agent: a, x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h });
     }
     return out;
+  }
+
+  // Layout editor: pointer ray, the floor point under the pointer and the furniture under it.
+  setRay(clientX, clientY) {
+    const ndc = new THREE.Vector2((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+  }
+
+  groundPoint(clientX, clientY) {
+    this.setRay(clientX, clientY);
+    const hit = new THREE.Vector3();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.office.floorTop);
+    return this.raycaster.ray.intersectPlane(plane, hit) ? hit : null;
+  }
+
+  pickFurniture(clientX, clientY) {
+    this.setRay(clientX, clientY);
+    return this.office.furniture.pick(this.raycaster);
   }
 
   hitTest(clientX, clientY) {

@@ -245,3 +245,20 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 .u-models { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
 .u-models li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
 .u-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+
+/* 🛠 Layout editor */
+.layout { z-index: 4; background: #1c261e; }
+.lay-title { font: 600 14px var(--pixel); color: var(--accent); }
+.lay-hint { font-size: 12px; line-height: 1.5; margin-top: 0; }
+.lay-hint kbd { font: 600 11px var(--pixel); padding: 0 4px; border: 2px solid var(--panel-edge); border-radius: 3px; }
+.lay-h { margin: 12px 0 6px; font: 600 13px var(--pixel); color: var(--blue); }
+.lay-selected { border: 2px solid var(--panel-edge); padding: 8px 10px; min-height: 40px; }
+.lay-selected .muted { margin: 0; font-size: 12px; }
+.lay-name small { color: var(--blue); margin-left: 4px; }
+.lay-actions, .lay-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.lay-tools { margin-bottom: 4px; }
+.lay-cat { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lay-cat button { text-align: left; }
+.lay-ico { display: inline-block; width: 1.4em; text-align: center; }
+.agents-body button:disabled { opacity: .4; cursor: not-allowed; }
+body.editing .top { box-shadow: inset 0 -3px 0 var(--accent); }

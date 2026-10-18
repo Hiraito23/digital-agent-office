@@ -27,6 +27,7 @@ flowchart LR
 config/                 data agen (di-mount ke container office, bisa ditulis)
   team.json             daftar agen + persona (nama, peran, instruksi, batasan)
   people.json           tampilan + suara per agen (rambut, warna, kostum, voice)
+  layout.json           posisi furnitur dari 🛠 Layout (belum ada = defaultLayout() di furniture.js)
 docs/                   PANDUAN.md (pemakaian), ARCHITECTURE.md (dokumen ini)
 office/                 image Docker "office"
   Dockerfile, package.json
@@ -39,6 +40,7 @@ office/                 image Docker "office"
     hermes-gateway-adapter.js   adapter dari Claw3D (MIT): tim, chat, orkestrasi
     summaries.js        log ringkasan jawaban (panel 📋 RINGKASAN), disimpan di office-data
     meetings.js         rapat tim: giliran bicara peserta + notulen Hermes (panel 💬 Rapat)
+    layout-api.js       GET/PUT/DELETE /api/layout: baca, simpan, dan reset config/layout.json
     usage.js            catatan token per hari/agen/model, laporan harian-mingguan-bulanan (panel 📊 Pemakaian), disimpan di office-data
   public/               sisi browser (ES modules, tanpa build step)
     index.html, style.css
@@ -50,10 +52,11 @@ office/                 image Docker "office"
         world.js        renderer, kamera, cahaya, agen (meja, kegiatan, gerak)
         routing.js      jalur jalan: koridor, lorong samping, pintu ruangan
       office/           scene kantor
-        layout.js       DENAH: ukuran kantor, ruangan, slot meja, titik kegiatan
+        layout.js       DENAH: ukuran kantor, ruangan, dinding, pintu (ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js)
         index.js        merakit seluruh scene (buildOffice)
-        rooms.js        dinding kaca, pintu, papan nama, ruang rapat
-        decor.js        lounge, pantry, akuarium, arcade, ping-pong, dll.
+        rooms.js        dinding kaca, pintu, papan nama
+        furniture.js    furnitur yang bisa dipindah: katalog, layout bawaan, aturan penempatan, manajer
+        decor.js        hiasan dinding (whiteboard, neon, jam)
         props.js        meja, kursi, lampu, pohon, rak server, ...
         textures.js     tekstur pixel-art (rumput, lantai per ruangan, papan nama)
         helpers.js      material, box/cone, tekstur canvas, random ber-seed
@@ -72,6 +75,7 @@ office/                 image Docker "office"
         summaries.js    panel 📋 RINGKASAN di kiri (jawaban yang sudah selesai)
         meeting.js      panel 💬 Rapat (form, transkrip langsung, notulen, unduh .md)
         usage.js        panel 📊 Pemakaian (tab harian/mingguan/bulanan, kartu per agen)
+        layout-editor.js  mode 🛠 Layout: pilih, seret, putar, tambah, hapus, urungkan, simpan
         jukebox.js      musik latar (playlist, ulang, sisa waktu)
         voice.js        suara agen (Web Speech API)
 ```
@@ -113,6 +117,27 @@ Dropdown di `ui/agents-panel.js` mengambil daftarnya dari `GET /api/models` (`ag
 
 `server/usage.js` menyimpan hitungan per hari: `{ "YYYY-MM-DD": { agentId: { model: { calls, input, output } } } }` di `office-usage.json` (disimpan dengan jeda 500 ms, 400 hari terakhir). `report(range)` mengelompokkan hari menjadi 7 hari, 8 minggu (mulai Senin), atau 6 bulan, dihitung dengan zona waktu `OFFICE_TZ` (bawaan `Asia/Jakarta`). `GET /api/usage?range=daily|weekly|monthly` di `index.js` mengembalikan `{ periods, total, agents: { id: { total, models, series } } }`, yang dirender `ui/usage.js` (polling 15 detik selama panel terbuka). Biaya tidak dihitung karena Hermes tidak mengirim harga per balasan.
 
+## Furnitur dan editor layout
+
+Furnitur adalah data, bukan kode: daftar `{ id, type, x, z, rot, variant? }` (`x`/`z` = pusat jejak dalam tile, `rot` = putaran 90° 0 sampai 3). `defaultLayout()` di `office/furniture.js` membuat tata letak bawaan; kalau ada `config/layout.json`, `main.js` memuatnya lebih dulu lewat `GET /api/layout` (`loadLayout()`) dan meneruskannya ke `World` → `buildOffice(scene, layout)`.
+
+**Katalog (`CATALOG`).** Tiap jenis punya `build()` (Group dengan pusat jejak sebagai titik asal, boleh mengisi `userData.tick(t)` untuk animasi seperti uap, ikan, bola, layar arcade), `rects` (potongan jejak untuk tabrakan, dalam koordinat lokal), `spots` (titik berdiri atau duduk agen, relatif terhadap benda), serta `variants`, `max`, dan `floor` (karpet: boleh di bawah benda lain).
+
+**Manajer (`createFurniture`).** Membangun, memindah, dan menghapus benda, serta:
+
+- `canPlace(item)`: di dalam `OFFICE`, tidak menabrak dinding (`WALL_RECTS` dari `ROOMS`), tidak menutup pintu atau lingkaran panggil (`BLOCK_RECTS`), tidak menimpa benda lain, dan menghormati `max`. Mengembalikan `{ ok, reason }`.
+- `snap(item, x, z)`: grid 0,1 tile, lalu menempel rata ke tepi lantai, dinding, dan tepi benda lain dalam jarak 0,14 tile.
+- `pick(raycaster)`: benda di bawah kursor. `World.groundPoint()` dan `World.pickFurniture()` menyiapkan sinarnya.
+- `syncSpots()`: mengisi `ACTIVITY_SPOTS` dan `MEETING.seats` **di tempat** dari `spots` semua benda. Objek titik dipertahankan menurut id (`<id benda>/<id titik>`), jadi agen yang sedang menuju atau memakai titik itu ikut berpindah. Ruang titik dihitung ulang dengan `roomAt()`.
+- `setDesks(people)`: agen ke-*i* mendapat meja ke-*i* menurut urutan di daftar (meja pertama = Hermes). Kursi memakai `seat` milik katalog (`desk`), ruangnya dari `roomAt()`. Agen yang lebih banyak daripada meja mendapat meja terbuka otomatis (`makeAutoDesk` di `index.js`), dan papan nama ruang pribadi mengikuti pemilik meja di dalamnya.
+- `onChange`: dipanggil setelah perubahan yang final; `World` memakainya untuk `refreshDesks()` sehingga agen yang duduk berjalan ke kursi barunya.
+
+**Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut memutar kamera (`OrbitControls`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
+
+**Server (`server/layout-api.js`).** Hanya memeriksa bentuk dan rentang (maks. 300 benda, id unik, posisi -5 sampai 60, rotasi 0 sampai 3); jenis benda divalidasi browser terhadap katalognya. Berkas ditulis atomik ke `config/layout.json` (`LAYOUT_FILE` bisa menggantinya).
+
+Batasan: dinding dan pintu belum bisa diedit, rapat selalu dianggap berlangsung di `rapat` (satu meja rapat), dan routing agen belum menghindari furnitur.
+
 ## Siklus hidup agen di World
 
 Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke properti) → `activity` (memakai properti), atau `toSeat` → `sitting` saat sedang bekerja. Status `working` dari gateway selalu memanggil agen ke mejanya. Jalur dihitung oleh `world/routing.js` lewat koridor dan pintu ruangan.
@@ -122,8 +147,9 @@ Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke propert
 | Ingin | Ubah |
 | --- | --- |
 | Menambah atau memindah ruangan | `ROOMS` di `office/layout.js` (bentuk, dinding, celah pintu, titik pintu, jenis lantai) |
-| Menambah ruang pribadi | `WING` di `office/layout.js` (lebar sayap / ukuran ruang); `PRIVATE_OFFICES` dibuat otomatis, meja pribadi mengisi `DESK_SLOTS` lebih dulu, papan nama lewat `setDesks()` di `office/index.js` |
-| Menambah properti yang bisa dipakai agen | Model di `office/decor.js`, titik di `ACTIVITY_SPOTS` (`office/layout.js`), pose baru di `characters/animation.js` |
+| Menambah ruang pribadi | `WING` di `office/layout.js` (lebar sayap / ukuran ruang); `PRIVATE_OFFICES` dibuat otomatis, `defaultLayout()` di `office/furniture.js` memberi tiap ruang satu meja dan dua lemari, papan nama lewat `setDesks()` |
+| Menambah jenis furnitur | Entri baru di `CATALOG` dan `CATALOG_ORDER` (`office/furniture.js`): `build`, `rects` (jejak tabrakan), `spots` bila dipakai agen; tambahkan ke `defaultLayout()` bila perlu ada sejak awal |
+| Menambah pose untuk properti | Titik (`spots`) di entri katalognya, pose baru di `characters/animation.js` |
 | Menambah kostum | Entri baru di `COSTUMES` (`characters/costumes.js`) + id-nya di daftar `COSTUMES` di `server/agents-api.js` |
 | Menambah gaya rambut | `addHair` di `characters/head.js` + pilihan di `ui/agents-panel.js` dan `server/agents-api.js` |
 | Menambah lagu | MP3 ke `public/audio/`, entri di `PLAYLIST` (`ui/jukebox.js`) |

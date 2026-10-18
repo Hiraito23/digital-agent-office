@@ -1,0 +1,601 @@
+// Movable furniture: the catalog (what can be placed), the default layout, and the
+// manager that builds, moves, validates and saves the pieces. The 🛠 Layout editor
+// (ui/layout-editor.js) drives it; layouts are saved on the server (config/layout.json).
+//
+// Every item is { id, type, x, z, rot, variant? }: x/z is the centre of its footprint in
+// tiles, rot is quarter turns (0-3), variant picks a colour or a personal desk item.
+// Activity spots (sofa, arcade, chairs, ...) and desk seats belong to their furniture
+// and move with it, so agents keep using whatever the layout looks like now.
+import * as THREE from "three";
+import { box, canvasTexture, cone, mat } from "./helpers.js";
+import { ACTIVITY_SPOTS, MEETING, OFFICE, PORTAL, PRIVATE_OFFICES, ROOMS, roomAt } from "./layout.js";
+import { C, makeCabinet, makeChair, makeCooler, makeDesk, makeRack } from "./props.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Rotates a local (x, z) offset by `rot` quarter turns, like THREE's rotation.y does.
+const rot = (r, x, z) => [[x, z], [z, -x], [-x, -z], [-z, x]][((r % 4) + 4) % 4];
+const norm = (r) => ((Math.round(r) % 4) + 4) % 4;
+
+// ---------------------------------------------------------------------------
+// Catalog. Every builder returns a Group whose origin is the centre of the footprint
+// on the floor. A builder may set group.userData.tick(t) for animation.
+// rects: footprint pieces in local coordinates { x, z, w, d } (used for collisions).
+// spots: where agents stand/sit, in local coordinates (heading is relative to the item).
+// ---------------------------------------------------------------------------
+
+const rugTexture = (() => {
+  let tex = null;
+  return () => tex ??= canvasTexture(34, 26, (ctx) => {
+    ctx.fillStyle = "#c2255c"; ctx.fillRect(0, 0, 34, 26);
+    ctx.fillStyle = "#f783ac"; ctx.fillRect(2, 2, 30, 22);
+    ctx.fillStyle = "#c2255c"; ctx.fillRect(4, 4, 26, 18);
+    ctx.fillStyle = "#ffdeeb"; for (let i = 6; i < 28; i += 4) ctx.fillRect(i, 12, 2, 2);
+  });
+})();
+
+const BEANBAG_COLORS = ["#f59f00", "#7048e8", "#e64980", "#12b886"];
+const ARCADE_COLORS = ["#e03131", "#1971c2", "#2b8a3e", "#f59f00"];
+const ARCADE_SCREEN = ["#2b8a3e", "#5f3dc4", "#c92a2a", "#1971c2", "#e67700"];
+
+export const CATALOG = {
+  desk: {
+    label: "Meja kerja", icon: "🖥", variants: 5, max: 40,
+    rects: [{ x: 0, z: 0, w: 1.3, d: 0.75 }, { x: 0, z: 0.775, w: 0.5, d: 0.5 }],
+    // the agent sits on the chair; the seat belongs to the desk in layout order
+    seat: { dx: 0, dz: 0.775, heading: Math.PI },
+    build: (ctx, item) => {
+      const g = new THREE.Group();
+      const d = makeDesk(ctx.screenTex, item.variant ?? 0);
+      d.position.set(-0.65, 0, -0.375);
+      g.add(d);
+      const c = makeChair();
+      c.position.set(0, 0, 0.775);
+      g.add(c);
+      return g;
+    },
+  },
+  sofa: {
+    label: "Sofa", icon: "🛋",
+    rects: [{ x: 0, z: 0, w: 0.7, d: 2.0 }],
+    spots: [
+      { id: "a", dx: 0.45, dz: -0.5, heading: Math.PI / 2, pose: "lounge", icon: "🛋" },
+      { id: "b", dx: 0.45, dz: 0.5, heading: Math.PI / 2, pose: "lounge", icon: "🛋" },
+    ],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.7, 0.32, 2.0, mat("#1971c2"), 0, 0.16, 0));
+      g.add(box(0.2, 0.42, 2.0, mat("#1864ab"), -0.27, 0.5, 0));
+      for (const z of [-1.0, 1.0]) g.add(box(0.7, 0.24, 0.16, mat("#1864ab"), 0, 0.4, z));
+      for (const z of [-0.45, 0.45]) g.add(box(0.5, 0.06, 0.82, mat("#4dabf7"), 0.03, 0.35, z));
+      return g;
+    },
+  },
+  "coffee-table": {
+    label: "Meja kopi", icon: "☕",
+    rects: [{ x: 0, z: 0, w: 0.9, d: 0.6 }],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.9, 0.06, 0.6, mat("#8d5a2b"), 0, 0.32, 0));
+      for (const [x, z] of [[-0.38, -0.25], [0.38, -0.25], [-0.38, 0.25], [0.38, 0.25]]) g.add(box(0.05, 0.3, 0.05, mat("#5a3418"), x, 0.15, z));
+      g.add(box(0.08, 0.1, 0.08, mat("#ffffff"), 0.2, 0.4, 0.1));
+      g.add(box(0.26, 0.03, 0.2, mat("#e64980"), -0.15, 0.36, -0.05));
+      return g;
+    },
+  },
+  beanbag: {
+    label: "Bean bag", icon: "🟠", variants: 4,
+    rects: [{ x: 0, z: 0, w: 0.75, d: 0.75 }],
+    spots: [{ id: "a", dx: 0, dz: 0, heading: 0, pose: "beanbag", icon: "🛋" }],
+    build: (ctx, item) => {
+      const g = new THREE.Group();
+      const bag = new THREE.Mesh(new THREE.IcosahedronGeometry(0.36, 1), mat(BEANBAG_COLORS[(item.variant ?? 0) % BEANBAG_COLORS.length]));
+      bag.scale.set(1, 0.6, 1);
+      bag.position.y = 0.2;
+      bag.castShadow = true;
+      g.add(bag);
+      return g;
+    },
+  },
+  rug: {
+    label: "Karpet", icon: "🟥", floor: true,
+    rects: [{ x: 0, z: 0, w: 3.4, d: 2.6 }],
+    build: () => {
+      const g = new THREE.Group();
+      const rug = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.6), new THREE.MeshLambertMaterial({ map: rugTexture() }));
+      rug.rotation.x = -Math.PI / 2;
+      rug.position.y = 0.012;
+      rug.receiveShadow = true;
+      g.add(rug);
+      return g;
+    },
+  },
+  counter: {
+    label: "Pantry kopi", icon: "☕",
+    rects: [{ x: 0, z: 0, w: 0.6, d: 1.4 }],
+    spots: [{ id: "a", dx: 0.8, dz: 0, heading: -Math.PI / 2, pose: "drink", icon: "☕" }],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.6, 0.85, 1.4, mat("#dee2e6"), 0, 0.425, 0));
+      g.add(box(0.64, 0.05, 1.44, mat("#495057"), 0, 0.87, 0));
+      g.add(box(0.36, 0.42, 0.3, mat("#343a40"), 0, 1.1, -0.3)); // coffee machine
+      g.add(box(0.04, 0.08, 0.1, new THREE.MeshBasicMaterial({ color: "#51cf66" }), 0.18, 1.2, -0.3));
+      g.add(box(0.4, 0.26, 0.42, mat("#f1f3f5"), 0, 1.02, 0.35)); // microwave
+      g.add(box(0.02, 0.18, 0.26, mat("#212529"), 0.21, 1.02, 0.32));
+      const steam = new THREE.Group();
+      for (let k = 0; k < 3; k += 1) steam.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.6 })));
+      steam.position.set(0.07, 1.35, -0.3);
+      g.add(steam);
+      g.userData.tick = (t) => steam.children.forEach((p, k) => {
+        const phase = ((t / 1400) + k / 3) % 1;
+        p.position.set(Math.sin(phase * 6 + k) * 0.04, phase * 0.4, 0);
+        p.material.opacity = 0.6 * (1 - phase);
+      });
+      return g;
+    },
+  },
+  aquarium: {
+    label: "Akuarium", icon: "🐟",
+    rects: [{ x: 0, z: 0, w: 0.5, d: 1.0 }],
+    spots: [{ id: "a", dx: 0.85, dz: 0, heading: -Math.PI / 2, pose: "look", icon: "🐟" }],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.5, 0.7, 1.0, mat("#5c3d24"), 0, 0.35, 0));
+      const water = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.5, 0.96), new THREE.MeshLambertMaterial({ color: "#4dabf7", transparent: true, opacity: 0.45 }));
+      water.position.y = 0.96;
+      g.add(water);
+      g.add(box(0.48, 0.04, 0.98, mat("#212529"), 0, 1.23, 0));
+      g.add(box(0.44, 0.06, 0.94, mat("#e9c46a"), 0, 0.74, 0)); // sand
+      for (const z of [-0.3, 0.25]) g.add(cone(0.04, 0.26, mat("#2f9e44"), 0, 0.9, z, 5));
+      const fish = ["#ff922b", "#ffd43b", "#f06595"].map((c) => {
+        const f = new THREE.Group();
+        f.add(box(0.03, 0.06, 0.1, new THREE.MeshBasicMaterial({ color: c }), 0, 0, 0));
+        f.add(box(0.025, 0.05, 0.04, new THREE.MeshBasicMaterial({ color: c }), 0, 0, -0.07));
+        g.add(f);
+        return f;
+      });
+      g.userData.tick = (t) => fish.forEach((f, k) => {
+        const a = t / (1600 + k * 400) + k * 2;
+        f.position.set(Math.sin(a * 0.7) * 0.1, 0.9 + Math.sin(a * 1.3) * 0.12, Math.sin(a) * 0.38);
+        f.rotation.y = Math.cos(a) > 0 ? 0 : Math.PI;
+      });
+      return g;
+    },
+  },
+  bookshelf: {
+    label: "Rak buku", icon: "📚",
+    rects: [{ x: 0, z: 0, w: 0.4, d: 1.1 }],
+    spots: [{ id: "a", dx: 0.75, dz: -0.5, heading: -Math.PI / 2, pose: "read", icon: "📖" }],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.4, 1.5, 1.1, mat("#8d5a2b"), 0, 0.75, 0));
+      const bookColors = ["#e03131", "#1971c2", "#2f9e44", "#f59f00", "#7048e8", "#0c8599"];
+      for (let row = 0; row < 4; row += 1) {
+        g.add(box(0.36, 0.03, 1.04, mat("#5a3418"), 0.03, 0.2 + row * 0.35, 0));
+        for (let k = 0; k < 7; k += 1) g.add(box(0.26, 0.24 + ((k + row) % 3) * 0.03, 0.1, mat(bookColors[(k + row) % 6]), 0.08, 0.34 + row * 0.35, -0.42 + k * 0.14));
+      }
+      return g;
+    },
+  },
+  arcade: {
+    label: "Mesin arcade", icon: "🎮", variants: 4,
+    rects: [{ x: 0, z: 0, w: 0.6, d: 0.6 }],
+    spots: [{ id: "a", dx: -0.9, dz: 0, heading: Math.PI / 2, pose: "play", icon: "🎮" }],
+    build: (ctx, item) => {
+      const v = item.variant ?? 0;
+      const g = new THREE.Group();
+      g.add(box(0.55, 1.5, 0.6, mat(ARCADE_COLORS[v % ARCADE_COLORS.length]), 0, 0.75, 0));
+      g.add(box(0.2, 0.12, 0.56, mat("#212529"), -0.32, 0.95, 0)); // control panel
+      g.add(box(0.06, 0.06, 0.06, new THREE.MeshBasicMaterial({ color: "#ffd43b" }), -0.38, 1.03, -0.12));
+      g.add(box(0.05, 0.05, 0.05, new THREE.MeshBasicMaterial({ color: "#51cf66" }), -0.38, 1.03, 0.1));
+      const screenMat = new THREE.MeshBasicMaterial({ color: "#2b8a3e" });
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.36), screenMat);
+      scr.rotation.y = -Math.PI / 2;
+      scr.position.set(-0.281, 1.22, 0);
+      g.add(scr);
+      g.add(box(0.56, 0.16, 0.62, mat("#212529"), 0, 1.52, 0));
+      g.userData.tick = (t) => screenMat.color.set(ARCADE_SCREEN[Math.floor(t / 450 + v * 2) % ARCADE_SCREEN.length]);
+      return g;
+    },
+  },
+  pingpong: {
+    label: "Meja pingpong", icon: "🏓",
+    rects: [{ x: 0, z: 0, w: 2.0, d: 1.1 }],
+    spots: [
+      { id: "a", dx: -1.35, dz: 0, heading: Math.PI / 2, pose: "pingpong", icon: "🏓" },
+      { id: "b", dx: 1.35, dz: 0, heading: -Math.PI / 2, pose: "pingpong", icon: "🏓" },
+    ],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(2.0, 0.05, 1.1, mat("#1864ab"), 0, 0.5, 0));
+      g.add(box(2.0, 0.006, 0.03, mat("#ffffff"), 0, 0.53, 0));
+      g.add(box(0.03, 0.12, 1.14, mat("#f1f3f5"), 0, 0.58, 0)); // net
+      for (const [x, z] of [[-0.9, -0.48], [0.9, -0.48], [-0.9, 0.48], [0.9, 0.48]]) g.add(box(0.05, 0.48, 0.05, mat("#343a40"), x, 0.24, z));
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: "#ff922b" }));
+      g.add(ball);
+      g.userData.tick = (t) => {
+        const ph = (t / 900) % 2;
+        const x = ph < 1 ? -0.85 + ph * 1.7 : 0.85 - (ph - 1) * 1.7;
+        ball.position.set(x, 0.56 + Math.abs(Math.sin(ph * Math.PI)) * 0.25, Math.sin(t / 700) * 0.2);
+      };
+      return g;
+    },
+  },
+  plant: {
+    label: "Tanaman", icon: "🪴",
+    rects: [{ x: 0, z: 0, w: 0.4, d: 0.4 }],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(0.36, 0.4, 0.36, mat("#d9480f"), 0, 0.2, 0));
+      for (let k = 0; k < 5; k += 1) {
+        const leaf = cone(0.12, 0.6, mat(C.leaves[k % 4]), Math.cos(k * 1.3) * 0.12, 0.7, Math.sin(k * 1.3) * 0.12, 4);
+        leaf.rotation.set(Math.sin(k) * 0.4, 0, Math.cos(k) * 0.4);
+        g.add(leaf);
+      }
+      return g;
+    },
+  },
+  rack: {
+    label: "Rak server", icon: "🗄",
+    rects: [{ x: 0, z: 0, w: 0.85, d: 0.65 }],
+    spots: [{ id: "a", dx: 0, dz: 1.15, heading: Math.PI, pose: "look", icon: "🖥" }],
+    build: () => makeRack(),
+  },
+  cabinet: {
+    label: "Lemari", icon: "🗃",
+    rects: [{ x: 0, z: 0, w: 0.55, d: 0.75 }],
+    build: () => makeCabinet(),
+  },
+  cooler: {
+    label: "Dispenser air", icon: "🚰",
+    rects: [{ x: 0, z: 0, w: 0.4, d: 0.4 }],
+    build: () => makeCooler(),
+  },
+  "meeting-table": {
+    label: "Meja rapat", icon: "🪑", max: 1,
+    rects: [{ x: 0, z: 0, w: 2.2, d: 1.0 }, { x: -0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: -0.6, z: 0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: 0.95, w: 0.45, d: 0.45 }],
+    // chairs: ACTIVITY_SPOTS meeting-1..4 and MEETING.seats 0..3; the fifth person stands by the table
+    spots: [
+      { id: "1", dx: -0.6, dz: -0.95, heading: 0, pose: "meeting", icon: "💬", chair: true, seat: 0 },
+      { id: "2", dx: 0.6, dz: -0.95, heading: 0, pose: "meeting", icon: "💬", chair: true, seat: 1 },
+      { id: "3", dx: -0.6, dz: 0.95, heading: Math.PI, pose: "meeting", icon: "💬", chair: true, seat: 2 },
+      { id: "4", dx: 0.6, dz: 0.95, heading: Math.PI, pose: "meeting", icon: "💬", chair: true, seat: 3 },
+      { id: "5", dx: 2.1, dz: 0.1, heading: -Math.PI / 2, pose: "look", icon: "💬", activity: false, seat: 4 },
+    ],
+    build: (ctx, item) => {
+      const g = new THREE.Group();
+      g.add(box(2.2, 0.06, 1.0, mat("#8d5a2b"), 0, 0.55, 0));
+      for (const [x, z] of [[-1, -0.42], [1, -0.42], [-1, 0.42], [1, 0.42]]) g.add(box(0.06, 0.52, 0.06, mat("#5a3418"), x, 0.26, z));
+      g.add(box(0.5, 0.02, 0.3, mat("#f8f9fa"), -0.3, 0.59, 0.1)); // papers
+      g.add(box(0.36, 0.04, 0.26, mat("#343a40"), 0.5, 0.6, -0.05)); // laptop
+      for (const s of CATALOG["meeting-table"].spots.filter((p) => p.chair)) {
+        const chair = makeChair();
+        chair.position.set(s.dx, 0, s.dz);
+        chair.rotation.y = s.heading === 0 ? Math.PI : 0; // backrest behind the sitter
+        g.add(chair);
+      }
+      return g;
+    },
+  },
+};
+
+export const CATALOG_ORDER = ["desk", "sofa", "coffee-table", "beanbag", "rug", "counter", "aquarium", "bookshelf", "arcade", "pingpong", "plant", "rack", "cabinet", "cooler", "meeting-table"];
+
+// ---------------------------------------------------------------------------
+// Default layout (the office as it was built before the editor existed)
+// ---------------------------------------------------------------------------
+
+export const defaultLayout = () => {
+  const items = [];
+  const add = (type, x, z, r = 0, variant) => items.push({ type, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
+
+  // one desk per private office first: agents take desks in this order
+  PRIVATE_OFFICES.forEach((room, i) => {
+    const back = room.door.outside.z > room.door.inside.z;
+    add("desk", (room.x0 + room.x1) / 2, back ? room.z0 + 1.375 : room.z1 - 1.375, back ? 0 : 2, i);
+  });
+  // a cabinet in both corners of the far wall of every private office
+  PRIVATE_OFFICES.forEach((room) => {
+    const back = room.door.outside.z > room.door.inside.z;
+    for (const x of [room.x0 + 0.45, room.x1 - 0.45]) add("cabinet", x, back ? room.z0 + 0.32 : room.z1 - 0.32, back ? 3 : 1);
+  });
+  // lounge
+  add("rug", 9.6, 17.3);
+  add("sofa", 9.6, 18.55, 1);
+  add("coffee-table", 9.6, 17.3);
+  add("beanbag", 8.4, 16.35, 0, 0);
+  add("beanbag", 10.9, 16.35, 0, 1);
+  add("counter", 6.35, 15.75);
+  add("aquarium", 6.3, 17.6);
+  add("cooler", 11.55, 15.45);
+  add("cabinet", 6.35, 9.5);
+  add("cabinet", 6.35, 10.3);
+  // meeting room and library
+  add("meeting-table", 8.6, 6.6);
+  add("bookshelf", 6.25, 7.1);
+  // server room
+  for (const x of [20.85, 21.85, 22.85]) add("rack", x, 5.45);
+  // game room
+  add("arcade", 23.45, 15.6, 0, 0);
+  add("arcade", 23.45, 16.6, 0, 1);
+  add("pingpong", 20.6, 17.6);
+  // big plants
+  for (const [x, z] of [[19.5, 5.5], [39.5, 18.5], [11.5, 18.55], [12.5, 15.5], [17.5, 15.5]]) add("plant", x, z);
+  return withIds(items);
+};
+
+const withIds = (items) => {
+  const next = {};
+  const used = new Set(items.map((i) => i.id).filter(Boolean));
+  for (const item of items) {
+    if (item.id) continue;
+    do { next[item.type] = (next[item.type] ?? 0) + 1; item.id = `${item.type}-${next[item.type]}`; } while (used.has(item.id));
+    used.add(item.id);
+  }
+  return items;
+};
+
+// ---------------------------------------------------------------------------
+// Placement rules: footprints, walls, doors, bounds
+// ---------------------------------------------------------------------------
+
+const EPS = 0.015;
+const rectOf = (x0, x1, z0, z1) => ({ x0, x1, z0, z1 });
+
+// Glass partitions as thin rectangles (door gaps left open) + door clearance + the summoning circle.
+const WALL_RECTS = [];
+const BLOCK_RECTS = [];
+for (const room of ROOMS) {
+  for (const wall of room.walls) {
+    const gaps = [...(wall.gaps ?? [])].sort((a, b) => a[0] - b[0]);
+    let cursor = wall.from;
+    const pieces = [];
+    for (const [g0, g1] of gaps) { pieces.push([cursor, g0]); cursor = g1; }
+    pieces.push([cursor, wall.to]);
+    for (const [a, b] of pieces) {
+      if (b - a < 0.02) continue;
+      WALL_RECTS.push(wall.along === "x" ? rectOf(a, b, wall.at - 0.07, wall.at + 0.07) : rectOf(wall.at - 0.07, wall.at + 0.07, a, b));
+    }
+    for (const [g0, g1] of gaps) {
+      BLOCK_RECTS.push(wall.along === "x" ? rectOf(g0 - 0.05, g1 + 0.05, wall.at - 0.8, wall.at + 0.8) : rectOf(wall.at - 0.8, wall.at + 0.8, g0 - 0.05, g1 + 0.05));
+    }
+  }
+}
+BLOCK_RECTS.push(rectOf(PORTAL.x - 1.4, PORTAL.x + 1.4, PORTAL.z - 1.1, OFFICE.z1)); // summoning circle + gate path
+
+const overlap = (a, b) => a.x0 < b.x1 - EPS && a.x1 > b.x0 + EPS && a.z0 < b.z1 - EPS && a.z1 > b.z0 + EPS;
+
+export const worldRects = (item) => {
+  const def = CATALOG[item.type];
+  const r = norm(item.rot);
+  return def.rects.map((rc) => {
+    const [cx, cz] = rot(r, rc.x, rc.z);
+    const [w, d] = r % 2 ? [rc.d, rc.w] : [rc.w, rc.d];
+    return rectOf(item.x + cx - w / 2, item.x + cx + w / 2, item.z + cz - d / 2, item.z + cz + d / 2);
+  });
+};
+
+const bbox = (rects) => rects.reduce((b, r) => rectOf(Math.min(b.x0, r.x0), Math.max(b.x1, r.x1), Math.min(b.z0, r.z0), Math.max(b.z1, r.z1)),
+  rectOf(Infinity, -Infinity, Infinity, -Infinity));
+
+// ---------------------------------------------------------------------------
+// Manager
+// ---------------------------------------------------------------------------
+
+export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAutoDesk, items: initial }) => {
+  const root = new THREE.Group();
+  scene.add(root);
+  const autoDesks = new THREE.Group(); // open desks for agents beyond the number of desks
+  scene.add(autoDesks);
+  const ctx = { screenTex };
+  const items = [];
+  const objects = new Map(); // id -> { group }
+  const spots = new Map(); // activity spot id -> spot object (kept in ACTIVITY_SPOTS)
+  let people = [];
+  const api = { items, onChange: null };
+
+  const disposeGroup = (g) => g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+
+  const place = (item) => {
+    const g = objects.get(item.id).group;
+    g.position.set(item.x, top, item.z);
+    g.rotation.y = (norm(item.rot) * Math.PI) / 2;
+  };
+
+  const make = (item) => {
+    const def = CATALOG[item.type];
+    const group = def.build(ctx, item);
+    group.userData.furnitureId = item.id;
+    root.add(group);
+    objects.set(item.id, { group });
+    place(item);
+  };
+
+  const spotWorld = (item, s) => {
+    const r = norm(item.rot);
+    const [ox, oz] = rot(r, s.dx, s.dz);
+    return { x: item.x + ox, z: item.z + oz, heading: s.heading + (r * Math.PI) / 2 };
+  };
+
+  // Activity spots and meeting seats follow their furniture; agents keep their spot object.
+  const syncSpots = () => {
+    const seen = new Set();
+    const seats = [];
+    for (const item of items) {
+      for (const s of CATALOG[item.type].spots ?? []) {
+        const w = spotWorld(item, s);
+        if (s.seat !== undefined) seats[s.seat] = { x: w.x, z: w.z, heading: w.heading, pose: s.pose, icon: s.icon };
+        if (s.activity === false) continue;
+        const id = `${item.id}/${s.id}`;
+        seen.add(id);
+        const room = roomAt(w.x, w.z)?.id ?? null;
+        const existing = spots.get(id);
+        if (existing) Object.assign(existing, { x: w.x, z: w.z, heading: w.heading, room });
+        else spots.set(id, { id, room, x: w.x, z: w.z, heading: w.heading, pose: s.pose, icon: s.icon });
+      }
+    }
+    for (const id of [...spots.keys()]) if (!seen.has(id)) spots.delete(id);
+    ACTIVITY_SPOTS.length = 0;
+    ACTIVITY_SPOTS.push(...spots.values());
+    MEETING.seats.length = 0;
+    MEETING.seats.push(...seats.filter(Boolean));
+  };
+
+  const deskItems = () => items.filter((i) => i.type === "desk");
+  const seatOfItem = (item) => {
+    const s = spotWorld(item, CATALOG.desk.seat);
+    return { x: s.x, z: s.z, heading: s.heading, room: roomAt(s.x, s.z)?.id ?? null };
+  };
+
+  // people: [{ id, name }] in desk order (Hermes first). Returns one seat per person.
+  api.setDesks = (list) => {
+    people = list;
+    const desks = deskItems();
+    const seats = people.map((_, i) => (desks[i] ? seatOfItem(desks[i]) : null));
+    autoDesks.clear();
+    const extra = Math.max(0, people.length - desks.length);
+    if (extra && makeAutoDesk) makeAutoDesk(autoDesks, extra).forEach((seat, k) => { seats[desks.length + k] = seat; });
+    const owner = new Map(); // private office -> owner name
+    seats.forEach((seat, i) => { if (seat?.room && !owner.has(seat.room)) owner.set(seat.room, people[i].name); });
+    PRIVATE_OFFICES.forEach((room) => rooms.setLabel(room.id, owner.has(room.id) ? `RUANG ${owner.get(room.id).toUpperCase()}` : `${room.name} (KOSONG)`));
+    return seats;
+  };
+
+  const changed = () => {
+    syncSpots();
+    api.setDesks(people);
+    api.onChange?.();
+  };
+
+  api.get = (id) => items.find((i) => i.id === id) ?? null;
+  api.objectOf = (id) => objects.get(id)?.group ?? null;
+  api.toJSON = () => items.map((i) => ({ ...i }));
+  api.count = (type) => items.filter((i) => i.type === type).length;
+
+  api.load = (list) => {
+    for (const { group } of objects.values()) { root.remove(group); disposeGroup(group); }
+    objects.clear();
+    items.length = 0;
+    const clean = (Array.isArray(list) ? list : []).filter((i) => i && CATALOG[i.type] && Number.isFinite(i.x) && Number.isFinite(i.z))
+      .map((i) => ({ id: i.id, type: i.type, x: i.x, z: i.z, rot: norm(i.rot ?? 0), ...(i.variant === undefined ? {} : { variant: i.variant }) }));
+    withIds(clean);
+    for (const item of clean) { items.push(item); make(item); }
+    changed();
+  };
+
+  // silent: the caller (editor) decides when the change counts (after the placement is confirmed)
+  api.add = (type, x, z, r = 0, variant, { silent = false } = {}) => {
+    const def = CATALOG[type];
+    if (!def) return null;
+    const item = { type, x, z, rot: norm(r), ...(def.variants ? { variant: variant ?? api.count(type) % def.variants } : {}) };
+    let n = 1;
+    while (items.some((i) => i.id === `${type}-${n}`)) n += 1;
+    item.id = `${type}-${n}`;
+    items.push(item);
+    make(item);
+    if (!silent) changed();
+    return item;
+  };
+
+  api.remove = (id, { silent = false } = {}) => {
+    const i = items.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    const o = objects.get(id);
+    root.remove(o.group);
+    disposeGroup(o.group);
+    objects.delete(id);
+    items.splice(i, 1);
+    if (!silent) changed();
+  };
+
+  // Moves/rotates an item. preview = move the model only (while dragging), no data change.
+  api.update = (id, patch, { preview = false } = {}) => {
+    const item = api.get(id);
+    if (!item) return;
+    if (preview) {
+      const g = objects.get(id).group;
+      const x = patch.x ?? item.x;
+      const z = patch.z ?? item.z;
+      g.position.set(x, top + 0.1, z);
+      g.rotation.y = (norm(patch.rot ?? item.rot) * Math.PI) / 2;
+      return;
+    }
+    Object.assign(item, patch, patch.rot === undefined ? {} : { rot: norm(patch.rot) });
+    if (patch.variant !== undefined) {
+      // the model depends on the variant (colour, desk item): rebuild it
+      const o = objects.get(id);
+      root.remove(o.group);
+      disposeGroup(o.group);
+      make(item);
+    } else place(item);
+    changed();
+  };
+
+  // Puts a previewed model back where its data says it is (a drag that was refused).
+  api.resetModel = (id) => { const item = api.get(id); if (item) place(item); };
+
+  api.reset = () => api.load(defaultLayout());
+
+  // Can this item stand here? { ok, reason }
+  api.canPlace = (item, ignoreId = item.id) => {
+    const def = CATALOG[item.type];
+    const rects = worldRects(item);
+    const b = bbox(rects);
+    if (b.x0 < OFFICE.x0 - EPS || b.x1 > OFFICE.x1 + EPS || b.z0 < OFFICE.z0 - EPS || b.z1 > OFFICE.z1 + EPS) return { ok: false, reason: "Di luar lantai kantor" };
+    if (rects.some((r) => WALL_RECTS.some((w) => overlap(r, w)))) return { ok: false, reason: "Menabrak dinding" };
+    if (rects.some((r) => BLOCK_RECTS.some((w) => overlap(r, w)))) return { ok: false, reason: "Menutup pintu atau jalan masuk" };
+    for (const other of items) {
+      if (other.id === ignoreId) continue;
+      const od = CATALOG[other.type];
+      if (def.floor !== od.floor) continue; // rugs lie under everything
+      const orects = worldRects(other);
+      if (rects.some((r) => orects.some((o) => overlap(r, o)))) return { ok: false, reason: "Bertabrakan dengan benda lain" };
+    }
+    if (def.max && items.filter((i) => i.type === item.type && i.id !== ignoreId).length >= def.max) return { ok: false, reason: `Hanya boleh ${def.max} ${def.label.toLowerCase()}` };
+    return { ok: true, reason: "" };
+  };
+
+  // Snap a dragged item's centre: 0.1 grid, then flush to walls, the floor edge and neighbours.
+  api.snap = (item, x, z) => {
+    const g = 0.1;
+    let nx = Math.round(x / g) * g;
+    let nz = Math.round(z / g) * g;
+    const moved = { ...item, x: nx, z: nz };
+    const b = bbox(worldRects(moved));
+    const R = 0.14;
+    let dx = null;
+    let dz = null;
+    const pickD = (cur, d) => (Math.abs(d) < R && (cur === null || Math.abs(d) < Math.abs(cur)) ? d : cur);
+    dx = pickD(dx, OFFICE.x0 - b.x0); dx = pickD(dx, OFFICE.x1 - b.x1);
+    dz = pickD(dz, OFFICE.z0 - b.z0); dz = pickD(dz, OFFICE.z1 - b.z1);
+    const def = CATALOG[item.type];
+    const targets = [...WALL_RECTS];
+    for (const other of items) if (other.id !== item.id && !CATALOG[other.type].floor && !def.floor) targets.push(...worldRects(other));
+    for (const t of targets) {
+      if (t.z1 > b.z0 - 0.3 && t.z0 < b.z1 + 0.3) { dx = pickD(dx, t.x0 - b.x1); dx = pickD(dx, t.x1 - b.x0); }
+      if (t.x1 > b.x0 - 0.3 && t.x0 < b.x1 + 0.3) { dz = pickD(dz, t.z0 - b.z1); dz = pickD(dz, t.z1 - b.z0); }
+    }
+    nx += dx ?? 0;
+    nz += dz ?? 0;
+    return { x: Math.round(nx * 1000) / 1000, z: Math.round(nz * 1000) / 1000 };
+  };
+
+  // The item under the pointer ray (nearest first; rugs only when nothing else is hit).
+  api.pick = (raycaster) => {
+    const hits = raycaster.intersectObjects([...objects.values()].map((o) => o.group), true);
+    for (const hit of hits) {
+      let o = hit.object;
+      while (o && !o.userData.furnitureId) o = o.parent;
+      if (o) return api.get(o.userData.furnitureId);
+    }
+    return null;
+  };
+
+  api.update3d = (t) => { for (const { group } of objects.values()) group.userData.tick?.(t); };
+  animated.push((t) => api.update3d(t));
+
+  api.load(initial ?? defaultLayout());
+  return api;
+};

@@ -108,36 +108,11 @@ export const isPath = (i, j) => {
 export const MEETING = {
   room: "rapat",
   moderator: { x: 10.9, z: 5.75, heading: Math.PI, pose: "write", icon: "🗣" },
-  seats: [
-    { x: 8.0, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
-    { x: 9.2, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
-    { x: 8.0, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
-    { x: 9.2, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
-    { x: 10.7, z: 6.7, heading: -Math.PI / 2, pose: "look", icon: "💬" },
-  ],
+  // filled from the meeting table in the furniture layout (office/furniture.js)
+  seats: [],
 };
 
-// pose: how the agent is animated while there; icon shows on the name tag.
-export const ACTIVITY_SPOTS = [
-  // Pantry & Lounge
-  { id: "coffee", room: "lounge", x: 7.15, z: 15.75, heading: -Math.PI / 2, pose: "drink", icon: "☕" },
-  { id: "aquarium", room: "lounge", x: 7.15, z: 17.6, heading: -Math.PI / 2, pose: "look", icon: "🐟" },
-  { id: "sofa-1", room: "lounge", x: 9.1, z: 18.1, heading: Math.PI, pose: "lounge", icon: "🛋" },
-  { id: "sofa-2", room: "lounge", x: 10.1, z: 18.1, heading: Math.PI, pose: "lounge", icon: "🛋" },
-  { id: "beanbag-1", room: "lounge", x: 8.4, z: 16.35, heading: 0, pose: "beanbag", icon: "🛋" },
-  { id: "beanbag-2", room: "lounge", x: 10.9, z: 16.35, heading: 0, pose: "beanbag", icon: "🛋" },
-  // Ruang Rapat
-  { id: "meeting-1", room: "rapat", x: 8.0, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
-  { id: "meeting-2", room: "rapat", x: 9.2, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
-  { id: "meeting-3", room: "rapat", x: 8.0, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
-  { id: "meeting-4", room: "rapat", x: 9.2, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
-  { id: "books", room: "rapat", x: 7.0, z: 6.6, heading: -Math.PI / 2, pose: "read", icon: "📖" },
-  { id: "whiteboard", room: "rapat", x: 10.9, z: 5.75, heading: Math.PI, pose: "write", icon: "✍" },
-  // Ruang Server
-  { id: "server", room: "server", x: 21.85, z: 6.6, heading: Math.PI, pose: "look", icon: "🖥" },
-  // Ruang Game
-  { id: "arcade-1", room: "game", x: 22.55, z: 15.6, heading: Math.PI / 2, pose: "play", icon: "🎮" },
-  { id: "arcade-2", room: "game", x: 22.55, z: 16.6, heading: Math.PI / 2, pose: "play", icon: "🎮" },
-  { id: "pingpong-1", room: "game", x: 19.25, z: 17.6, heading: Math.PI / 2, pose: "pingpong", icon: "🏓" },
-  { id: "pingpong-2", room: "game", x: 21.95, z: 17.6, heading: -Math.PI / 2, pose: "pingpong", icon: "🏓" },
-];
+// Where agents idle (sofa, arcade, coffee, ...). The spots belong to furniture and are
+// filled in place by the furniture manager (office/furniture.js), so they follow the
+// layout; each one: { id, room, x, z, heading, pose, icon }.
+export const ACTIVITY_SPOTS = [];
