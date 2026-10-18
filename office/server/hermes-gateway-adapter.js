@@ -1198,6 +1198,13 @@ async function handleMethod(method, params, id, sendEvent) {
     case "meeting.current":
       return resOk(id, { meeting: meetings.current(), maxParticipants: meetings.MAX_PARTICIPANTS, maxRounds: meetings.MAX_ROUNDS });
 
+    case "summaries.mark": {
+      const entry = summaries.setRead(String(p.id || ""), p.read);
+      if (!entry) return resErr(id, "not_found", "ringkasan tidak ditemukan");
+      broadcastEvent({ type: "event", event: "summary.read", payload: { id: entry.id, read: entry.read } });
+      return resOk(id, { id: entry.id, read: entry.read });
+    }
+
     case "summaries.list":
       return resOk(id, { summaries: summaries.list(Number(p.limit) || 100) });
 
@@ -1408,11 +1415,11 @@ function startAdapter() {
               "status","config.get","config.set","config.patch",
               "agents.files.get","agents.files.set",
               "exec.approvals.get","exec.approvals.set","exec.approval.resolve","exec.approvals.pending",
-              "tools.catalog","summaries.list","chat.active","meeting.start","meeting.stop","meeting.current",
+              "tools.catalog","summaries.list","summaries.mark","chat.active","meeting.start","meeting.stop","meeting.current",
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron","tool","approval","summary","meeting"] },
+              events: ["chat","presence","heartbeat","cron","tool","approval","summary","summary.read","meeting"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },

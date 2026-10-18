@@ -1,6 +1,7 @@
 "use strict";
 // Summaries of finished agent replies, shown in the office's 📋 RINGKASAN list.
-// Each entry: { id, agentId, kind: "chat" | "meeting", at, task, summary }.
+// Each entry: { id, agentId, kind: "chat" | "meeting", at, task, summary, read }.
+// `read` is set only by the user (checkbox in the list).
 // Saved next to the chat history (office-data volume) so the list survives
 // restarts. On first run the list is filled from the existing chat history.
 const fs = require("fs");
@@ -85,6 +86,14 @@ const createSummaries = ({ file, historyFile }) => {
     // Newest first.
     list(limit = 100) {
       return entries.slice(-limit).reverse();
+    },
+    // The user ticks an entry as read (or unread) in the 📋 RINGKASAN list.
+    setRead(id, read) {
+      const entry = entries.find((e) => e.id === id);
+      if (!entry) return null;
+      entry.read = Boolean(read);
+      save();
+      return entry;
     },
     removeAgent(agentId) {
       entries = entries.filter((e) => e.agentId !== agentId);

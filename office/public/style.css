@@ -148,7 +148,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 /* 📋 RINGKASAN: finished replies, left side (collapsible) */
 .summaries { top: 56px; left: 12px; bottom: 150px; width: 300px; display: flex; flex-direction: column; background: var(--panel); border: 3px solid var(--panel-edge); box-shadow: 4px 4px 0 rgba(0,0,0,.3); }
 .summaries.collapsed { bottom: auto; }
-.summaries.collapsed .summary-list { display: none; }
+.summaries.collapsed .summary-list, .summaries.collapsed .summary-filter { display: none; }
+.summary-unread { flex: 1; margin: 0 8px; font: 11px var(--chat-font); color: var(--muted); }
+.summary-unread.has-unread { color: #ffe066; font-weight: 600; }
+.summary-filter { display: flex; align-items: center; gap: 6px; padding: 6px 10px 0; font: 11.5px var(--chat-font); color: var(--muted); cursor: pointer; }
+.summary-filter input, .sm-check input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+.summary-list li.unread { border-color: rgba(255, 212, 59, .75); background: rgba(255, 212, 59, .07); }
+.summary-list li.read { opacity: .62; }
+.summary-list li.read:hover { opacity: 1; }
+.sm-check { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--muted); cursor: pointer; flex: none; }
+.summary-list li.unread .sm-check span { color: #ffe066; font-weight: 600; }
+.summary-list .sm-head { align-items: center; }
+.summary-list .sm-head b { flex: 1; }
 .summary-list { list-style: none; margin: 0; padding: 6px 8px 8px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; font: 12.5px/1.45 var(--chat-font); }
 .summary-list li { padding: 6px 8px; border: 2px solid rgba(143,191,106,.4); cursor: pointer; }
 .summary-list li:hover { border-color: var(--accent); }
