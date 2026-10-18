@@ -108,6 +108,7 @@ view.addEventListener("pointerup", (e) => {
   down = null;
 });
 
+window.__world = world; // handy for inspecting the office from the browser console
 const nameTags = new NameTags(tagsEl);
 const say = (agentId, text, ms) => nameTags.say(agentId, text, ms);
 // idle small talk between agents: bubbles above their heads and lines in the Kantor tab

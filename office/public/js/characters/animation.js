@@ -2,7 +2,8 @@
 // drink, look, read, write, play (arcade), ping-pong, idle, plus talking.
 
 // Pose the rig. mode: "walk" | "sit" | "idle"; t in ms.
-export const animatePerson = (person, mode, t, phase = 0, talking = false) => {
+// gesture: "" | "wave" (greeting, one arm up) | "stretch" (both arms up), layered on top of any pose.
+export const animatePerson = (person, mode, t, phase = 0, talking = false, gesture = "") => {
   const { body, legs, arms, head, blob } = person.userData.rig;
   const k = t / 1000 + phase;
   legs.forEach((l) => l.rotation.set(0, 0, 0));
@@ -58,6 +59,32 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false) => {
     arms[0].rotation.set(-1.1, 0, 0.3);
     arms[1].rotation.set(-1.1, 0, -0.3);
     head.rotation.x = 0.3;
+    arms[1].rotation.z = -0.3 + Math.max(0, Math.sin(k * 0.45)) * 0.18; // now and then turns a page
+  } else if (mode === "readsit") {
+    // reading a book on the sofa / bean bag
+    body.position.y = 0.02;
+    legs.forEach((l) => { l.rotation.x = -1.35; });
+    arms[0].rotation.set(-1.25, 0, 0.35);
+    arms[1].rotation.set(-1.25 + Math.max(0, Math.sin(k * 0.4)) * 0.08, 0, -0.35);
+    head.rotation.x = 0.4;
+    head.rotation.y = Math.sin(k * 0.3) * 0.08;
+    blob.visible = false;
+  } else if (mode === "sleep") {
+    // dozing off: head down, arms folded, slow breathing
+    body.position.y = 0.0 + Math.sin(k * 1.1) * 0.012;
+    legs.forEach((l) => { l.rotation.x = -1.35; });
+    arms[0].rotation.set(-0.95, 0, 0.55);
+    arms[1].rotation.set(-0.95, 0, -0.55);
+    head.rotation.x = 0.6 + Math.sin(k * 1.1) * 0.03;
+    head.rotation.z = 0.18;
+    blob.visible = false;
+  } else if (mode === "eat") {
+    // plate in one hand, bites with the other, chewing
+    const bite = Math.max(0, Math.sin(k * 2.0));
+    arms[0].rotation.set(-0.75, 0, 0.2);
+    arms[1].rotation.x = -0.8 - bite * 1.15;
+    arms[1].rotation.z = -0.1;
+    head.rotation.x = bite * 0.12 + Math.sin(k * 9) * 0.025 * (bite > 0.4 ? 1 : 0);
   } else if (mode === "write") {
     arms[1].rotation.x = -2.2 + Math.sin(k * 5) * 0.12;
     arms[1].rotation.z = Math.sin(k * 3) * 0.25;
@@ -78,7 +105,15 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false) => {
     arms[1].rotation.z = 0.06;
     head.rotation.y = Math.sin(k * 0.7) * 0.25;
   }
-  if (talking) {
+  if (gesture === "wave") {
+    arms[1].rotation.set(0, 0, 2.55 + Math.sin(k * 11) * 0.3);
+    head.rotation.z = 0.08;
+  } else if (gesture === "stretch") {
+    arms[0].rotation.set(-2.8, 0, 0.15);
+    arms[1].rotation.set(-2.8, 0, -0.15);
+    head.rotation.x = -0.3;
+  }
+  if (talking && !gesture) {
     // nodding head and a gesturing hand while speaking
     head.rotation.x += Math.sin(k * 14) * 0.08;
     head.position.y = 0.9 + Math.abs(Math.sin(k * 9)) * 0.015;

@@ -19,6 +19,44 @@ export const PIXEL_MODES = [
   { label: "Retro", ratio: () => 0.33 },
 ];
 
+// What an agent does at an activity spot: the sofa and bean bag can mean reading or a nap, the pantry
+// a snack instead of a drink. ms is extra time spent there (a nap lasts longer).
+const FOOD = ["🍙", "🍩", "🥪", "🍜", "🍪", "🍌"];
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+function pickAct(spot) {
+  const r = Math.random();
+  if (spot.pose === "lounge" || spot.pose === "beanbag") {
+    if (r < 0.25) return { pose: "sleep", icon: "💤", ms: 12000 };
+    if (r < 0.6) return { pose: "readsit", icon: "📖", ms: 7000 };
+    return null;
+  }
+  if (spot.pose === "drink") {
+    if (r < 0.5) return { pose: "eat", icon: pick(FOOD), ms: 3000 };
+    return null;
+  }
+  if (spot.pose === "read" && r < 0.5) return { pose: "read", icon: pick(["📖", "📚", "🔖"]), ms: 4000 };
+  return null;
+}
+
+const GREET = [
+  (n) => [`Hai, ${n}! 👋`, "Hai juga! 👋"],
+  (n) => [`Halo ${n}~`, "Halo! Semangat ya 💪"],
+  (n) => [`Eh, ${n}! Apa kabar?`, "Baik! Kamu gimana?"],
+  (n) => [`Hei ${n}, lagi santai?`, "Iya nih, lagi jalan-jalan sebentar 😄"],
+  (n) => [`${n}! 👋`, "Yo! 👋"],
+];
+const GREET_PERIOD = {
+  pagi: (n) => [`Selamat pagi, ${n}! ☀`, "Pagi! Sudah sarapan?"],
+  sore: (n) => [`Sore, ${n}!`, "Sore! Hampir waktunya pulang ya"],
+  malam: (n) => [`Masih lembur, ${n}? 🌙`, "Iya, sebentar lagi selesai"],
+};
+function pickGreeting(a, b, period) {
+  const key = String(period || "").toLowerCase();
+  const fromPeriod = Object.keys(GREET_PERIOD).find((k) => key.includes(k));
+  const make = fromPeriod && Math.random() < 0.4 ? GREET_PERIOD[fromPeriod] : pick(GREET);
+  return make(b.name);
+}
+
 export class World {
   constructor(canvas, { layout } = {}) {
     this.canvas = canvas;
@@ -134,6 +172,7 @@ export class World {
         id: info.id, name: info.name, role: info.role, isMain, preset, seat: null,
         x: sx, z: sz, heading: Math.PI / 4, route: [], mode: "idle", status: "idle", spot: null,
         nextWander: performance.now() + 1500 + Math.random() * 3000, lastActive: 0, phase: Math.random() * 10,
+        gesture: "", gestureUntil: 0, pauseUntil: 0, greetWith: null, act: null,
       };
       a.model = this.makeModel(info.id, { ...preset, ...(this.appearances[info.id] ?? {}) }, a);
       this.agents.set(info.id, a);
@@ -258,7 +297,7 @@ export class World {
     this.environment.update(dt, now);
     for (const a of this.agents.values()) {
       let moving = false;
-      if (a.route.length) {
+      if (a.route.length && now >= a.pauseUntil) {
         const target = a.route[0];
         const dx = target.x - a.x;
         const dz = target.z - a.z;
@@ -275,7 +314,8 @@ export class World {
           if (!a.route.length && a.mode === "toSpot") {
             a.room = a.spot.room ?? null;
             a.mode = "activity";
-            a.activityEnd = now + 9000 + Math.random() * 9000;
+            a.act = pickAct(a.spot);
+            a.activityEnd = now + (a.act?.ms ?? 9000) + Math.random() * 9000;
           }
         } else {
           a.x += (dx / dist) * step;
@@ -288,6 +328,8 @@ export class World {
         const exit = doorOf(a.room);
         const out = exit ? exit.outside : { x: a.x, z: corridorFor(a.z) };
         a.route = planRoute(a, { x: out.x, z: corridorFor(out.z) }, a.room);
+        if (a.act?.pose === "sleep") { a.gesture = "stretch"; a.gestureUntil = now + 1800; a.pauseUntil = now + 1800; }
+        a.act = null;
         a.spot = null;
         a.room = null;
         a.mode = "wander";
@@ -324,17 +366,51 @@ export class World {
       else if (inMeeting) targetHeading = a.meeting.heading;
       else if (a.mode === "chat" && !moving && a.chatPartner) targetHeading = Math.atan2(a.chatPartner.x - a.x, a.chatPartner.z - a.z); // face the other agent
       else if (atSpot) targetHeading = a.spot.heading;
+      else if (a.greetWith && now < a.pauseUntil) targetHeading = Math.atan2(a.greetWith.x - a.x, a.greetWith.z - a.z); // turn to the one being greeted
       else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
       let diff = targetHeading - a.model.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       a.model.rotation.y += diff * Math.min(1, dt / 120);
       a.model.position.set(a.x, this.office.floorTop, a.z);
-      const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? a.spot.pose : "idle";
-      a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? a.spot.icon : "";
-      animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking || a.chatSpeaking));
+      const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
+      a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? (a.act?.icon ?? a.spot.icon) : "";
+      if (a.gesture && now > a.gestureUntil) a.gesture = "";
+      animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking || a.chatSpeaking), a.gesture);
     }
+    this.updateGreetings(now);
     this.updateChatter(now);
+  }
+
+  // Two agents who pass close to each other wave and say hi (bubbles only, no voice).
+  updateGreetings(now) {
+    if (now < (this.nextGreetCheck ?? 0) || document.hidden) return;
+    this.nextGreetCheck = now + 500;
+    if (now < (this.nextGreetAt ?? 0)) return;
+    const ok = (a) => (a.mode === "idle" || a.mode === "wander" || a.mode === "toSpot") && a.status !== "working" && !a.meeting && !a.speaking && !a.gesture;
+    const list = [...this.agents.values()].filter(ok);
+    this.greetCool ??= new Map();
+    for (let i = 0; i < list.length; i += 1) {
+      for (let j = i + 1; j < list.length; j += 1) {
+        const a = list[i];
+        const b = list[j];
+        if (Math.hypot(a.x - b.x, a.z - b.z) > 2.4) continue;
+        const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
+        if (now < (this.greetCool.get(key) ?? 0)) continue;
+        this.greetCool.set(key, now + 45000 + Math.random() * 45000);
+        this.nextGreetAt = now + 5000 + Math.random() * 5000;
+        for (const [x, y] of [[a, b], [b, a]]) {
+          x.gesture = "wave";
+          x.gestureUntil = now + 2200;
+          x.pauseUntil = now + 1700;
+          x.greetWith = y;
+        }
+        const [hi, back] = pickGreeting(a, b, this.environment?.periodName?.());
+        this.onSay?.(a.id, hi, 2600);
+        setTimeout(() => this.onSay?.(b.id, back, 2600), 900);
+        return;
+      }
+    }
   }
 
   // Small talk: two idle agents meet in the hall and swap a few lines (bubbles above their heads).
@@ -363,7 +439,11 @@ export class World {
     const here = (x) => this.agents.get(x.id) === x && (x.mode === "toChat" || x.mode === "chat");
     if (!here(ch.a) || !here(ch.b) || now - ch.startedAt > 90000) { this.endChat(now); return; }
     if (ch.state === "approach") {
-      if (ch.a.mode === "chat" && ch.b.mode === "chat") { ch.state = "talk"; ch.nextLineAt = now + 500; }
+      if (ch.a.mode === "chat" && ch.b.mode === "chat") {
+        ch.state = "talk";
+        ch.nextLineAt = now + 1500;
+        for (const x of [ch.a, ch.b]) { x.gesture = "wave"; x.gestureUntil = now + 1300; } // wave hello before talking
+      }
       return;
     }
     if (now < ch.nextLineAt) return;
