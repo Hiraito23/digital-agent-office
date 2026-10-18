@@ -781,6 +781,8 @@ async function execDelegateTask(args) {
 
   emitSub("delta", { message: { role: "assistant", content: "…" } });
 
+  // listed in chat.active, so a refreshed page still shows this agent at work
+  activeRuns.set(subRunId, { runId: subRunId, sessionKey, agentId: targetId, startedAt: Date.now(), abort() {} });
   let responseText = "";
   try {
     const result = await streamOneTurn(messages, model, [], (partial) => {
@@ -812,6 +814,8 @@ async function execDelegateTask(args) {
     if (keep) { history.push({ role: "assistant", content: `⚠ ${message}`, error: true, at: Date.now() }); saveHistoryToDisk(); }
     emitSub("error", { errorMessage: message });
     return JSON.stringify({ ok: false, error: message });
+  } finally {
+    activeRuns.delete(subRunId);
   }
 
   return JSON.stringify({ ok: true, agent_id: targetId, response: responseText });
@@ -1351,6 +1355,7 @@ async function handleMethod(method, params, id, sendEvent) {
         runId,
         sessionKey,
         agentId: sessionAgentId,
+        startedAt: Date.now(),
         abort() { aborted = true; },
       });
 
@@ -1468,7 +1473,7 @@ async function handleMethod(method, params, id, sendEvent) {
 
     case "chat.active":
       // Runs still in progress, so a refreshed tab can show who is working.
-      return resOk(id, { runs: [...activeRuns.values()].map((r) => ({ runId: r.runId, sessionKey: r.sessionKey, agentId: r.agentId })) });
+      return resOk(id, { runs: [...activeRuns.values()].map((r) => ({ runId: r.runId, sessionKey: r.sessionKey, agentId: r.agentId, startedAt: r.startedAt })) });
 
     case "chat.history": {
       const histKey = typeof p.sessionKey === "string" ? p.sessionKey : MAIN_SESSION_KEY;

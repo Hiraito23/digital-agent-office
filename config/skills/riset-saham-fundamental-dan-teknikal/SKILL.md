@@ -1,56 +1,96 @@
 ---
 name: riset-saham-fundamental-dan-teknikal
-description: "Template riset saham: fundamental, teknikal, skenario, dan risiko."
-version: 1.0.0
+description: "Playbook riset saham: sumber, fundamental, kualitas laba, valuasi, teknikal, skenario, risiko, dan template laporan."
+version: 2.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
   hermes:
-    tags: [saham, riset, fundamental, teknikal]
+    tags: [saham, riset, fundamental, teknikal, idx]
 ---
 
-# Template riset saham: fundamental
+# Playbook Riset Saham
+
+Hanya riset informasi. Bukan saran investasi: tidak ada perintah beli/jual personal, tidak ada janji hasil, tidak ada transaksi.
 
 ## When to Use
 
-- Meriset sebuah emiten atau sektor, membandingkan saham, atau menyusun laporan pantauan pasar.
+- Meriset satu emiten atau sektor, membandingkan beberapa saham, menyusun laporan pantauan, atau menjelaskan istilah dan laporan keuangan.
 
 ## Procedure
 
-**1. Sumber:** laporan keuangan dan keterbukaan informasi di situs emiten/IDX, OJK, BI, BPS, berita kredibel. Cantumkan sumber dan tanggal. Jika data terbaru tidak bisa diakses, tulis demikian; jangan mengarang angka.
+**1. Tetapkan pertanyaan dan horizon.** Apa yang ingin diketahui (nilai wajar, kualitas bisnis, risiko, perbandingan)? Horizon: trading (hari-minggu), menengah (bulan-1 tahun), panjang (>3 tahun). Horizon menentukan data yang relevan.
 
-**2. Rasio kunci**
+**2. Sumber (catat nama dan tanggal akses)**
+- Primer: situs emiten (laporan tahunan, laporan keuangan, paparan publik), IDX (keterbukaan informasi, data perdagangan), OJK, BI, BPS, Kementerian terkait.
+- Sekunder: berita keuangan kredibel, riset publik sekuritas, data pasar.
+- Jika tidak bisa mengakses data terbaru, tulis: "Data per <tanggal terakhir yang diketahui>, perlu dicek ulang." Jangan mengarang angka.
 
-| Aspek | Metrik | Cara baca |
+**3. Pahami bisnisnya (sebelum angka)**
+Bagaimana emiten menghasilkan uang? Segmen pendapatan, pelanggan utama, ketergantungan komoditas/kurs/regulasi, keunggulan (merek, skala, izin, biaya), siapa pemegang saham pengendali, dan rekam jejak manajemen.
+
+**4. Analisis fundamental**
+
+| Aspek | Metrik | Rumus / cara baca |
 | --- | --- | --- |
-| Valuasi | PER, PBV, EV/EBITDA, dividend yield | bandingkan dengan sektor dan sejarah sendiri |
-| Profitabilitas | margin kotor/bersih, ROE, ROA | konsisten naik atau turun? |
-| Pertumbuhan | pendapatan dan laba YoY, 3 sampai 5 tahun | stabil, siklikal, atau sekali jalan? |
-| Kesehatan | DER, current ratio, interest coverage, arus kas operasi | utang aman dan laba tertunai? |
+| Pertumbuhan | pendapatan dan laba YoY, CAGR 3-5 tahun | stabil, siklikal, atau sekali jalan? |
+| Profitabilitas | margin kotor, operasional, bersih; ROE; ROA | ROE = laba bersih / ekuitas rata-rata; bandingkan dengan sektor |
+| Kualitas laba | arus kas operasi / laba bersih | konsisten >= 1 lebih sehat; waspada bila laba naik tapi kas turun |
+| Leverage | DER, net debt / EBITDA, interest coverage | coverage = EBIT / beban bunga; < 2x berisiko |
+| Likuiditas | current ratio, quick ratio | < 1 perlu dilihat penyebabnya |
+| Efisiensi | perputaran piutang, persediaan | memburuk = modal kerja tersedot |
+| Valuasi | PER, PBV, EV/EBITDA, dividend yield, PEG | bandingkan dengan sektor, sejarah 5 tahun, dan pesaing |
+| Dividen | payout ratio, konsistensi | payout > 100% tidak berkelanjutan |
 
-**3. Teknikal (bila diminta):** tren (HH/HL atau LH/LL), support/resistance, volume, MA 20/50/200, RSI, MACD. Sajikan sebagai skenario dengan level pembatalan.
+Cek bendera merah: opini audit non-WTP, perubahan auditor mendadak, transaksi pihak berelasi besar, piutang naik jauh lebih cepat dari penjualan, penggadaian saham pengendali, laba bergantung pada keuntungan sekali jalan, rights issue berulang.
 
-**4. Katalis dan risiko:** kebijakan, siklus komoditas, suku bunga, kurs, aksi korporasi, tata kelola, konsentrasi pelanggan, likuiditas saham.
+**5. Valuasi sederhana (selalu beri rentang)**
+- Relatif: nilai wajar = metrik pesaing/sektor x metrik emiten (mis. PER sektor x EPS proyeksi).
+- Dividen/arus kas: bila memakai DCF, tulis asumsi pertumbuhan, margin, WACC, dan analisis sensitivitas (naik/turun 1-2 poin).
+- Margin of safety: selisih antara nilai wajar konservatif dan harga pasar, bukan titik tunggal.
 
-**5. Template laporan** (docs/riset-saham/<kode>.md)
+**6. Teknikal (bila diminta, sebagai skenario)**
+Tren (HH/HL atau LH/LL), support dan resistance dari area yang sering diuji, volume pada breakout, MA 20/50/200, RSI (momentum, bukan sinyal tunggal), MACD. Tulis level pembatalan skenario ("tesis batal bila harga tutup di bawah X"). Sampaikan keterbatasan: teknikal probabilistik, bukan kepastian.
+
+**7. Katalis dan risiko**
+Katalis: laporan kuartal, aksi korporasi, kebijakan, harga komoditas, ekspansi, kontrak baru. Risiko: siklus, suku bunga dan kurs, regulasi, konsentrasi pelanggan, utang jatuh tempo, tata kelola, likuiditas saham (volume harian kecil, free float rendah), risiko pasar umum.
+
+**8. Skenario (wajib)**
+
+| Skenario | Asumsi kunci | Pemicu | Dampak pada laba/valuasi |
+| --- | --- | --- | --- |
+| Bull | | | |
+| Base | | | |
+| Bear | | | |
+
+**9. Template laporan** (simpan di docs/riset-saham/<kode>-<tanggal>.md)
 
 ```
-Ringkasan (3 kalimat) | Tanggal data dan sumber
-Profil bisnis | Tabel metrik vs sektor
-Kelebihan | Risiko
-Skenario: Bull / Base / Bear (asumsi, kisaran, pemicu)
-Yang perlu dipantau berikutnya
-Catatan: riset informasi, bukan saran investasi.
+# <Kode> - <Nama emiten> (data per <tanggal>)
+Ringkasan (3 kalimat): bisnis, kondisi keuangan, hal paling penting
+Profil bisnis dan model pendapatan
+Tabel metrik 3-5 tahun vs sektor vs pesaing
+Kualitas laba dan bendera merah
+Valuasi (rentang dan asumsi)
+Katalis | Risiko
+Skenario Bull/Base/Bear
+Hal yang perlu dipantau berikutnya (tanggal bila ada)
+Sumber (nama, tautan, tanggal akses)
+Catatan: riset informasi, bukan saran investasi; keputusan dan risikonya ada pada pengguna.
 ```
 
-**6. Aturan:** tidak ada perintah beli/jual personal, tidak ada janji untung, tidak ada transaksi.
+**10. Membandingkan beberapa saham:** tabel dengan kriteria sama (pertumbuhan, margin, ROE, DER, PER, PBV, dividen, likuiditas) dan kesimpulan per kriteria, bukan peringkat tunggal.
 
 ## Pitfalls
 
-- Memakai angka lama atau tanpa sumber.
-- Satu rasio dijadikan kesimpulan.
-- Bahasa yang meyakinkan berlebihan ("pasti naik").
+- Memakai data lama tanpa tanggal atau angka tanpa sumber.
+- Satu rasio dijadikan kesimpulan (PER murah belum tentu murah).
+- Mengabaikan likuiditas dan free float pada saham kecil.
+- Bahasa meyakinkan berlebihan ("pasti naik").
+- Mencampur fakta, perkiraan, dan opini.
 
 ## Verification
 
-- Semua angka punya sumber dan tanggal; skenario dan risiko ada; disclaimer ada di akhir laporan.
+- Semua angka punya sumber dan tanggal; rasio dihitung dengan rumus yang konsisten.
+- Ada rentang valuasi, tiga skenario, risiko, dan level pembatalan.
+- Disclaimer ada di akhir laporan dan tidak ada instruksi beli/jual.

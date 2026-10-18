@@ -7,6 +7,7 @@ const when = (ms) => new Date(ms).toLocaleString("id-ID", { day: "numeric", mont
 const ICON = { html: "🌐", htm: "🌐", md: "📝", txt: "📄", json: "🧾", csv: "📊", svg: "🖼", png: "🖼", jpg: "🖼", jpeg: "🖼", gif: "🖼", webp: "🖼", pdf: "📕", css: "🎨", js: "📜" };
 const iconOf = (name) => ICON[name.split(".").pop().toLowerCase()] || "📄";
 const q = (p) => encodeURIComponent(p);
+const readable = (name) => /\.(md|markdown|txt)$/i.test(name); // opened in the document reader (viewer.html)
 
 export const initFiles = ({ getProject }) => {
   const panel = document.getElementById("files");
@@ -37,7 +38,7 @@ export const initFiles = ({ getProject }) => {
     const join = (n) => (data.path ? `${data.path}/${n}` : n);
     const rows = data.entries.map((e) => e.dir
       ? `<div class="f-row"><button class="f-name" data-go="${esc(join(e.name))}">📁 ${esc(e.name)}</button><span class="f-meta"></span><a class="f-act" href="/api/files/zip?path=${q(join(e.name))}" title="Unduh folder (.zip)">⬇ zip</a></div>`
-      : `<div class="f-row"><a class="f-name" href="/api/files/raw?path=${q(join(e.name))}" target="_blank" rel="noopener" title="Buka di tab baru">${iconOf(e.name)} ${esc(e.name)}</a><span class="f-meta">${size(e.size)} · ${when(e.mtime)}</span><a class="f-act" href="/api/files/raw?path=${q(join(e.name))}&download=1" title="Unduh file">⬇</a></div>`).join("");
+      : `<div class="f-row"><a class="f-name" href="${readable(e.name) ? `/viewer.html?path=${q(join(e.name))}` : `/api/files/raw?path=${q(join(e.name))}`}" target="_blank" rel="noopener" title="${readable(e.name) ? "Baca dokumen (bisa disimpan sebagai PDF)" : "Buka di tab baru"}">${iconOf(e.name)} ${esc(e.name)}</a><span class="f-meta">${size(e.size)} · ${when(e.mtime)}</span><a class="f-act" href="/api/files/raw?path=${q(join(e.name))}&download=1" title="Unduh file">⬇</a></div>`).join("");
     const up = data.path ? `<div class="f-row"><button class="f-name" data-go="${esc(parts.slice(0, -1).join("/"))}">⬆ ..</button></div>` : "";
     const zipAll = `<a class="f-zip" href="/api/files/zip?path=${q(data.path)}">⬇ Unduh folder ini (.zip)</a>`;
     body.innerHTML = `${up}${rows || '<p class="f-empty">Folder ini kosong. Hasil kerja agen akan muncul di sini.</p>'}${zipAll}`;

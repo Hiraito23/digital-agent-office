@@ -48,10 +48,11 @@ export class NameTags {
 
   // --- progress of a task ---------------------------------------------------
 
-  startTask(agentId) {
+  // elapsedMs: for a task already under way (page refreshed while the agent works)
+  startTask(agentId, elapsedMs = 0) {
     const existing = this.tasks.get(agentId);
     if (existing?.state === "running") return;
-    this.tasks.set(agentId, { start: performance.now(), steps: 0, pct: 0.04, tool: "", state: "running", endedAt: 0 });
+    this.tasks.set(agentId, { start: performance.now() - Math.max(0, elapsedMs), steps: 0, pct: 0.04, tool: "", state: "running", endedAt: 0 });
   }
 
   // One more tool call: the bar jumps ahead and the caption shows what is being run.

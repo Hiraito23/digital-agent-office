@@ -202,7 +202,7 @@ gw.addEventListener("status", async (e) => {
         if (liveRuns.has(r.runId)) continue;
         liveRuns.set(r.runId, { agentId: r.agentId, text: "" });
         setAgentStatus(r.agentId, "working");
-        nameTags.startTask(r.agentId);
+        nameTags.startTask(r.agentId, r.startedAt ? Date.now() - r.startedAt : 0);
       }
     }).catch(() => {});
     if (voice.supported && !voiceHintShown) {
