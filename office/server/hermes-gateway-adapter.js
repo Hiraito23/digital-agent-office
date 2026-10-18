@@ -79,7 +79,7 @@ const MAX_TOOL_ROUNDS = 8;
 // Orchestrator system prompt
 // ---------------------------------------------------------------------------
 
-const ORCHESTRATOR_SYSTEM_PROMPT = `Kamu adalah ${HERMES_AGENT_NAME}, orkestrator tim di kantor virtual 3D. Anggota tim adalah agen kantor sungguhan (Haruto, Kenji, Sakura, Yui, Takumi, Akane, Daichi, dan lainnya) yang tampil sebagai karakter di kantor. Kamu menyuruh mereka dengan tool tim kantor (server MCP "office-team"):
+const ORCHESTRATOR_SYSTEM_PROMPT = `Kamu adalah ${HERMES_AGENT_NAME}, orkestrator tim di kantor virtual 3D. Anggota tim adalah agen kantor sungguhan (Haruto sales digital, Kenji analis saham, Sakura konten, Yui brainstorming, Takumi QA, Akane keamanan, Daichi riset pasar, dan lainnya) yang tampil sebagai karakter di kantor. Kamu menyuruh mereka dengan tool tim kantor (server MCP "office-team"):
 
 - team_list: daftar anggota tim beserta agent_id-nya.
 - team_delegate(agent_id, task, wait_seconds): beri tugas ke seorang anggota; hasilnya dikembalikan ke kamu.
@@ -90,6 +90,7 @@ ATURAN PENTING:
 1. Untuk menyuruh anggota tim SELALU panggil team_delegate. Jangan memakai delegate_task bawaan untuk itu (itu hanya membuat pembantu anonim yang tidak terlihat di kantor).
 2. Jangan pernah bilang sudah mendelegasikan atau meminta seseorang kalau kamu belum benar-benar memanggil team_delegate di giliran ini. Pengguna melihat anggota itu bekerja di kantor, jadi klaim palsu langsung ketahuan.
 3. Kalau pengguna menanyakan kenapa seseorang belum bekerja, cek dengan team_context dan, bila memang belum ada tugasnya, panggil team_delegate sekarang.
+4. Panggil team_delegate LANGSUNG, satu panggilan per anggota (boleh beberapa panggilan berturut-turut). Jangan membungkus beberapa delegasi dalam tool_call/execute_code atau JSON besar, itu sering rusak. Jangan membuat folder atau file sendiri untuk tugas yang akan dikerjakan anggota tim; mereka menyimpan hasilnya sendiri di folder proyek.
 
 Saat diberi tujuan: (1) tentukan peran yang dibutuhkan, (2) team_delegate ke tiap peran dengan tugas yang lengkap (tujuan, konteks, hasil yang diharapkan), (3) bila hasil belum selesai gunakan team_result, (4) rangkum hasilnya untuk pengguna. Jawab singkat; pekerjaan beratnya dilakukan anggota tim.`;
 
@@ -762,7 +763,8 @@ async function execDelegateTask(args) {
   const model = agent.settings.model || HERMES_MODEL;
 
   // Build messages for sub-agent
-  const systemMsg = agent.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
+  const plan = plannedFiles(message);
+  const systemMsg = agent.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) + deliverableNote(plan) }] : [];
   const contextHistory = agent.settings.wipe ? [] : forModel(history);
   const messages = [...systemMsg, ...contextHistory, { role: "user", content: message }];
   const keep = agent.settings.continuity !== false;
@@ -787,7 +789,7 @@ async function execDelegateTask(args) {
     }, null, hermesEventForwarder(targetId, sessionKey));
     recordUsage(targetId, result);
     clearApprovalsFor(sessionKey);
-    responseText = await ensureFilesSaved({ agentId: targetId, baseMessages: messages, userMessage: message, replyText: result.textContent, model, sessionKey });
+    responseText = plan.files.length ? await ensureFilesSaved({ agentId: targetId, baseMessages: messages, plan, replyText: result.textContent, model, sessionKey }) : result.textContent;
 
     // Persist to sub-agent history (the summary points at this reply by its time)
     const replyAt = Date.now();
@@ -836,9 +838,82 @@ function expectedFiles(userMessage) {
   return [...out];
 }
 
+// What should end up on disk for a request: the files it names, else, for "buatkan website / desain /
+// dokumen ...", a file the office names itself (docs/<words-of-the-request>.html or .md; an existing
+// file is never reused, a number is added). Computed once per request and passed along.
+const claimedFiles = new Set(); // files planned for some request: another agent's file never counts as this one's
+const STOP_WORDS = new Set(["dari", "yang", "untuk", "dengan", "dan", "di", "ke", "buat", "buatkan", "bikin", "bikinkan", "kerjakan", "tolong", "saya", "aku", "sebuah", "suatu", "itu", "ini", "lagi", "agar", "supaya", "sebagai", "pada", "dalam", "mau", "ingin", "yg", "dgn", "tpi", "tapi"]);
+function plannedFiles(userMessage) {
+  const named = expectedFiles(userMessage);
+  if (named.length) return { files: named, auto: false, startedAt: Date.now() };
+  const none = { files: [], auto: false, startedAt: Date.now() };
+  const text = String(userMessage).split("\n\n(Permintaan asli")[0].trim();
+  if (!text || /\?\s*$/.test(text) || /^(apa|siapa|kenapa|mengapa|bagaimana|kapan|dimana|di mana|berapa|jelaskan|ceritakan)\b/i.test(text)) return none;
+  if (!/\b(buat(?:kan)?|bikin(?:kan)?|kerjakan|rancang|susun(?:kan)?|tulis(?:kan)?|generate|hasilkan|desain(?:kan)?|design|redesign)\b/i.test(text)) return none;
+  const web = /(landing ?page|halaman|website|situs|\bweb\b|html|wireframe|mockup|prototipe|prototype|antarmuka|tampilan|dashboard|aplikasi web|\bui\b|\bux\b|desain|design|logo|poster)/i.test(text);
+  const doc = /(dokumen|laporan|\bprd\b|spesifikasi|rencana|catatan|ringkasan|proposal|checklist|test plan|panduan|artikel|konten|riset|analisis|user stor)/i.test(text);
+  const ext = web ? "html" : doc ? "md" : null;
+  if (!ext) return none;
+  const words = text.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w && !STOP_WORDS.has(w));
+  const slug = words.slice(0, 6).join("-").replace(/-+/g, "-").slice(0, 48).replace(/^-|-$/g, "") || "hasil";
+  const base = activeProject?.path || "/workspace/hasil-agen";
+  let file = `${base}/docs/${slug}.${ext}`;
+  for (let n = 2; fs.existsSync(file) || claimedFiles.has(file); n += 1) file = `${base}/docs/${slug}-${n}.${ext}`;
+  claimedFiles.add(file);
+  return { files: [file], auto: true, ext, base, startedAt: Date.now() };
+}
+
+function deliverableNote(plan) {
+  if (!plan.files.length) return "";
+  return `\n\nSimpan hasil kerjamu sebagai file ${plan.files.join(", ")} (buat foldernya bila perlu) dengan tool write_file atau perintah terminal, lalu sebutkan path lengkapnya di jawaban. Jangan hanya menulis isinya di chat.`;
+}
+
+// Did the agent save its result under another name? (a file with the right extension, new since the request)
+function newFileSince(dir, ext, since, depth = 0, budget = { n: 400 }) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return false; }
+  for (const e of entries) {
+    if (budget.n-- <= 0) return false;
+    if (e.name === "node_modules" || e.name === ".git") continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) { if (depth < 3 && newFileSince(full, ext, since, depth + 1, budget)) return true; continue; }
+    if (e.name.toLowerCase().endsWith(`.${ext}`) && !claimedFiles.has(full.split(path.sep).join("/"))) { try { if (fs.statSync(full).mtimeMs >= since - 2000) return true; } catch { /* ignore */ } }
+  }
+  return false;
+}
+
+// Last resort: the agent wrote the file's content in its reply (a code block) but never saved it.
+// The office saves it to the requested path, inside /workspace only, and never overwrites a file.
+const LANG_FOR_EXT = {
+  html: ["html", "htm"], htm: ["html", "htm"], md: ["markdown", "md"], json: ["json"], css: ["css"], js: ["js", "javascript"],
+  jsx: ["jsx", "javascript", "js"], ts: ["ts", "typescript"], tsx: ["tsx", "typescript"], svg: ["svg", "xml", "html"],
+  py: ["py", "python"], csv: ["csv"], yml: ["yaml", "yml"], yaml: ["yaml", "yml"], sql: ["sql"], sh: ["sh", "bash"], txt: [],
+};
+function saveFromReply(file, replyText) {
+  if (!file.startsWith("/workspace/") || file.includes("..")) return false;
+  const ext = path.extname(file).slice(1).toLowerCase();
+  const blocks = [...String(replyText).matchAll(/```([\w+-]*)[^\n]*\n([\s\S]*?)```/g)]
+    .map((m) => ({ lang: m[1].toLowerCase(), body: m[2] }))
+    .filter((b) => b.body.trim().length > 20);
+  if (!blocks.length) return false;
+  const langs = LANG_FOR_EXT[ext] ?? [];
+  let chosen = blocks.filter((b) => langs.includes(b.lang)).sort((a, b) => b.body.length - a.body.length)[0];
+  if (!chosen && blocks.length === 1) chosen = blocks[0];
+  if (!chosen || chosen.body.length > 1_500_000) return false;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, chosen.body.endsWith("\n") ? chosen.body : `${chosen.body}\n`, { flag: "wx" }); // wx: never overwrite
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // baseMessages: the messages the agent got (system, history, the user's request). Returns the reply, extended.
-async function ensureFilesSaved({ agentId, baseMessages, userMessage, replyText, model, sessionKey }) {
-  const missing = () => expectedFiles(userMessage).filter((f) => !fs.existsSync(f));
+async function ensureFilesSaved({ agentId, baseMessages, plan, replyText, model, sessionKey }) {
+  // an agent that chose another name for an automatically named file is fine too
+  const savedElsewhere = () => plan.auto && newFileSince(plan.base, plan.ext, plan.startedAt);
+  const missing = () => (savedElsewhere() ? [] : plan.files.filter((f) => !fs.existsSync(f)));
   let gone = missing();
   if (!gone.length) return replyText;
   const reminder = `Sistem: file berikut BELUM ada di disk, jadi kamu belum benar-benar menyimpannya (menulis isi file di jawaban tidak menyimpan apa pun):\n${gone.map((f) => `- ${f}`).join("\n")}\nSimpan sekarang dengan tool write_file (atau perintah terminal) ke path lengkap di atas, lalu konfirmasi path-nya dengan satu kalimat. Jangan menulis ulang isi file di jawaban.`;
@@ -850,8 +925,11 @@ async function ensureFilesSaved({ agentId, baseMessages, userMessage, replyText,
     extra = String(retry.textContent || "").trim();
   } catch { /* the warning below says it */ }
   gone = missing();
+  const saved = gone.filter((f) => saveFromReply(f, `${replyText}\n${extra}`));
+  gone = missing();
+  const note = saved.length ? `\n\n💾 Kantor menyimpan ${saved.join(", ")} dari isi jawaban agen (agennya tidak memanggil tool tulis file). Periksa isinya, karena bisa belum lengkap.` : "";
   const warning = gone.length ? `\n\n⚠ File ini belum tersimpan di folder proyek: ${gone.join(", ")}. Minta agennya menyimpan ulang atau salin isinya dari chat.` : "";
-  return `${replyText}${extra ? `\n\n${extra}` : ""}${warning}`;
+  return `${replyText}${extra ? `\n\n${extra}` : ""}${note}${warning}`;
 }
 
 // "Suruh Sakura ...", "minta Haruto dan Kenji untuk ...": a clear order to named agents is handed
@@ -880,6 +958,37 @@ function detectDelegation(text) {
   return { agents: found, message: `${rest}\n\n(Permintaan asli pengguna lewat Hermes: "${text.slice(0, 500)}")` };
 }
 
+// A goal without names ("siapkan peluncuran produk kopi", "buatkan strategi konten bulan depan"): the weak
+// orchestrator model often says it delegated without calling the tool, so the office picks the roles
+// itself from the wording and hands each of them their part. Returns null for questions and chat,
+// which go to Hermes as usual.
+const GOAL_START = /^\s*(?:tolong\s+|bisa\s+(?:tolong\s+)?|coba\s+)?(?:siapkan|persiapkan|buat(?:kan)?|bikin(?:kan)?|rancang|susun(?:kan)?|rencanakan|kerjakan|kembangkan|garap|riset(?:kan)?|analisis(?:kan)?|cari(?:kan)?|tulis(?:kan)?|luncurkan|jalankan)\b/i;
+const GOAL_ROLES = [
+  { id: "yui-brainstorm", re: /(ide|strategi|brainstorm|konsep|rencana|peluncuran|luncurkan|launch|kampanye|prioritas|solusi)/i, doc: "ide dan strategi", ask: "Brainstorming dan susun strategi" },
+  { id: "daichi-riset", re: /(riset|pasar|pesaing|kompetitor|pelanggan|tren|harga|peluncuran|luncurkan|launch|kampanye|produk|bisnis|usaha)/i, doc: "riset pasar dan pesaing", ask: "Riset pasar, pesaing, dan calon pelanggan" },
+  { id: "sakura-konten", re: /(konten|caption|copy|artikel|postingan|sosial media|instagram|tiktok|iklan|kampanye|peluncuran|luncurkan|launch|promosi|brand)/i, doc: "konten dan copy", ask: "Tulis konten dan copy" },
+  { id: "haruto-sales", re: /(jual|penjualan|sales|prospek|penawaran|follow.?up|closing|funnel|pelanggan|peluncuran|luncurkan|launch|kampanye|promosi|produk)/i, doc: "rencana penjualan dan skrip", ask: "Susun funnel, skrip chat, dan follow-up penjualan" },
+  { id: "kenji-saham", re: /(saham|emiten|idx|bursa|ihsg|investasi|dividen)/i, doc: "riset saham", ask: "Riset saham dan susun laporan" },
+  { id: "takumi-qa", re: /(\bqa\b|uji|tes\b|testing|periksa kualitas|bug|kualitas)/i, doc: "laporan QA", ask: "Periksa kualitas dan uji" },
+  { id: "akane-security", re: /(keamanan|security|aman|rentan|vulnerab|phishing|peretas|hack|password|owasp)/i, doc: "laporan keamanan", ask: "Periksa keamanan dan susun temuan" },
+];
+
+function detectGoalPlan(text) {
+  const goal = String(text).trim();
+  if (goal.length < 12 || goal.length > 600 || /\?\s*$/.test(goal) || !GOAL_START.test(goal)) return null;
+  const members = new Map([...agentRegistry.values()].filter((a) => a.id !== AGENT_ID).map((a) => [a.id, a]));
+  const chosen = GOAL_ROLES.filter((r) => members.has(r.id) && r.re.test(goal));
+  // a single unrelated hit is not a team job (e.g. "cari tahu cuaca"): let Hermes handle it
+  if (chosen.length < 2 && !/(peluncuran|luncurkan|launch|kampanye|strategi|rencana|bisnis|produk|riset|saham|keamanan|konten|penjualan)/i.test(goal)) return null;
+  if (!chosen.length) return null;
+  const topic = goal.replace(GOAL_START, "").trim();
+  const perAgent = {};
+  for (const r of chosen) {
+    perAgent[r.id] = `${r.ask} untuk: ${topic}\n\nBuatkan dokumen ${r.doc} yang lengkap, ringkas, dan siap dipakai (simpan sebagai file di folder proyek), lalu rangkum isinya dalam 3 sampai 5 poin.\n\n(Permintaan asli pengguna lewat Hermes: "${goal.slice(0, 500)}")`;
+  }
+  return { agents: chosen.map((r) => members.get(r.id)), message: "", perAgent };
+}
+
 // Runs such an order: every named agent works on it (visible in the office), then the replies are
 // reported in Hermes' chat. Saved in Hermes' history like a normal turn.
 async function delegationShortcut({ sessionKey, userMessage, plan, emitDelta }) {
@@ -889,7 +998,7 @@ async function delegationShortcut({ sessionKey, userMessage, plan, emitDelta }) 
   emitDelta(`Baik, saya suruh ${plan.agents.map((a) => a.name).join(", ")} mengerjakannya…`);
   const results = await Promise.all(plan.agents.map(async (agent) => {
     let out;
-    try { out = JSON.parse(await execDelegateTask({ agent_id: agent.id, message: plan.message })); } catch (err) { out = { ok: false, error: sanitizeErrorMessage(err) }; }
+    try { out = JSON.parse(await execDelegateTask({ agent_id: agent.id, message: plan.perAgent?.[agent.id] ?? plan.message })); } catch (err) { out = { ok: false, error: sanitizeErrorMessage(err) }; }
     return { agent, out };
   }));
   const finalText = results
@@ -997,10 +1106,10 @@ async function executeToolCall(tc, sendEvent) {
 // Agentic loop — handles multi-round tool-calling conversations
 // ---------------------------------------------------------------------------
 
-async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, emitDelta, abortCheck, sendEvent }) {
+async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, emitDelta, abortCheck, sendEvent, extraSystem = "" }) {
   const agent = agentRegistry.get(agentId);
   const prompt = agent?.systemPrompt && agentId === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt;
-  const systemMsg = prompt ? [{ role: "system", content: withProjectContext(prompt) }] : [];
+  const systemMsg = prompt ? [{ role: "system", content: withProjectContext(prompt) + extraSystem }] : [];
   const history = getHistory(sessionKey);
   const contextHistory = (agent?.settings?.wipe) ? [] : forModel(history);
   let messages = [...systemMsg, ...contextHistory, { role: "user", content: userMessage }];
@@ -1266,20 +1375,23 @@ async function handleMethod(method, params, id, sendEvent) {
           // as the MCP server office-team (team-mcp.js), so nothing is sent here.
           const tools = [];
 
-          const plan = isOrchestrator ? detectDelegation(userMessage) : null;
+          const plan = isOrchestrator ? (detectDelegation(userMessage) || detectGoalPlan(userMessage)) : null;
+          // what must end up on disk (named in the request, or a file the office names for "buatkan website ...")
+          const deliverable = !plan && !isOrchestrator ? plannedFiles(userMessage) : { files: [] };
           let finalText = plan
             ? await delegationShortcut({ sessionKey, userMessage, plan, emitDelta: onTextDelta })
             : await runAgenticLoop({
               sessionKey, agentId: sessionAgentId, userMessage,
               model, tools, emitDelta: onTextDelta,
               abortCheck: () => aborted, sendEvent,
+              extraSystem: deliverableNote(deliverable),
             });
           // an agent that was asked to save files but did not: make it do so (or warn)
-          if (!plan && !isOrchestrator && !aborted && expectedFiles(userMessage).some((f) => !fs.existsSync(f))) {
+          if (deliverable.files.length && !aborted) {
             const history = getHistory(sessionKey);
-            const systemMsg = agent?.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
+            const systemMsg = agent?.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) + deliverableNote(deliverable) }] : [];
             const base = [...systemMsg, ...forModel(history).slice(-12, -1)];
-            const improved = await ensureFilesSaved({ agentId: sessionAgentId, baseMessages: base, userMessage, replyText: finalText, model, sessionKey });
+            const improved = await ensureFilesSaved({ agentId: sessionAgentId, baseMessages: base, plan: deliverable, replyText: finalText, model, sessionKey });
             if (improved !== finalText) {
               finalText = improved;
               const last = history[history.length - 1];

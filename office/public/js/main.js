@@ -15,6 +15,7 @@ import { initApprovals } from "./ui/approvals.js";
 import { initSummaries } from "./ui/summaries.js";
 import { initMeeting } from "./ui/meeting.js";
 import { initUsage } from "./ui/usage.js";
+import { initFiles } from "./ui/files.js";
 import { initLayoutEditor, loadLayout } from "./ui/layout-editor.js";
 import { initEnvironmentControls } from "./ui/environment-controls.js";
 import { setNews, setFacts } from "./world/chatter.js";
@@ -284,6 +285,9 @@ initMeeting({
 
 // 📊 Pemakaian: token usage per agent and model (daily / weekly / monthly).
 initUsage({ agents: () => [...agentsById.values()], nameOf });
+
+// 📂 Berkas: browse, open and download what the agents saved in the workspace folder.
+initFiles({ getProject: () => document.getElementById("project-select").value || null });
 
 // PERSETUJUAN: risky commands wait here for your answer.
 initApprovals({

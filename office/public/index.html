@@ -23,6 +23,7 @@
       <button id="time-toggle" class="chip" title="Waktu">🕒 Waktu</button>
       <button id="weather-toggle" class="chip" title="Cuaca">☀ Cerah</button>
       <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
+      <button id="files-toggle" class="chip" title="Lihat dan unduh file hasil kerja agen">📂 Berkas</button>
       <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
       <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
       <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
@@ -78,6 +79,16 @@
       </div>
       <button id="layout-done" type="button" class="primary wide">✓ Selesai</button>
     </div>
+  </aside>
+
+  <aside id="files" class="hud agents files hidden">
+    <div class="chat-head">
+      <div id="files-path" class="f-crumbs"></div>
+      <button id="files-refresh" title="Muat ulang">⟳</button>
+      <button id="files-close" title="Tutup">✕</button>
+    </div>
+    <div id="files-status" class="agents-status"></div>
+    <div id="files-body" class="agents-body"></div>
   </aside>
 
   <aside id="usage" class="hud agents usage hidden">

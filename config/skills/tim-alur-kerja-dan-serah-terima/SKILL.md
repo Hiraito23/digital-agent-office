@@ -1,15 +1,15 @@
 ---
 name: tim-alur-kerja-dan-serah-terima
-description: "Alur kerja tim, format serah-terima, lokasi file, dan aturan git untuk semua agen."
+description: "Alur kerja tim, format serah-terima, dan lokasi file untuk semua agen."
 version: 1.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
   hermes:
-    tags: [tim, workflow, handoff, git]
+    tags: [tim, workflow, handoff]
 ---
 
-# Alur Kerja Tim dan Serah-terima
+# Alur kerja tim
 
 ## When to Use
 
@@ -18,46 +18,41 @@ metadata:
 
 ## Procedure
 
-**1. Urutan kerja satu fitur**
+**1. Siapa mengerjakan apa**
 
-| Tahap | Pemilik | Keluaran | Disimpan di |
-| --- | --- | --- | --- |
-| Kebutuhan | Yui | PRD + acceptance criteria | docs/prd/ |
-| Alur dan desain | Sakura | wireframe, tokens, handoff | docs/design/ |
-| Kontrak API + skema | Kenji + Daichi | kontrak, migrasi, ERD | docs/api/, backend/ |
-| Implementasi | Kenji (backend), Haruto (frontend) | kode + tes unit | folder proyek |
-| QA | Takumi | test plan, hasil tes, laporan bug | docs/qa/, tes di test/ |
-| Security | Akane | laporan temuan | docs/security/ |
-| Penutupan | Yui | status Selesai vs Definition of Done | docs/prd/ |
+| Kebutuhan | Agen |
+| --- | --- |
+| Menjual, penawaran, follow-up, funnel | Haruto (Sales Digital) |
+| Riset saham dan pasar modal | Kenji (Analis Saham) |
+| Konten, caption, copy, kalender konten | Sakura (Content & Copywriter) |
+| Ide, strategi, memilih prioritas | Yui (Brainstorming) |
+| Menguji dan memeriksa kualitas | Takumi (QA) |
+| Keamanan sistem dan akun | Akane (Security) |
+| Riset pasar, pesaing, pelanggan | Daichi (Riset Pasar) |
 
-Pekerjaan yang tidak saling bergantung boleh paralel (mis. desain dan skema). Frontend menunggu kontrak API, QA menunggu implementasi.
+Alur umum untuk satu inisiatif: Yui (ide dan strategi) -> Daichi (riset pasar) -> Sakura (konten) dan Haruto (penjualan) -> Takumi (periksa kualitas materi dan alur) -> Akane (keamanan bila ada sistem atau data). Pekerjaan yang tidak saling bergantung boleh paralel.
 
 **2. Format serah-terima** (akhiri setiap pekerjaan dengan ini)
 
 ```
 Selesai: <apa yang dikerjakan, 1-2 kalimat>
 File: <path lengkap di bawah /workspace, satu per baris>
-Cara uji: <perintah atau langkah, hasil yang diharapkan>
 Asumsi/risiko: <yang belum pasti>
 Berikutnya: <nama agen> untuk <tugas>
 ```
 
-**3. Lokasi file.** Simpan semua hasil di folder proyek aktif di bawah /workspace (atau /workspace/hasil-agen bila tidak ada proyek aktif). Jangan di /opt/data, /tmp, atau cache/scratch. Sebut path lengkapnya di jawaban.
+**3. Lokasi file.** Simpan semua hasil di folder proyek aktif di bawah /workspace (atau /workspace/hasil-agen bila tidak ada proyek aktif), mis. docs/<jenis>/<nama>.md atau .html. Jangan di /opt/data, /tmp, atau cache/scratch. Sebut path lengkapnya di jawaban.
 
-**4. Aturan git.** Cek `git status` dan branch dulu. Kerja di satu branch bersama `agent/<nama-tugas>`. Jangan commit atau push ke main/master/develop, jangan force push, push hanya bila pengguna meminta. Commit kecil dengan pesan jelas.
+**4. Kapan bertanya.** Hanya bila terblokir (informasi penting hilang, atau tindakan tidak bisa dibatalkan). Selain itu ambil asumsi paling masuk akal, tulis di bagian Asumsi, dan lanjutkan.
 
-**5. Kapan bertanya.** Hanya bila terblokir (informasi penting hilang, atau tindakan merusak/tidak bisa dibatalkan). Selain itu ambil asumsi paling masuk akal, tulis di bagian Asumsi, dan lanjutkan.
-
-**6. Status.** Pakai kata yang sama: Selesai, Sedang dikerjakan, Terhambat (sebutkan penyebab dan siapa yang bisa membantu), Perlu keputusan.
+**5. Status.** Pakai kata yang sama: Selesai, Sedang dikerjakan, Terhambat (sebutkan penyebab), Perlu keputusan.
 
 ## Pitfalls
 
-- Mengubah kontrak API atau skema tanpa memberi tahu agen yang bergantung.
-- Menyatakan selesai tanpa menjalankan tes atau build.
+- Mengarang data atau sumber.
+- Menyatakan selesai tanpa menyimpan file.
 - Menyimpan hasil di folder yang tidak terlihat pengguna.
-- Melebar ke fitur di luar PRD.
 
 ## Verification
 
-- Catatan serah-terima lengkap dan path file benar-benar ada (`ls`).
-- Perintah uji yang ditulis sudah dijalankan dan hasilnya sesuai.
+- Catatan serah-terima lengkap dan path file benar-benar ada.

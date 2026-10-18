@@ -17,7 +17,7 @@
       "rate": 1
     }
   },
-  "haruto-frontend": {
+  "haruto-sales": {
     "hair": "spiky",
     "outfit": "hoodie",
     "accessory": "headset",
@@ -33,7 +33,7 @@
       "rate": 1.1
     }
   },
-  "kenji-backend": {
+  "kenji-saham": {
     "hair": "short",
     "outfit": "shirt",
     "accessory": "glasses",
@@ -52,7 +52,7 @@
       "rate": 0.95
     }
   },
-  "sakura-uiux": {
+  "sakura-konten": {
     "hair": "bun",
     "outfit": "shirt",
     "hairColor": "#7a3e1d",
@@ -70,7 +70,7 @@
       "rate": 1
     }
   },
-  "yui-pm": {
+  "yui-brainstorm": {
     "hair": "long",
     "outfit": "blazer",
     "hairColor": "#3b2416",
@@ -120,7 +120,7 @@
       "rate": 1.05
     }
   },
-  "daichi-infra": {
+  "daichi-riset": {
     "hair": "short",
     "outfit": "blazer",
     "hairColor": "#868e96",

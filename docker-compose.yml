@@ -41,7 +41,7 @@ services:
     volumes:
       - office-data:/data/.hermes                              # riwayat chat agen
       - ./config:/data/config                                  # team.json + people.json (diedit dari panel ⚙ Agen)
-      - ${PROJECTS_DIR:-./projects}:/workspace:ro             # hanya untuk menampilkan daftar proyek
+      - ${PROJECTS_DIR:-./projects}:/workspace                # daftar proyek, cek file hasil agen, dan menyimpan file dari jawaban agen yang lupa menyimpan
     # Tampilan kantor (office/public) ada di dalam image: setelah mengubahnya,
     # jalankan `docker compose up -d --build office`.
     environment:

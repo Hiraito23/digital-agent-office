@@ -19,9 +19,9 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 
 | Mau | Caranya |
 | --- | --- |
-| Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Naruto kerjakan frontend, Luffy API-nya, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
+| Menyiapkan penjualan atau kampanye | Pilih proyek → klik **Hermes** → "Yui brainstorming ide kampanye, Daichi riset pesaing, Sakura tulis konten, Haruto susun skrip penjualan" → hasilnya tersimpan di `docs/` proyek |
 | Rapat membahas project | **💬 Rapat** → isi topik, centang peserta (maks. 5), pilih jumlah putaran → **Mulai rapat**. Notulen masuk ke 📋 RINGKASAN (lihat [Rapat tim](#rapat-tim-rapat)) |
-| Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
+| Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Daichi diskusi ide X, lalu rangkum dan beri rekomendasi" |
 | Ngobrol dengan satu agen | Pilih agennya di kotak chat kiri bawah (select **Ke**), atau klik karakternya / namanya di header, lalu ketik pesan |
 | Mengubah suasana kantor | Tombol **🕒 Waktu** (otomatis, pagi, siang, sore, malam) dan **☀ Cuaca** (cerah, berawan, hujan, badai, kabut) di header |
 | Memindah atau menambah furnitur kantor | **🛠 Layout** → klik benda lalu seret (lihat [Mengatur layout kantor](#mengatur-layout-kantor--layout)) |
@@ -106,7 +106,7 @@ Perintah di atas tidak mengubah model default Hermes. Hermes sebagai ketua tim d
 **Mengatur biaya.** Setiap balasan membawa sekitar 12.000 token input (prompt sistem, tools, dan riwayat), jadi model default yang mahal cepat menguras saldo.
 
 - Pasang model murah atau gratis sebagai default.
-- Beri model kuat hanya ke agen yang butuh penalaran berat (misalnya Kenji, Haruto, Akane).
+- Beri model kuat hanya ke agen yang butuh penalaran berat (misalnya Kenji untuk riset saham dan Akane untuk keamanan).
 - Pantau di [📊 Pemakaian](#pemakaian-token--pemakaian). Panel itu hanya menampilkan token; saldo asli dilihat di portal Nous atau console Anthropic.
 - Hindari **💬 Rapat** dengan banyak putaran dan peserta untuk topik sepele: setiap giliran bicara dihitung sebagai satu balasan penuh.
 
@@ -144,16 +144,16 @@ flowchart LR
 ```
 
 1. **Anda mengetik di kantor** (klik karakter, kirim pesan). Browser mengirimnya lewat WebSocket ke server kantor.
-2. **Adapter menentukan siapa yang menjawab.** Pesan ke Hermes diproses dengan kemampuan orkestrator; pesan ke anggota tim (Naruto, Luffy, Sakura, Yui, Takumi, Akane, Daichi) memakai persona mereka dari `team.json`, ditambah folder proyek aktif dan aturan git.
+2. **Adapter menentukan siapa yang menjawab.** Pesan ke Hermes diproses dengan kemampuan orkestrator; pesan ke anggota tim (Haruto, Kenji, Sakura, Yui, Takumi, Akane, Daichi) memakai persona mereka dari `team.json`, ditambah folder proyek aktif dan aturan git.
 3. **Adapter memanggil Hermes Agent** (`/v1/chat/completions` di port 8642). Hermes menambahkan identitas `SOUL.md`, memori, dan skill, lalu menjalankan tools (terminal, file, web, ...) di container `hermes`.
 4. **Hermes meminta model AI** di provider yang Anda pilih lewat `hermes model`. Di sinilah biaya token terjadi (gratis untuk model `:free`).
 5. **Jawaban mengalir balik** sebagai event `delta` (sedang menulis) lalu `final` (selesai), ditambah event tool dan permintaan persetujuan. Kantor memakai event ini untuk: karakter berjalan ke meja dan duduk mengetik, menampilkan gelembung kata dan ikon tool, menampilkan balasan di kotak chat (tidak dibacakan), mencatat di tab Log, lalu kembali bersantai setelah selesai.
 
 ### Hermes sebagai orkestrator
 
-Hermes menyuruh anggota tim lewat **server MCP `office-team`**, yang dijalankan kantor sendiri dan **didaftarkan otomatis ke Hermes** saat kantor menyala (tanpa langkah manual di clone baru). Alatnya: `team_list` (daftar anggota dan id-nya), `team_delegate` (memberi tugas ke seorang anggota dan menunggu hasilnya), `team_result` (mengambil hasil tugas yang belum selesai), dan `team_context` (membaca percakapan terbaru seorang anggota). Jadi cukup beri Hermes tujuan besar, misalnya "buat fitur login". Hermes membaginya ke Yui (kebutuhan), Sakura (desain), Haruto (frontend), Kenji (backend), dan Takumi (test), lalu merangkum hasilnya. Setiap delegasi dikerjakan oleh agen kantor yang sebenarnya, persis seperti kalau Anda chat dengannya: ia terlihat bekerja di kantor (progress bar di bawah namanya), dan tugas serta jawabannya tersimpan di chat agen itu dan di Ringkasan. Kalau agennya belum selesai dalam 100 detik, Hermes mendapat `task_id` dan mengambil hasilnya nanti dengan `team_result`.
+Hermes menyuruh anggota tim lewat **server MCP `office-team`**, yang dijalankan kantor sendiri dan **didaftarkan otomatis ke Hermes** saat kantor menyala (tanpa langkah manual di clone baru). Alatnya: `team_list` (daftar anggota dan id-nya), `team_delegate` (memberi tugas ke seorang anggota dan menunggu hasilnya), `team_result` (mengambil hasil tugas yang belum selesai), dan `team_context` (membaca percakapan terbaru seorang anggota). Jadi cukup beri Hermes tujuan besar, misalnya "siapkan peluncuran produk kopi". Hermes membaginya ke Yui (ide dan strategi), Daichi (riset pasar), Sakura (konten), Haruto (penjualan), dan Takumi (periksa kualitas materi), lalu merangkum hasilnya. Setiap delegasi dikerjakan oleh agen kantor yang sebenarnya, persis seperti kalau Anda chat dengannya: ia terlihat bekerja di kantor (progress bar di bawah namanya), dan tugas serta jawabannya tersimpan di chat agen itu dan di Ringkasan. Kalau agennya belum selesai dalam 100 detik, Hermes mendapat `task_id` dan mengambil hasilnya nanti dengan `team_result`.
 
-**Perintah langsung ke agen.** Karena model yang lemah kadang tidak memanggil tool (dan hanya mengaku sudah mendelegasikan), pesan ke Hermes yang berbentuk perintah ke agen bernama, misalnya "suruh Sakura pilih warna ...", "minta Haruto dan Kenji untuk membuat ...", "tugaskan Takumi ...", langsung diteruskan oleh kantor ke agen-agen itu tanpa melewati model Hermes. Hermes menjawab dengan hasil tiap agen. Pesan lain (pertanyaan, diskusi, tujuan besar) tetap diproses Hermes seperti biasa.
+**Perintah langsung ke agen.** Karena model yang lemah kadang tidak memanggil tool (dan hanya mengaku sudah mendelegasikan), pesan ke Hermes yang berbentuk perintah ke agen bernama, misalnya "suruh Sakura pilih warna ...", "minta Haruto dan Sakura untuk membuat ...", "tugaskan Takumi ...", langsung diteruskan oleh kantor ke agen-agen itu tanpa melewati model Hermes. Hermes menjawab dengan hasil tiap agen. Pesan lain (pertanyaan, diskusi, tujuan besar) tetap diproses Hermes seperti biasa.
 
 Agen yang direkrut Hermes saat chat hanya hidup sampai container `office` restart. Agen tetap dibuat lewat panel **⚙ Agen** (tersimpan di `config/team.json`).
 
@@ -364,7 +364,7 @@ Tiap agen bisa memakai model AI sendiri, supaya biaya token bisa diatur: model k
 
 Pilihan disimpan di `config/team.json` (kunci `model`) dan berlaku saat pesan berikutnya. Syaratnya `direct_model_requests` aktif (langkah 4 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai)). Model Hermes sendiri mengikuti `model.default` di config Hermes dan tidak diatur dari panel.
 
-Model berbayar hanya bisa dipakai kalau akunnya punya saldo; lihat [Memakai model berbayar](#memakai-model-berbayar). Contoh pembagian untuk menghemat token: Sonnet untuk Kenji, Haruto, dan Akane; Haiku atau model gratis untuk Yui dan Sakura.
+Model berbayar hanya bisa dipakai kalau akunnya punya saldo; lihat [Memakai model berbayar](#memakai-model-berbayar). Contoh pembagian untuk menghemat token: Sonnet untuk Kenji dan Akane; Haiku atau model gratis untuk Sakura dan Yui.
 
 ## Pemakaian token (📊 Pemakaian)
 
@@ -403,6 +403,12 @@ Buat folder berisi `SKILL.md` dengan bagian: frontmatter (`name`, `description`,
 
 Agen juga bisa membuat dan memperbaiki skill sendiri lewat tool `skill_manage`, misalnya setelah Anda bilang "simpan cara kerja tadi sebagai skill". Untuk mereview dulu sebelum disimpan, aktifkan `skills.write_approval: true` di `config.yaml`, lalu pakai `/skills pending`, `/skills approve <id>`, atau `/skills reject <id>`.
 
+### 📂 Berkas: lihat dan unduh hasil kerja agen
+
+Tidak perlu membuka folder `projects` atau WSL. Klik **📂 Berkas** di header: panel menampilkan isi folder workspace (folder `projects` Anda). Klik folder untuk masuk (jalur di atas bisa diklik untuk kembali), klik nama file untuk **membukanya di tab baru** (HTML tampil sebagai halaman, gambar dan PDF tampil langsung, Markdown dan teks sebagai teks), **⬇** untuk mengunduh file, dan **⬇ zip** atau tombol **Unduh folder ini (.zip)** untuk mengunduh satu folder utuh. Kalau proyek sedang dipilih, panel langsung membuka folder proyek itu. ⟳ memuat ulang daftar.
+
+Keamanan: hanya bisa membaca (tidak ada hapus atau ubah), tidak bisa keluar dari folder workspace, folder `.git` dan `node_modules` disembunyikan, dan file HTML buatan agen dibuka di lingkungan terisolasi (sandbox) supaya skripnya tidak bisa menyentuh kantor. Zip dibatasi 150 MB.
+
 ### Tim bawaan: soul dan skill per peran
 
 Clone baru langsung berisi tim lengkap, tanpa membuat agen satu per satu. Yang ikut dari GitHub:
@@ -412,20 +418,20 @@ Clone baru langsung berisi tim lengkap, tanpa membuat agen satu per satu. Yang i
 
 | Agen | Peran | Skill bawaan (selain skill bersama) | Isi singkat |
 | --- | --- | --- | --- |
-| Semua | Semua | `tim-alur-kerja-dan-serah-terima` | urutan kerja antar agen, format serah-terima, lokasi file, aturan git, kapan bertanya |
-| Haruto | Frontend Developer | `frontend-struktur-dan-komponen` | struktur folder frontend, urutan membuat fitur, pola Axios dan hook, checklist state UI |
-| Kenji | Backend Developer | `backend-modul-nestjs-dan-kontrak-api` | struktur modul NestJS, template kontrak API, format error, checklist keamanan dan performa |
-| Sakura | UI/UX Designer | `uiux-handoff-dan-aksesibilitas` | pemetaan token ke Tailwind/Ant Design, daftar state, template handoff, checklist WCAG AA |
-| Yui | Product Manager | `pm-prd-prioritas-dan-laporan` | template PRD, user story Given/When/Then, MoSCoW/RICE, Definition of Done, format laporan |
-| Takumi | QA Engineer | `qa-test-plan-dan-laporan-bug` | struktur tes, template test plan, laporan bug dan severity, checklist regresi |
+| Semua | Semua | `tim-alur-kerja-dan-serah-terima` | pembagian tugas antar agen, format serah-terima, lokasi file, kapan bertanya |
+| Haruto | Sales Digital | `sales-digital-funnel-dan-follow-up` | profil pelanggan ideal, funnel dan metrik, skrip chat, follow-up, penanganan keberatan, pipeline |
+| Kenji | Analis Riset Saham | `riset-saham-fundamental-dan-teknikal` | sumber data, rasio kunci, teknikal, skenario bull/base/bear, template laporan (bukan saran investasi) |
+| Sakura | Content & Copywriter | `konten-copywriting-dan-kalender` | formula copy (AIDA, PAS, BAB), adaptasi per kanal, kalender konten |
+| Yui | Brainstorming & Strategist | `brainstorming-teknik-dan-evaluasi` | teknik ide (SCAMPER dll.), matriks penilaian, uji asumsi, rencana tindak |
+| Takumi | QA Engineer | `qa-test-plan-dan-laporan-bug` | template test plan, laporan bug dan severity, checklist regresi |
 | Akane | Cyber Security Engineer | `security-review-owasp` | checklist OWASP/ASVS, template temuan, pemetaan severity, aturan main |
-| Daichi | Infra & Database Engineer | `infra-database-migrasi-dan-backup` | struktur infra, migrasi aman (expand-migrate-contract), backup dan uji restore, Docker Compose |
+| Daichi | Riset Pasar & Kompetitor | `riset-pasar-dan-kompetitor` | tabel kompetitor, segmen pelanggan, SWOT, rekomendasi berprioritas |
 
 Setiap soul menyebut skill miliknya, jadi agen tahu skill mana yang dimuat untuk pekerjaan apa. Skill sendiri bersifat global di Hermes (semua agen bisa membacanya); pemetaan per peran dilakukan lewat soul.
 
 **Mengubah atau menambah.** Edit langsung berkas `config/skills/<nama>/SKILL.md` (berlaku pada tugas berikutnya, tanpa restart) atau buat folder skill baru dengan format yang sama. Soul diubah lewat panel **⚙ Agen** (berlaku langsung); batas panjang instruksi 4.000 karakter, jadi taruh detail panjang di skill. Agen yang membuat skill lewat `skill_manage` menaruhnya di `/opt/data/skills`, bukan di repo; salin ke `config/skills/` bila ingin ikut ke GitHub.
 
-**Skill tambahan dari hub.** Cari dengan `hermes skills search <kata kunci>` (misalnya react, nestjs, owasp, playwright), `inspect` dulu, lalu `install`. Skill dari hub tersimpan di volume Hermes dan tidak ikut GitHub.
+**Skill tambahan dari hub.** Cari dengan `hermes skills search <kata kunci>` (misalnya owasp, seo, copywriting, playwright), `inspect` dulu, lalu `install`. Skill dari hub tersimpan di volume Hermes dan tidak ikut GitHub.
 
 **Catatan skill per agen:** semua agen di kantor berbagi satu mesin Hermes. Kalau suatu saat butuh skill, memori, atau model yang benar-benar terpisah per agen, langkahnya adalah membuat profil Hermes per agen (`hermes profile create`), masing-masing dengan port dan konfigurasi sendiri.
 
@@ -522,7 +528,7 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Furnitur tidak mau ditaruh (jejak merah) | Di luar lantai, menutup jalan masuk atau lingkaran panggil, atau menimpa benda lain | Baca alasan di atas panel 🛠 Layout, lalu geser sedikit atau putar bendanya |
 | Tata letak jadi berantakan | Salah pindah banyak benda | **Ctrl+Z** berulang, atau **Kembalikan ke bawaan** di panel 🛠 Layout |
 | Agen menaruh file di `/opt/data` dan tidak muncul di folder proyek, atau "Write denied ... outside HERMES_WRITE_SAFE_ROOT" | Tool tulis Hermes hanya boleh menulis di `HERMES_WRITE_SAFE_ROOT`; bawaan image hanya `/opt/data` | Pastikan `docker-compose.yml` punya `HERMES_WRITE_SAFE_ROOT=/opt/data:/workspace` di service `hermes`, lalu `docker compose up -d` |
-| Agen menjawab "sudah menyimpan ke docs/x.md" tapi file-nya tidak ada di folder proyek | Model lemah menulis isi file di chat tanpa memanggil tool tulis file | Kantor mengeceknya sendiri: bila permintaan menyebut nama file (mis. `docs/x.md`) dan file itu tidak ada di folder proyek, agen disuruh menyimpannya sungguhan satu kali, dan jawabannya diberi peringatan ⚠ kalau tetap gagal. Pakai model yang lebih kuat untuk hasil lebih andal |
+| Agen menjawab "sudah menyimpan ke docs/x.md" tapi file-nya tidak ada di folder proyek | Model lemah menulis isi file di chat tanpa memanggil tool tulis file | Kantor mengeceknya sendiri: bila permintaan menyebut nama file (mis. `docs/x.md`) dan file itu tidak ada di folder proyek, agen disuruh menyimpannya sungguhan satu kali, lalu, bila agen tetap tidak menyimpan tetapi sudah menulis isinya di jawaban (blok kode), **kantor menyimpannya sendiri** ke path itu (hanya di folder proyek, tidak pernah menimpa file yang sudah ada, ditandai 💾 di jawaban; isinya bisa belum lengkap). Kalau tidak ada blok kode, jawabannya diberi peringatan ⚠. Pakai model yang lebih kuat untuk hasil lebih andal |
 | Hermes bilang "sudah delegate" tapi agen lain tidak bekerja | Server MCP `office-team` belum terdaftar di Hermes, atau model yang dipakai Hermes terlalu lemah untuk memanggil tool | `docker exec hermes hermes mcp list` harus menampilkan `office-team` (kantor mendaftarkannya otomatis ±4 detik setelah menyala; `docker compose restart office` untuk mengulang). Model gratis kadang tetap tidak memanggil tool: pakai model yang lebih kuat untuk Hermes (`hermes config set model.default ...`) atau chat langsung ke agennya |
 | Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |

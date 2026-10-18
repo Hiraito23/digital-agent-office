@@ -1,12 +1,12 @@
 ---
 name: qa-test-plan-dan-laporan-bug
-description: "Struktur tes oase-tanjung, template test plan, laporan bug, severity, dan checklist regresi."
+description: "Template test plan, laporan bug, severity, dan checklist regresi."
 version: 1.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
   hermes:
-    tags: [qa, testing, jest, playwright, vitest]
+    tags: [qa, testing, regresi]
 ---
 
 # Test Plan dan Laporan Bug
@@ -17,9 +17,7 @@ metadata:
 
 ## Procedure
 
-**1. Struktur tes wajib**
-
-WAJIB ikuti struktur tes proyek oase-tanjung: backend/test/<fitur>/*.spec.ts (Jest, mis. auth.service.spec.ts, permissions.guard.spec.ts) plus test/app.e2e-spec.ts, dan frontend/test/<fitur>/<fitur>-<aspek>.spec.ts(x) (mis. booking-mapper.spec.ts, booking-detail-tabs.spec.tsx). Satu folder per fitur, nama tes menjelaskan perilaku, data uji di fixtures/ fitur tersebut. Uji mapper (common/mappers), hooks, komponen modules/<fitur>, serta application dan service backend.
+**1. Objek uji:** website, aplikasi, alur proses, materi penjualan/konten, atau dokumen. Tentukan kriteria keberhasilannya lebih dulu. Bila ada kode tes, simpan di test/<fitur>/ dan jalankan sungguhan; bila tidak, uji manual dan catat langkah serta hasilnya.
 
 **2. Template test plan** (docs/qa/<fitur>-test-plan.md)
 
@@ -41,11 +39,11 @@ Judul: <komponen> - <gejala singkat>
 Langkah reproduksi: 1... 2... 3...
 Diharapkan: ...   Aktual: ...
 Severity: Critical | High | Medium | Low   Environment: <versi/commit, browser, data>
-Bukti: <output tes, log, request/response>   Pemilik: Haruto | Kenji
+Bukti: <output tes, log, request/response>   Pemilik: <orang atau agen yang memperbaiki>
 ```
 Severity: Critical = data hilang/bocor, sistem tidak bisa dipakai; High = fitur utama gagal tanpa jalan pintas; Medium = fitur sebagian salah dengan jalan pintas; Low = kosmetik.
 
-**6. Checklist regresi cepat:** login/logout dan izin per peran, CRUD fitur terkait, validasi form, paginasi dan filter, pesan error, responsif, dan fitur yang berbagi komponen atau endpoint yang sama.
+**6. Checklist regresi cepat:** alur utama, validasi form, pesan error, tampilan di ponsel dan desktop, tautan dan tombol, serta fitur lain yang berbagi bagian yang sama.
 
 **7. Status akhir:** Lulus (semua kriteria terpenuhi), Lulus dengan catatan (hanya Low/Medium yang disepakati), Gagal (ada Critical/High atau kriteria tidak terpenuhi).
 

@@ -405,3 +405,18 @@ body.chat-collapsed .party { max-height: calc(100vh - var(--panel-top) - 76px); 
 .chat .msg.typing .dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes typing-dots { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 .hud.chat.kantor-mode .mmo-to { visibility: hidden; }
+
+/* 📂 Berkas */
+.files { z-index: 4; background: #18130e; }
+.f-crumbs { flex: 1; font: 600 13px var(--pixel); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.f-crumbs button, .files .chat-head > button { background: transparent; color: var(--accent); border: 0; font: inherit; cursor: pointer; padding: 0 2px; }
+.f-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--panel-edge); }
+.f-row:hover { background: rgba(255,255,255,.05); }
+.f-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); text-decoration: none; text-align: left; font-size: 14px; background: transparent; border: 0; cursor: pointer; }
+.agents-body button.f-name { border: 0; padding: 0; font: 500 14px var(--chat-font); }
+.f-name:hover { color: var(--accent); }
+.f-meta { font-size: 11px; color: var(--blue); white-space: nowrap; }
+.f-act { font-size: 12px; color: var(--accent); text-decoration: none; border: 2px solid var(--panel-edge); padding: 1px 6px; white-space: nowrap; }
+.f-act:hover { background: var(--accent); color: var(--ink); }
+.f-empty { color: var(--blue); font-size: 13px; padding: 12px 4px; }
+.f-zip { display: block; margin-top: 12px; text-align: center; padding: 6px; background: var(--accent); color: var(--ink); text-decoration: none; font: 600 13px var(--pixel); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }

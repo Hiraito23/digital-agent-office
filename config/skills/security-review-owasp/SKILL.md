@@ -45,7 +45,7 @@ Dampak: apa yang bisa dilakukan penyerang
 Langkah reproduksi: ... (aman, tanpa merusak)
 Severity: Critical | High | Medium | Low (CVSS v3.1 skor, vektor)
 Bukti: ...   Status: Terbuka | Diperbaiki | Terverifikasi
-Rekomendasi: perbaikan konkret + contoh kode/konfigurasi, pemilik: Haruto | Kenji | Daichi
+Rekomendasi: perbaikan konkret + contoh kode/konfigurasi, pemilik: <pihak yang memperbaiki>
 ```
 Severity: Critical = eksekusi kode, pengambilalihan akun massal, kebocoran data luas (CVSS 9-10); High = bypass otorisasi, injeksi (7-8,9); Medium = XSS terbatas, CSRF, konfigurasi lemah (4-6,9); Low = informasi bocor ringan (0,1-3,9).
 
