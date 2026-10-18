@@ -58,6 +58,20 @@ export const isPath = (i, j) => {
 // Decor and activity spots (agents walk here when idle)
 // ---------------------------------------------------------------------------
 
+// 💬 Rapat: where a meeting sits. The moderator (Hermes) stands at the
+// whiteboard, participants take the four chairs and then stand near the door.
+export const MEETING = {
+  room: "rapat",
+  moderator: { x: 10.9, z: 5.75, heading: Math.PI, pose: "write", icon: "🗣" },
+  seats: [
+    { x: 8.0, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
+    { x: 9.2, z: 5.65, heading: 0, pose: "meeting", icon: "💬" },
+    { x: 8.0, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
+    { x: 9.2, z: 7.55, heading: Math.PI, pose: "meeting", icon: "💬" },
+    { x: 10.7, z: 6.7, heading: -Math.PI / 2, pose: "look", icon: "💬" },
+  ],
+};
+
 // pose: how the agent is animated while there; icon shows on the name tag.
 export const ACTIVITY_SPOTS = [
   // Pantry & Lounge

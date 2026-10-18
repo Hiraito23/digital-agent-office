@@ -72,7 +72,9 @@ const createSummaries = ({ file, historyFile }) => {
     add({ agentId, kind = "chat", task, text, summary }) {
       const entry = {
         id: newId(), agentId, kind, at: Date.now(),
-        task: summarize(task, 120), summary: summary ? summarize(summary, 600) : summarize(text),
+        task: summarize(task, 120),
+        // Meeting minutes keep their lines (Ringkasan / Keputusan / Action item).
+        summary: kind === "meeting" ? String(summary || text || "").trim().slice(0, 1500) : summarize(summary || text),
       };
       if (!entry.summary) return null;
       entries.push(entry);

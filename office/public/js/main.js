@@ -13,6 +13,7 @@ import { initAgentPanel } from "./ui/agents-panel.js";
 import { initProjectPicker } from "./ui/projects.js";
 import { initApprovals } from "./ui/approvals.js";
 import { initSummaries } from "./ui/summaries.js";
+import { initMeeting } from "./ui/meeting.js";
 
 const jukebox = initJukebox();
 
@@ -245,6 +246,14 @@ gw.addEventListener("tool", (e) => {
 
 // 📋 RINGKASAN (left): a short summary each time an agent finishes a reply.
 const summaryPanel = initSummaries({ gw, nameOf, onOpen: (id) => openChat(id) });
+
+// 💬 Rapat: team meetings in the meeting room, closed with minutes by Hermes.
+initMeeting({
+  gw, world, nameOf, say, voice, logActivity,
+  roleOf: (id) => agentsById.get(id)?.role ?? "",
+  agents: () => [...agentsById.values()],
+  getProject: () => document.getElementById("project-select").value || null,
+});
 
 // PERSETUJUAN: risky commands wait here for your answer.
 initApprovals({

@@ -19,6 +19,7 @@
     <div class="title">AGENTIC DIGITAL OFFICE</div>
     <div id="roster" class="roster"></div>
     <select id="project-select" class="chip project" title="Proyek yang dikerjakan agen"><option value="">📁 Pilih proyek…</option></select>
+    <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
     <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
     <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
     <button id="voice-toggle" class="chip music" title="Agen membacakan balasan">🔊 Suara</button>
@@ -37,6 +38,15 @@
     </div>
     <div id="agents-status" class="agents-status"></div>
     <div id="agents-body" class="agents-body"></div>
+  </aside>
+
+  <aside id="meeting" class="hud agents meeting hidden">
+    <div class="chat-head">
+      <div class="chat-name">💬 RAPAT TIM</div>
+      <button id="meeting-close" title="Tutup">✕</button>
+    </div>
+    <div id="meeting-status" class="agents-status"></div>
+    <div id="meeting-body" class="agents-body"></div>
   </aside>
 
   <aside id="summaries" class="hud summaries">

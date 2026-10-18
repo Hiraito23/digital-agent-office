@@ -20,10 +20,9 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 | Mau | Caranya |
 | --- | --- |
 | Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Naruto kerjakan frontend, Luffy API-nya, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
+| Rapat membahas project | **💬 Rapat** → isi topik, centang peserta (maks. 5), pilih jumlah putaran → **Mulai rapat**. Notulen masuk ke 📋 RINGKASAN (lihat [Rapat tim](#rapat-tim-rapat)) |
 | Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
 | Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
-
-Belum ada ruang chat grup tempat semua agen bicara bersamaan; diskusi tim berjalan lewat Hermes sebagai moderator.
 
 **Riwayat dan ringkasan.** Riwayat chat tiap agen disimpan di server (volume `office-data`), termasuk pesan yang baru dikirim dan balasan yang gagal, jadi tetap ada setelah halaman di-refresh. Kalau di-refresh saat agen masih bekerja, balasannya tetap masuk. Panel **📋 RINGKASAN** di kiri berisi ringkasan singkat setiap kali agen selesai menjawab (siapa, kapan, tugasnya, inti jawabannya); klik salah satunya untuk membuka chat lengkap, atau klik **–** untuk menyembunyikan panel.
 
@@ -198,6 +197,18 @@ Aturan yang selalu diberikan ke agen:
 - Tidak membaca atau mengubah file rahasia (`.env`, kunci, kredensial).
 
 Perlu diingat: dengan fitur ini agen bisa membuat, mengubah, dan menghapus file serta menjalankan perintah terminal di folder proyek. Aturan di atas adalah instruksi untuk agen, bukan pengaman teknis, jadi selalu tinjau perubahan sebelum di-merge. Pilih **📁 Pilih proyek…** (kosong) kalau tidak ingin agen bekerja di proyek mana pun.
+
+## Rapat tim (💬 Rapat)
+
+Untuk membahas sebuah project bersama beberapa agen sekaligus:
+
+1. Pilih proyeknya di **📁 Proyek** (opsional, supaya rapat tahu konteksnya).
+2. Klik **💬 Rapat** di header, isi **topik**, centang **peserta** (maksimal 5, sesuai kursi di Ruang Rapat), lalu pilih **putaran bicara** (1 sampai 3).
+3. Klik **💬 Mulai rapat**. Hermes berjalan ke whiteboard, peserta duduk di kursi Ruang Rapat (ikon 💬 di label nama).
+4. Hermes membuka rapat, lalu tiap peserta bicara bergiliran 2 sampai 4 kalimat dari sudut pandang perannya; gelembung kata dan transkrip di panel menunjukkan siapa yang sedang bicara.
+5. Hermes menutup rapat dengan **notulen**: Ringkasan, Keputusan, dan Action item per orang. Notulen muncul di panel rapat dan di **📋 RINGKASAN**, dan tersimpan di riwayat chat setiap peserta, jadi Anda bisa melanjutkan, misalnya ke Naruto: "kerjakan action item-mu dari rapat tadi".
+
+Tombol **Salin notulen** dan **Unduh .md** menyimpan notulen + transkrip. **■ Akhiri rapat** menghentikan rapat kapan saja. Selama rapat agen hanya berdiskusi, tidak mengubah file. Peserta yang modelnya tidak merespons selama 90 detik dilewati supaya rapat tetap berjalan. Lama rapat kira-kira (1 + peserta × putaran + 1) giliran × 5 sampai 15 detik.
 
 ## Tools Hermes (🧰 Tools dan PERSETUJUAN)
 

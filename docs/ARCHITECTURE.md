@@ -38,6 +38,7 @@ office/                 image Docker "office"
     projects.js         daftar proyek di /workspace + proyek aktif (config/office.json)
     hermes-gateway-adapter.js   adapter dari Claw3D (MIT): tim, chat, orkestrasi
     summaries.js        log ringkasan jawaban (panel 📋 RINGKASAN), disimpan di office-data
+    meetings.js         rapat tim: giliran bicara peserta + notulen Hermes (panel 💬 Rapat)
   public/               sisi browser (ES modules, tanpa build step)
     index.html, style.css
     audio/              MP3 pribadi (tidak masuk git, lihat audio/README.md)
@@ -68,6 +69,7 @@ office/                 image Docker "office"
         projects.js     dropdown 📁 Proyek (proyek yang dikerjakan agen)
         approvals.js    panel PERSETUJUAN (izin perintah berisiko dari Hermes)
         summaries.js    panel 📋 RINGKASAN di kiri (jawaban yang sudah selesai)
+        meeting.js      panel 💬 Rapat (form, transkrip langsung, notulen, unduh .md)
         jukebox.js      musik latar (playlist, ulang, sisa waktu)
         voice.js        suara agen (Web Speech API)
 ```
@@ -91,6 +93,10 @@ Tools (terminal, file, web, browser, memori, skill, ...) dijalankan oleh Hermes 
 - `approval.request`: adapter menyimpannya di `pendingApprovals` dan meneruskannya sebagai event `approval`. `ui/approvals.js` menampilkan tombol pilihan; jawabannya lewat metode `exec.approval.resolve`, yang diteruskan adapter ke `POST /v1/runs/{run_id}/approval` `{ choice, request_id }`. Tab baru mengambil yang masih menunggu lewat `exec.approvals.pending`.
 
 Tab 🧰 Tools di panel ⚙ Agen memakai metode `tools.catalog` (adapter memanggil `GET /v1/toolsets`). Daftarnya hanya-baca, karena konfigurasi toolset diatur di dashboard Hermes.
+
+## Rapat tim
+
+`meeting.start` (`server/meetings.js`) menjalankan giliran secara berurutan: pembukaan Hermes, peserta × putaran, lalu notulen Hermes. Setiap giliran adalah satu `streamOneTurn` dengan prompt persona + aturan rapat + transkrip sejauh ini, dengan batas diam 90 detik. Event `meeting` (`started`, `speaking`, `delta`, `turn`, `ended`, `stopped`, `error`) menggerakkan `ui/meeting.js` dan `World.startMeeting()` / `endMeeting()`; posisi kursi dan whiteboard ada di `MEETING` (`office/layout.js`). Notulen dicatat lewat `recordSummary` (jenis `meeting`) dan ditambahkan ke riwayat setiap peserta.
 
 ## Siklus hidup agen di World
 

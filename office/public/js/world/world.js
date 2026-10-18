@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, PORTAL, WANDER } from "../office/layout.js";
+import { ACTIVITY_SPOTS, CENTER, MEETING, PORTAL, WANDER } from "../office/layout.js";
 import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
@@ -147,9 +147,48 @@ export class World {
   }
 
   // Free activity spots (sofa, arcade, coffee, ...) that no agent is using or walking to.
+  // The meeting room is off limits while a meeting is on.
   freeSpots() {
     const taken = new Set([...this.agents.values()].map((a) => a.spot?.id).filter(Boolean));
-    return ACTIVITY_SPOTS.filter((s) => !taken.has(s.id));
+    return ACTIVITY_SPOTS.filter((s) => !taken.has(s.id) && !(this.meetingOn && s.room === MEETING.room));
+  }
+
+  // 💬 Rapat: send the moderator to the whiteboard and participants to the chairs.
+  startMeeting(moderatorId, participantIds) {
+    this.endMeeting();
+    this.meetingOn = true;
+    // agents idling in the meeting room (books, whiteboard, chairs) make room
+    for (const a of this.agents.values()) {
+      if (a.spot?.room === MEETING.room && a.mode === "activity") a.activityEnd = 0;
+      if (a.spot?.room === MEETING.room && a.mode === "toSpot") { a.spot = null; a.mode = "idle"; a.route = []; }
+    }
+    const places = [[moderatorId, MEETING.moderator], ...participantIds.map((id, i) => [id, MEETING.seats[i]])];
+    for (const [id, place] of places) {
+      const a = this.agents.get(id);
+      if (!a || !place) continue;
+      const from = a.mode === "activity" ? a.room : null; // inside a room: leave through its door
+      a.spot = null;
+      a.meeting = place;
+      a.room = null;
+      a.route = planRoute(a, place, from, MEETING.room);
+      a.mode = "toMeeting";
+    }
+  }
+
+  // Everyone leaves the meeting room and goes back to normal.
+  endMeeting() {
+    this.meetingOn = false;
+    for (const a of this.agents.values()) {
+      if (!a.meeting) continue;
+      a.meeting = null;
+      const exit = doorOf(MEETING.room);
+      a.route = a.mode === "meeting" || a.mode === "toMeeting"
+        ? planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.mode === "meeting" ? MEETING.room : null)
+        : a.route;
+      a.room = null;
+      a.mode = "wander";
+      a.nextWander = performance.now() + 3000 + Math.random() * 4000;
+    }
   }
 
   leaveSpot(a) {
@@ -169,6 +208,7 @@ export class World {
     if (!a) return;
     a.status = status;
     a.lastActive = performance.now();
+    if (a.meeting) return; // stays in the meeting room until the meeting ends
     if (status === "working" && a.seat && a.mode !== "sitting") {
       this.leaveSpot(a); // drop the sofa/arcade/coffee and go to work
       a.route = planRoute(a, a.seat, a.leavingRoom);
@@ -196,6 +236,7 @@ export class World {
           a.z = target.z;
           a.route.shift();
           if (!a.route.length && a.mode === "toSeat") a.mode = "sitting";
+          if (!a.route.length && a.mode === "toMeeting") { a.mode = "meeting"; a.room = MEETING.room; }
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
           if (!a.route.length && a.mode === "toSpot") {
             a.room = a.spot.room ?? null;
@@ -240,9 +281,11 @@ export class World {
 
       const sitting = a.mode === "sitting" && !moving;
       const atSpot = a.mode === "activity" && !moving && a.spot;
+      const inMeeting = a.mode === "meeting" && !moving && a.meeting;
       // face the desk when seated, the prop at an activity, the camera side when idle
       let targetHeading = a.heading;
       if (sitting) targetHeading = Math.PI;
+      else if (inMeeting) targetHeading = a.meeting.heading;
       else if (atSpot) targetHeading = a.spot.heading;
       else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
       let diff = targetHeading - a.model.rotation.y;
@@ -250,8 +293,8 @@ export class World {
       while (diff < -Math.PI) diff += Math.PI * 2;
       a.model.rotation.y += diff * Math.min(1, dt / 120);
       a.model.position.set(a.x, this.office.floorTop, a.z);
-      const pose = moving ? "walk" : sitting ? "sit" : atSpot ? a.spot.pose : "idle";
-      a.activityIcon = atSpot ? a.spot.icon : "";
+      const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? a.spot.pose : "idle";
+      a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? a.spot.icon : "";
       animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking));
     }
   }

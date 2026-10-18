@@ -36,7 +36,7 @@ export const initSummaries = ({ gw, nameOf, onOpen }) => {
   const render = () => {
     list.innerHTML = entries.length
       ? entries.map((e) => `
-        <li data-agent="${esc(e.agentId)}" title="Buka chat ${esc(nameOf(e.agentId))}">
+        <li data-agent="${esc(e.agentId)}" class="${e.kind === "meeting" ? "meeting" : ""}" title="Buka chat ${esc(nameOf(e.agentId))}">
           <div class="sm-head"><b>${e.kind === "meeting" ? "💬 " : ""}${esc(nameOf(e.agentId))}</b><span>${when(e.at)}</span></div>
           ${e.task ? `<div class="sm-task">${e.kind === "meeting" ? "Rapat" : "Tugas"}: ${esc(e.task)}</div>` : ""}
           <div class="sm-text">${esc(e.summary)}</div>

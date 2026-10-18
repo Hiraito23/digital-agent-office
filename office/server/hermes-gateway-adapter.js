@@ -29,6 +29,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const { createSummaries } = require("./summaries");
+const { createMeetings } = require("./meetings");
 const { WebSocketServer } = require("ws");
 
 function loadDotenvFile(filePath) {
@@ -251,6 +252,23 @@ function recordSummary(input) {
   const entry = summaries.add(input);
   if (entry) broadcastEvent({ type: "event", event: "summary", payload: entry });
 }
+
+// 💬 Rapat: team meetings in the meeting room (server/meetings.js).
+const meetings = createMeetings({
+  agentRegistry, orchestratorId: AGENT_ID, model: HERMES_MODEL, streamOneTurn,
+  systemPromptFor: (agent) => withProjectContext(agent?.id === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt || ""),
+  broadcast: broadcastEvent, forwarder: hermesEventForwarder, sanitize: sanitizeErrorMessage,
+  onMinutes: (m, minutes) => {
+    recordSummary({ agentId: AGENT_ID, kind: "meeting", task: m.topic, summary: minutes });
+    // Everyone who attended remembers the minutes in their own chat.
+    for (const id of [AGENT_ID, ...m.participants]) {
+      const history = getHistory(`agent:${id}:${MAIN_KEY}`);
+      history.push({ role: "user", content: `[Rapat tim] ${m.topic}`, at: m.startedAt });
+      history.push({ role: "assistant", content: `Notulen rapat:\n${minutes}`, at: Date.now() });
+    }
+    saveHistoryToDisk();
+  },
+});
 let persistDebounceTimer = null;
 
 function loadHistoryFromDisk() {
@@ -487,8 +505,10 @@ async function completeOneTurn(messages, model, tools) {
 // Hermes runs its own tools (terminal, file, web, ...) server-side and reports
 // them as named SSE events next to the OpenAI chunks; onEvent receives those.
 const HERMES_EVENTS = new Set(["hermes.tool.progress", "approval.request"]);
+// Silence on the stream for this long = the provider stalled (tools report progress events meanwhile).
+const STREAM_IDLE_MS = Number(process.env.HERMES_STREAM_IDLE_MS) || 180_000;
 
-async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, onEvent) {
+async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, onEvent, idleMs = STREAM_IDLE_MS) {
   const body = { model, messages, stream: true };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
 
@@ -499,6 +519,8 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
     res.resume();
     throw new Error(`Hermes API HTTP ${res.statusCode}`);
   }
+  // A provider that stops sending (free models sometimes stall) must not hang the run forever.
+  res.setTimeout(idleMs, () => res.destroy(new Error(`model tidak merespons selama ${Math.round(idleMs / 1000)} detik (timeout)`)));
 
   let textContent = "";
   let finishReason = "stop";
@@ -550,6 +572,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
       }
     });
     res.on("end", resolve);
+    res.on("close", resolve); // destroyed (aborted or timed out) without "end"
     res.on("error", reject);
   });
 
@@ -559,6 +582,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
     return { id: tc.id, name: tc.name, args };
   });
 
+  if (abortCheck && abortCheck()) return { textContent, toolCalls, finishReason };
   if (!textContent.trim() && toolCalls.length === 0 && finishReason === "stop") {
     const fallback = await completeOneTurn(messages, resolvedModel, tools);
     return {
@@ -1159,6 +1183,21 @@ async function handleMethod(method, params, id, sendEvent) {
       return resOk(id, { ok: true, aborted });
     }
 
+    // --- 💬 Rapat (team meetings) -------------------------------------------
+
+    case "meeting.start":
+      try {
+        return resOk(id, { meeting: meetings.start(p) });
+      } catch (err) {
+        return resErr(id, "meeting_failed", sanitizeErrorMessage(err));
+      }
+
+    case "meeting.stop":
+      return resOk(id, { ok: meetings.stop(typeof p.id === "string" ? p.id : "") });
+
+    case "meeting.current":
+      return resOk(id, { meeting: meetings.current(), maxParticipants: meetings.MAX_PARTICIPANTS, maxRounds: meetings.MAX_ROUNDS });
+
     case "summaries.list":
       return resOk(id, { summaries: summaries.list(Number(p.limit) || 100) });
 
@@ -1369,11 +1408,11 @@ function startAdapter() {
               "status","config.get","config.set","config.patch",
               "agents.files.get","agents.files.set",
               "exec.approvals.get","exec.approvals.set","exec.approval.resolve","exec.approvals.pending",
-              "tools.catalog","summaries.list","chat.active",
+              "tools.catalog","summaries.list","chat.active","meeting.start","meeting.stop","meeting.current",
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron","tool","approval","summary"] },
+              events: ["chat","presence","heartbeat","cron","tool","approval","summary","meeting"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },

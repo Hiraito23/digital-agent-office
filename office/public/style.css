@@ -129,6 +129,22 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 
 .chip.music.playing { border-color: var(--accent); color: var(--accent); }
 
+/* 💬 RAPAT TIM panel (right side, same frame as ⚙ Agen) */
+.meeting { z-index: 4; }
+.meeting-people { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.meeting-people label.color { align-items: flex-start; }
+.meeting-people small { display: block; color: var(--blue); font-size: 11px; }
+.meeting-people input { width: auto; height: auto; margin-top: 2px; }
+.meeting-view { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.meeting-view h3 { margin: 0; font: 600 15px var(--chat-font); color: var(--accent); }
+.meeting-view > p { margin: 0; font-size: 12px; }
+.meeting-log { padding: 0; min-height: 120px; max-height: 46vh; }
+.meeting-turn b { display: block; font-size: 12px; color: #364fc7; margin-bottom: 2px; }
+.meeting-turn.live { border-style: dashed; }
+.meeting-minutes { font: 13px/1.5 var(--chat-font); white-space: pre-wrap; background: #fff9db; color: var(--ink); border: 2px solid var(--ink); padding: 8px 10px; }
+.meeting-minutes b { display: block; margin-bottom: 4px; }
+.summary-list li.meeting .sm-text { white-space: pre-wrap; }
+
 /* 📋 RINGKASAN: finished replies, left side (collapsible) */
 .summaries { top: 56px; left: 12px; bottom: 150px; width: 300px; display: flex; flex-direction: column; background: var(--panel); border: 3px solid var(--panel-edge); box-shadow: 4px 4px 0 rgba(0,0,0,.3); }
 .summaries.collapsed { bottom: auto; }
