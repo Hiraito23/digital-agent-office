@@ -9,3 +9,10 @@ node_modules/
 
 # Personal music files (copyrighted, not for redistribution) — see office/public/audio/README.md
 office/public/audio/*.mp3
+
+# Default projects folder (when PROJECTS_DIR is not set)
+projects/*
+!projects/README.md
+
+# Active project (per computer)
+config/office.json

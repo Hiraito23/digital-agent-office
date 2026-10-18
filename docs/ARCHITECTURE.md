@@ -35,6 +35,7 @@ office/                 image Docker "office"
     static-files.js     file UI, three.js dari node_modules, streaming MP3
     ws-proxy.js         meneruskan /ws ke adapter (127.0.0.1)
     agents-api.js       REST panel ⚙ Agen + SOUL.md lewat dashboard Hermes
+    projects.js         daftar proyek di /workspace + proyek aktif (config/office.json)
     hermes-gateway-adapter.js   adapter dari Claw3D (MIT): tim, chat, orkestrasi
   public/               sisi browser (ES modules, tanpa build step)
     index.html, style.css
@@ -63,6 +64,7 @@ office/                 image Docker "office"
       ui/
         name-tags.js    label nama + gelembung kata (DOM)
         agents-panel.js panel ⚙ Agen (tambah/ubah/hapus agen, SOUL.md)
+        projects.js     dropdown 📁 Proyek (proyek yang dikerjakan agen)
         jukebox.js      musik latar (playlist, ulang, sisa waktu)
         voice.js        suara agen (Web Speech API)
 ```
@@ -73,6 +75,10 @@ office/                 image Docker "office"
 2. `ws-proxy.js` meneruskannya ke adapter. Adapter memilih persona agen dari `config/team.json` dan memanggil API Hermes.
 3. Jawaban kembali sebagai event `chat` (`delta` lalu `final`).
 4. `main.js` memperbarui status agen di `World` (jalan ke meja dan mengetik), menampilkan gelembung kata (`ui/name-tags.js`), membacakan balasan (`ui/voice.js`), dan mencatat ke Aktivitas Terbaru.
+
+## Proyek
+
+`PROJECTS_DIR` dari `.env` di-mount ke kedua container sebagai `/workspace`: baca-tulis di `hermes` (tempat tools agen berjalan), hanya-baca di `office` (untuk daftar proyek). Proyek aktif disimpan di `config/office.json` (tidak di-commit). `server/projects.js` meneruskannya ke adapter lewat `team.setProject()`, lalu adapter menambahkan folder proyek dan aturan branch git ke prompt sistem setiap agen (`withProjectContext` di `hermes-gateway-adapter.js`).
 
 ## Siklus hidup agen di World
 

@@ -618,7 +618,7 @@ async function execDelegateTask(args) {
   const model = agent.settings.model || HERMES_MODEL;
 
   // Build messages for sub-agent
-  const systemMsg = agent.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : [];
+  const systemMsg = agent.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
   const contextHistory = agent.settings.wipe ? [] : [...history];
   const messages = [...systemMsg, ...contextHistory, { role: "user", content: message }];
 
@@ -761,7 +761,7 @@ async function executeToolCall(tc, sendEvent) {
 
 async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, emitDelta, abortCheck, sendEvent }) {
   const agent = agentRegistry.get(agentId);
-  const systemMsg = agent?.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : [];
+  const systemMsg = agent?.systemPrompt ? [{ role: "system", content: withProjectContext(agent.systemPrompt) }] : [];
   const history = getHistory(sessionKey);
   const contextHistory = (agent?.settings?.wipe) ? [] : [...history];
   let messages = [...systemMsg, ...contextHistory, { role: "user", content: userMessage }];
@@ -1318,8 +1318,35 @@ function broadcastRoster() {
   });
 }
 
+// Active project (set from the office's 📁 Proyek picker). Every agent's system
+// prompt gets the project folder and the git branch rules appended, including
+// sub-agents that Hermes delegates to.
+let activeProject = null; // { name, path }
+
+const projectContext = () => {
+  if (!activeProject) return "";
+  const { name, path: dir } = activeProject;
+  return `
+
+Proyek aktif: "${name}" di folder ${dir} (folder milik pengguna yang di-mount ke container).
+- Kerjakan semua file dan perintah terminal di folder ini: pakai path absolut atau jalankan \`cd ${dir}\` lebih dulu.
+- Baca struktur folder dan README proyek sebelum mengubah apa pun, lalu ikuti konvensi yang sudah ada.
+- Aturan git (wajib): sebelum mengubah file, jalankan \`git status\` dan \`git branch --show-current\`.
+  Kalau branch aktif belum diawali "agent/", buat satu branch kerja bersama untuk tugas ini:
+  \`git checkout -b agent/<nama-tugas-singkat>\`. Seluruh tim memakai branch itu; jangan pindah ke branch lain.
+- Jangan pernah commit atau push ke main, master, atau develop; jangan force push; jangan menghapus branch atau riwayat.
+  Commit kecil dengan pesan yang jelas. Push hanya kalau pengguna memintanya.
+- Jangan membaca, menampilkan, atau mengubah file rahasia (.env, kunci, kredensial).`;
+};
+
+const withProjectContext = (systemPrompt) => `${systemPrompt}${projectContext()}`;
+
 // Live team management (used by the office's agent panel).
 const team = {
+  setProject(project) {
+    activeProject = project && project.name ? { name: project.name, path: project.path } : null;
+    console.log(`[hermes-adapter] Active project: ${activeProject ? activeProject.path : "(none)"}`);
+  },
   ORCHESTRATOR_ID: AGENT_ID,
   upsert(member) {
     if (!member || member.id === AGENT_ID) return;

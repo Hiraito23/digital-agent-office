@@ -27,6 +27,7 @@ Yang dibutuhkan: Windows 10/11 dengan WSL2, Docker Desktop, Git, koneksi interne
     - `API_SERVER_KEY`: kunci acak. Buat di PowerShell dengan `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`, lalu tempel hasilnya.
     - `DASH_USER`: biarkan `admin`.
     - `DASH_PASS`: password dashboard pilihan Anda (juga dipakai panel ⚙ Agen untuk menyimpan SOUL.md).
+    - `PROJECTS_DIR`: folder berisi proyek yang boleh dikerjakan agen, misalnya `D:/Coding` (lihat bagian Mengerjakan proyek). Kosongkan untuk memakai folder `projects/` di repo ini.
 
     File ini rahasia dan tidak ikut ke GitHub.
 6. **(Opsional) Salin musik.** File MP3 tidak ada di GitHub. Kalau ingin ada musik, salin `asuka-city.mp3` dan `littleroot-town.mp3` ke `office\public\audio\` sebelum langkah 7 (untuk lagu lain lihat `office/public/audio/README.md`). Tanpa ini kantor tetap jalan, hanya tanpa musik.
@@ -147,6 +148,22 @@ Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label n
 | Meja ping-pong | Main ping-pong | 🏓 |
 
 Dekorasi lain: karpet, meja kopi, papan neon, jam dinding, dan tanaman besar di sudut. Satu properti hanya dipakai satu agen dalam satu waktu; kegiatan berlangsung sekitar 9 sampai 18 detik.
+
+## Mengerjakan proyek (📁 Proyek)
+
+Agen bisa membaca dan menulis kode di proyek Anda. Folder `PROJECTS_DIR` di `.env` (misalnya `D:/Coding`) di-mount ke container Hermes sebagai `/workspace`.
+
+1. Pilih proyek di dropdown **📁 Proyek** di header kantor. Daftarnya berisi folder di `PROJECTS_DIR` beserta repo git satu tingkat di bawahnya (misalnya `Kalla/oase-tanjung`), lengkap dengan branch aktifnya.
+2. Beri tugas ke Hermes atau langsung ke agen, misalnya "Tambahkan halaman daftar pelanggan sesuai struktur folder yang ada". Semua agen, termasuk yang didelegasikan Hermes, otomatis tahu folder proyeknya.
+3. Cek hasilnya di folder proyek dengan `git status`, `git log`, dan `git diff`.
+
+Aturan yang selalu diberikan ke agen:
+
+- Sebelum mengubah file, agen memeriksa branch. Kalau belum di branch yang diawali `agent/`, agen membuat **satu branch kerja bersama** untuk tugas itu (`agent/<nama-tugas>`), dan seluruh tim memakai branch itu.
+- Tidak pernah commit atau push ke `main`, `master`, atau `develop`; tidak force push; tidak menghapus branch. Push hanya kalau Anda memintanya.
+- Tidak membaca atau mengubah file rahasia (`.env`, kunci, kredensial).
+
+Perlu diingat: dengan fitur ini agen bisa membuat, mengubah, dan menghapus file serta menjalankan perintah terminal di folder proyek. Aturan di atas adalah instruksi untuk agen, bukan pengaman teknis, jadi selalu tinjau perubahan sebelum di-merge. Pilih **📁 Pilih proyek…** (kosong) kalau tidak ingin agen bekerja di proyek mana pun.
 
 ## Mengelola agen (panel ⚙ Agen)
 

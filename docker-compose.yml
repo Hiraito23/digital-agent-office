@@ -14,6 +14,8 @@ services:
       - "127.0.0.1:9119:9119"   # dashboard
     volumes:
       - hermes-data:/opt/data
+      # Folder proyek yang boleh dikerjakan agen (baca + tulis). Atur PROJECTS_DIR di .env.
+      - ${PROJECTS_DIR:-./projects}:/workspace
     environment:
       - HERMES_DASHBOARD=1
       - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${DASH_USER}
@@ -34,6 +36,7 @@ services:
     volumes:
       - office-data:/data/.hermes                              # riwayat chat agen
       - ./config:/data/config                                  # team.json + people.json (diedit dari panel ⚙ Agen)
+      - ${PROJECTS_DIR:-./projects}:/workspace:ro             # hanya untuk menampilkan daftar proyek
     # Tampilan kantor (office/public) ada di dalam image: setelah mengubahnya,
     # jalankan `docker compose up -d --build office`.
     environment:
@@ -43,6 +46,8 @@ services:
       - HERMES_MODEL=hermes-agent
       - HERMES_AGENT_NAME=Hermes
       - TEAM_FILE=/data/config/team.json
+      - OFFICE_FILE=/data/config/office.json                  # proyek aktif
+      - WORKSPACE_DIR=/workspace
       - PEOPLE_FILE=/data/config/people.json
       - HERMES_DASHBOARD_URL=http://hermes:9119                # SOUL.md lewat API dashboard resmi
       - DASH_USER=${DASH_USER}

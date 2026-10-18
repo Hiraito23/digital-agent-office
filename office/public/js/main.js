@@ -1,7 +1,7 @@
 // Entry point of the office UI. It wires the pieces together:
 //   world/      3D scene, camera and agent movement (World)
 //   net/        WebSocket client for the Hermes gateway (Gateway)
-//   ui/         name tags, agent panel, jukebox and voices
+//   ui/         name tags, agent panel, project picker, jukebox and voices
 // and owns the app state shared between them: roster, agent status,
 // chat history per agent and the activity feed.
 import { World } from "./world/world.js";
@@ -10,6 +10,7 @@ import { initJukebox } from "./ui/jukebox.js";
 import { VoiceBox } from "./ui/voice.js";
 import { NameTags } from "./ui/name-tags.js";
 import { initAgentPanel } from "./ui/agents-panel.js";
+import { initProjectPicker } from "./ui/projects.js";
 
 const jukebox = initJukebox();
 
@@ -291,6 +292,15 @@ chatInput.addEventListener("keydown", (e) => {
     e.preventDefault();
     chatForm.requestSubmit();
   }
+});
+
+// 📁 project picker: tell the team which folder to work in
+initProjectPicker({
+  onChange: ({ name, path, error }) => {
+    if (error) logActivity(`Proyek: ${error}`, "err");
+    else if (name) logActivity(`Proyek aktif: ${name} (${path}); tim bekerja di branch agent/...`, "ok");
+    else logActivity("Tidak ada proyek aktif");
+  },
 });
 
 gw.start();
