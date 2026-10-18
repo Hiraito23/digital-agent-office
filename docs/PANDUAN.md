@@ -4,16 +4,26 @@ Terakhir diperbarui: 18 Oktober 2026 · versi online: [Panduan Agentic Digital O
 
 ## Ringkasan
 
-Agentic Digital Office adalah tim agen AI (dipimpin orkestrator Hermes, anggotanya Anda buat sendiri) yang tampil sebagai karakter 3D di sebuah kantor virtual. Semuanya berjalan di Docker Desktop dari folder `D:\Coding\kantor-hermes`, dan hanya bisa dibuka dari komputer ini.
+Agentic Digital Office adalah tim agen AI (dipimpin orkestrator Hermes, anggotanya Anda buat sendiri) yang tampil sebagai karakter 3D di sebuah kantor virtual. Semuanya berjalan di Docker Desktop dari folder `D:\Coding\digital-agent-office`, dan hanya bisa dibuka dari komputer ini.
 
 | Bagian | Isi | Alamat |
 | --- | --- | --- |
-| Container `office` | Kantor 3D (three.js) + adapter Hermes | http://localhost:3000/office |
+| Container `office` | Kantor 3D (three.js) + adapter Hermes | http://localhost:3000 |
 | Container `hermes` | Hermes Agent resmi dari Nous Research: otak agen, API, dashboard | Dashboard http://127.0.0.1:9119, API http://127.0.0.1:8642 |
-| Volume `kantor-hermes_hermes-data` | Konfigurasi, API key, memori, skill Hermes | (di dalam Docker) |
-| Volume `kantor-hermes_office-data` | Riwayat chat tiap agen di kantor | (di dalam Docker) |
+| Volume `digital-agent-office_hermes-data` | Konfigurasi, login provider AI, memori, skill Hermes | (di dalam Docker) |
+| Volume `digital-agent-office_office-data` | Riwayat chat tiap agen di kantor | (di dalam Docker) |
 
-Status per hari ini: semua komponen jalan dan terhubung. Agen belum bisa menjawab sampai API key model diisi lewat `hermes setup` (lihat langkah 8 di bagian instalasi).
+Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta memakai tools. Hermes tersambung ke Nous Portal dengan model gratis `poolside/laguna-s-2.1:free` (lihat [Memilih provider dan model AI](#memilih-provider-dan-model-ai)).
+
+## Mulai cepat
+
+| Mau | Caranya |
+| --- | --- |
+| Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Haruto kerjakan frontend, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
+| Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
+| Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
+
+Belum ada ruang chat grup tempat semua agen bicara bersamaan; diskusi tim berjalan lewat Hermes sebagai moderator. Riwayat chat tiap agen tersimpan, jadi diskusi bisa dilanjutkan kapan saja.
 
 ## Instalasi dari awal (laptop/PC baru)
 
@@ -32,13 +42,33 @@ Yang dibutuhkan: Windows 10/11 dengan WSL2, Docker Desktop, Git, koneksi interne
     File ini rahasia dan tidak ikut ke GitHub.
 6. **(Opsional) Salin musik.** File MP3 tidak ada di GitHub. Kalau ingin ada musik, salin `asuka-city.mp3` dan `littleroot-town.mp3` ke `office\public\audio\` sebelum langkah 7 (untuk lagu lain lihat `office/public/audio/README.md`). Tanpa ini kantor tetap jalan, hanya tanpa musik.
 7. **Nyalakan.** Di folder proyek jalankan `docker compose up -d --build`. Pertama kali butuh beberapa menit karena mengunduh image Hermes.
-8. **Isi API key model (wajib, sekali per komputer).** Jalankan `docker exec -it hermes hermes setup`, pilih provider (mis. OpenRouter, Anthropic, atau Nous Portal), lalu tempel API key Anda. Setelah selesai jalankan `docker compose restart`.
+8. **Sambungkan provider AI (wajib, sekali per komputer).** Ikuti [Memilih provider dan model AI](#memilih-provider-dan-model-ai) di bawah: login/isi API key, pilih model, salin `API_SERVER_KEY` ke Hermes, lalu restart.
 9. **Buka kantor** di http://localhost:3000 (sebaiknya di Microsoft Edge agar suara Indonesia tersedia) dan **dashboard Hermes** di http://127.0.0.1:9119 (login `admin` + `DASH_PASS`).
-10. **Uji.** Klik karakter Hermes dan kirim "Halo, perkenalkan timmu". Kalau muncul "Provider authentication failed", ulangi langkah 8.
+10. **Uji.** Klik karakter Hermes dan kirim "Halo, perkenalkan timmu". Kalau muncul "Provider authentication failed", lihat bagian Pemecahan masalah.
 
 Data yang ikut dari GitHub: tim agen beserta tampilan dan suaranya (`config/team.json`, `config/people.json`). Yang **tidak** ikut dan dibuat ulang di tiap komputer: `.env`, API key model, SOUL.md, memori, dan riwayat chat (semuanya tersimpan di volume Docker komputer itu).
 
 Mengambil pembaruan terbaru: `git pull`, lalu `docker compose up -d --build`.
+
+### Memilih provider dan model AI
+
+Hermes butuh satu provider AI. Semua perintah di bawah dijalankan di PowerShell, di folder proyek.
+
+1. **Login atau isi API key.** Jalankan `docker exec -it hermes hermes model`, lalu pilih provider:
+    - **Nous Portal** (login lewat browser, ada model gratis). Saldo $0 hanya bisa memakai model berakhiran `:free`; model berbayar seperti Claude Opus akan ditolak dengan pesan "Billing or credits exhausted".
+    - **OpenRouter, Anthropic, OpenAI, Gemini, dll.** dengan API key dari situs masing-masing (berbayar sesuai pemakaian).
+2. **Pilih model** di menu yang sama. Untuk Nous Portal gratis, `poolside/laguna-s-2.1:free` sudah teruji bisa berbahasa Indonesia dan memakai tools. Bisa juga diatur langsung:
+    ```
+    docker exec hermes hermes config set model.provider nous
+    docker exec hermes hermes config set model.default "poolside/laguna-s-2.1:free"
+    ```
+3. **Salin `API_SERVER_KEY` ke Hermes.** Setelah wizard `hermes setup`/`hermes model`, Hermes membaca kunci API server dari file `.env` miliknya sendiri. Tanpa langkah ini port 8642 tidak menyala dan kantor tidak bisa bicara dengan Hermes:
+    ```
+    docker exec hermes sh -c 'grep -q "^API_SERVER_KEY=" /opt/data/.env || printf "\nAPI_SERVER_KEY=%s\n" "$API_SERVER_KEY" >> /opt/data/.env'
+    ```
+4. **Restart dan uji:** `docker compose restart hermes`, tunggu sekitar 20 detik, lalu kirim pesan ke agen di kantor.
+
+Mengecek status login: `docker exec hermes hermes auth list`. Mengganti model nanti cukup ulangi langkah 2 lalu `docker compose restart hermes`.
 
 ### Perintah harian
 
@@ -47,7 +77,7 @@ Mengambil pembaruan terbaru: `git pull`, lalu `docker compose up -d --build`.
 | Menyalakan | `docker compose up -d` |
 | Mematikan (data tetap aman) | `docker compose down` |
 | Melihat log | `docker compose logs -f` |
-| Setelah mengganti API key | `docker compose restart` |
+| Setelah mengganti provider, API key, atau model | `docker compose restart hermes` |
 | Menambah, mengubah, menghapus agen | panel **⚙ Agen** di kantor (langsung berlaku) |
 | Setelah mengubah apa pun di `office/` (tampilan, server, adapter) | `docker compose up -d --build office`, lalu refresh browser |
 | Mengambil pembaruan dari GitHub | `git pull`, lalu `docker compose up -d --build` |
@@ -304,7 +334,9 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Gejala | Penyebab | Solusi |
 | --- | --- | --- |
-| Balasan "Provider authentication failed" | API key model belum diisi | `docker exec -it hermes hermes setup`, lalu `docker compose restart` |
+| Balasan "Provider authentication failed" | Belum login provider, atau `model.provider` masih `auto` padahal hanya ada login Nous | `docker exec hermes hermes auth list`; lalu ikuti [Memilih provider dan model AI](#memilih-provider-dan-model-ai) |
+| "Billing or credits exhausted" | Model berbayar dengan saldo Nous $0 | Pilih model `:free` (mis. `poolside/laguna-s-2.1:free`) atau isi kredit di portal.nousresearch.com |
+| Semua agen gagal / status kantor terhubung tapi tidak ada balasan, log Hermes "No messaging platforms enabled" | API server Hermes (port 8642) tidak menyala karena `API_SERVER_KEY` belum ada di `.env` Hermes | Jalankan langkah 3 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai), lalu `docker compose restart hermes` |
 | Kantor tidak terbuka | Docker Desktop mati atau container berhenti | Nyalakan Docker Desktop, lalu `docker compose up -d` |
 | Status "Terputus" di kantor | Container `office` sedang restart | Tunggu 10 detik; cek `docker compose logs office` |
 | Agen baru tidak muncul | Halaman belum menerima pembaruan | Refresh browser; kalau team.json diedit manual, `docker compose restart office` |
@@ -316,4 +348,4 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Tool gagal karena kunci API | Toolset belum dikonfigurasi | Lihat ⚙ Agen → 🧰 Tools, isi kuncinya di dashboard Hermes (port 9119), lalu `docker compose restart hermes` |
 | Perintah `hermes` tidak dikenal di PowerShell | Hermes ada di dalam container | Pakai `docker exec -it hermes hermes ...` |
 
-Semua komponen hanya berjalan lewat Docker: kode kantor ada di dalam image `kantor-hermes/office`, dan yang di-mount dari folder ini hanya `config/` (data agen). Instalasi percobaan awal di Ubuntu (WSL) sudah dihapus pada 18 Oktober 2026; cadangan `.bashrc` lama tersimpan di `~/.bashrc.bak-kantor-hermes`.
+Semua komponen hanya berjalan lewat Docker: kode kantor ada di dalam image `digital-agent-office/office:local`, dan yang di-mount dari folder ini hanya `config/` (data agen) serta folder proyek `PROJECTS_DIR`. Instalasi percobaan awal di Ubuntu (WSL) sudah dihapus pada 18 Oktober 2026; cadangan `.bashrc` lama tersimpan di `~/.bashrc.bak-kantor-hermes`.

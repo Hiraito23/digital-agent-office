@@ -7,7 +7,7 @@ Dua container:
 
 | Container | Isi | Alamat |
 |---|---|---|
-| `office` | Kantor 3D (three.js) + adapter Hermes | http://localhost:3000 (juga `/office`) |
+| `office` | Kantor 3D (three.js) + adapter Hermes | http://localhost:3000 |
 | `hermes` | Hermes Agent resmi (API + dashboard) | dashboard http://127.0.0.1:9119, API http://127.0.0.1:8642 |
 
 Semua port hanya terbuka di komputer ini (127.0.0.1).
@@ -18,8 +18,8 @@ Semua port hanya terbuka di komputer ini (127.0.0.1).
 docker compose up -d                  # nyalakan
 docker compose down                   # matikan (data tetap aman di volume)
 docker compose logs -f                # lihat log
-docker exec -it hermes hermes setup   # isi API key model (wajib sekali)
-docker compose restart                # restart setelah ganti API key
+docker exec -it hermes hermes model   # login provider AI + pilih model (wajib sekali, lihat PANDUAN)
+docker compose restart hermes         # restart setelah ganti provider/model
 docker compose up -d --build office   # build ulang setelah mengubah apa pun di office/ (tampilan, server, adapter)
 ```
 
@@ -39,4 +39,6 @@ docker compose up -d --build office   # build ulang setelah mengubah apa pun di 
   (UI 3D dalam ES modules: `office/` scene, `characters/` karakter, `world/` agen, `ui/` panel). Peta lengkapnya ada di
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Setelah mengubah apa pun di `office/`: `docker compose up -d --build office`.
 
-Data Hermes ada di volume Docker `kantor-hermes_hermes-data`, riwayat chat kantor di `kantor-hermes_office-data`.
+Setelah login provider, salin juga `API_SERVER_KEY` ke `.env` milik Hermes (langkah 3 di bagian "Memilih provider dan model AI" di [PANDUAN](docs/PANDUAN.md)); tanpa itu API port 8642 tidak menyala.
+
+Data Hermes ada di volume Docker `digital-agent-office_hermes-data`, riwayat chat kantor di `digital-agent-office_office-data`.
