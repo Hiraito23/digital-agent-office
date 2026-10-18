@@ -14,7 +14,7 @@ export const PRIVATE_OFFICES = [];
 for (const [row, zr] of [["back", WING.backRow], ["front", WING.frontRow]]) {
   for (let x0 = WING.x0; x0 < WING.x1; x0 += WING.roomW) {
     const x1 = x0 + WING.roomW;
-    const cx = x0 + 2.9; // door, off to the right so the way in never crosses the desk
+    const cx = x0 + WING.roomW / 2; // door and desk are centred in the room
     const n = PRIVATE_OFFICES.length + 1;
     const back = row === "back";
     const doorZ = back ? zr.z1 : zr.z0;
@@ -31,10 +31,9 @@ for (const [row, zr] of [["back", WING.backRow], ["front", WING.frontRow]]) {
       door: back
         ? { outside: { x: cx, z: doorZ + 0.6 }, inside: { x: cx, z: doorZ - 0.6 } }
         : { outside: { x: cx, z: doorZ - 0.6 }, inside: { x: cx, z: doorZ + 0.6 } },
-      // desk on the left (against the far wall in the back row, facing the door in
-      // the front row); seat = seatOf(desk); agents walk in via the door column
-      desk: back ? { x: x0 + 0.3, z: zr.z0 + 1.0 } : { x: x0 + 0.3, z: zr.z0 + 1.9 },
-      via: { x: cx },
+      // desk against the far wall, facing the door; the front row is the back row
+      // mirrored (flip: desk turned around, the agent faces +z). seat = seatOf(desk)
+      desk: back ? { x: cx - 0.65, z: zr.z0 + 1.0, flip: false } : { x: cx + 0.65, z: zr.z1 - 1.0, flip: true },
     });
   }
 }
@@ -77,10 +76,14 @@ export const CENTER = { x: (OFFICE.x0 + OFFICE.x1) / 2, z: (OFFICE.z0 + OFFICE.z
 export const DESK_COLS = [8, 10.6, 13.2, 15.8, 18.4];
 export const DESK_ROWS = [8.4, 12.4];
 export const DESK_SLOTS = [
-  ...PRIVATE_OFFICES.map((r) => ({ ...r.desk, room: r.id, viaX: r.via.x })),
+  ...PRIVATE_OFFICES.map((r) => ({ ...r.desk, room: r.id })),
   ...DESK_ROWS.flatMap((z) => DESK_COLS.map((x) => ({ x, z, room: null }))),
 ];
-export const seatOf = (slot) => ({ x: slot.x + 0.65, z: slot.z + 1.15, room: slot.room ?? null, viaX: slot.viaX ?? null });
+// A desk spans 1.3 x 0.75 from its slot corner; the chair is 0.4 in front of it.
+// A flipped desk is turned around its slot corner, so its seat lies towards -z.
+export const seatOf = (slot) => slot.flip
+  ? { x: slot.x - 0.65, z: slot.z - 1.15, heading: 0, room: slot.room ?? null }
+  : { x: slot.x + 0.65, z: slot.z + 1.15, heading: Math.PI, room: slot.room ?? null };
 
 export const WANDER = [
   [9.95, 11.1], [14.5, 11.1], [17.75, 11.1], [21.6, 11.1],

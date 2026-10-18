@@ -259,12 +259,13 @@ const meetings = createMeetings({
   systemPromptFor: (agent) => withProjectContext(agent?.id === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt || ""),
   broadcast: broadcastEvent, forwarder: hermesEventForwarder, sanitize: sanitizeErrorMessage,
   onMinutes: (m, minutes) => {
-    recordSummary({ agentId: AGENT_ID, kind: "meeting", task: m.topic, summary: minutes });
+    const at = Date.now();
+    recordSummary({ agentId: AGENT_ID, kind: "meeting", task: m.topic, summary: minutes, msgAt: at });
     // Everyone who attended remembers the minutes in their own chat.
     for (const id of [AGENT_ID, ...m.participants]) {
       const history = getHistory(`agent:${id}:${MAIN_KEY}`);
       history.push({ role: "user", content: `[Rapat tim] ${m.topic}`, at: m.startedAt });
-      history.push({ role: "assistant", content: `Notulen rapat:\n${minutes}`, at: Date.now() });
+      history.push({ role: "assistant", content: `Notulen rapat:\n${minutes}`, at });
     }
     saveHistoryToDisk();
   },
@@ -751,14 +752,15 @@ async function execDelegateTask(args) {
     clearApprovalsFor(sessionKey);
     responseText = result.textContent;
 
-    // Persist to sub-agent history
+    // Persist to sub-agent history (the summary points at this reply by its time)
+    const replyAt = Date.now();
     if (keep) {
-      history.push({ role: "assistant", content: responseText, at: Date.now() });
+      history.push({ role: "assistant", content: responseText, at: replyAt });
       saveHistoryToDisk();
     }
 
     emitSub("final", { stopReason: "end_turn", message: { role: "assistant", content: responseText } });
-    recordSummary({ agentId: targetId, task: message, text: responseText });
+    recordSummary({ agentId: targetId, task: message, text: responseText, msgAt: replyAt });
 
     // Presence update for sub-agent session
     broadcastEvent({
@@ -932,12 +934,13 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
     throw err;
   }
 
-  // Persist to history
+  // Persist to history (the summary points at this reply by its time)
+  const replyAt = Date.now();
   if (keep) {
-    history.push({ role: "assistant", content: finalText, at: Date.now() });
+    history.push({ role: "assistant", content: finalText, at: replyAt });
     saveHistoryToDisk();
   }
-  if (!abortCheck?.()) recordSummary({ agentId, task: userMessage, text: finalText });
+  if (!abortCheck?.()) recordSummary({ agentId, task: userMessage, text: finalText, msgAt: replyAt });
 
   return finalText;
 }

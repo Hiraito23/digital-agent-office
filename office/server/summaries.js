@@ -53,7 +53,7 @@ const createSummaries = ({ file, historyFile }) => {
           const a = messages[i + 1];
           if (q.role !== "user" || a.role !== "assistant" || typeof a.content !== "string" || !a.content.trim()) continue;
           if (a.error || a.content.trim().startsWith("⚠")) continue; // failed replies are not summaries
-          entries.push({ id: newId(), agentId, kind: "chat", at, task: summarize(q.content, 120), summary: summarize(a.content) });
+          entries.push({ id: newId(), agentId, kind: "chat", at, task: summarize(q.content, 120), summary: summarize(a.content), msgIndex: i + 1 });
         }
       }
       entries = entries.slice(-MAX_ENTRIES);
@@ -61,18 +61,43 @@ const createSummaries = ({ file, historyFile }) => {
     } catch { /* no history yet */ }
   };
 
+  // Older entries without a link to their reply: find it in the history by the
+  // task text (each user/assistant pair is used once, oldest first).
+  const linkOld = () => {
+    let history = {};
+    try { history = JSON.parse(fs.readFileSync(historyFile, "utf8")); } catch { return; }
+    const used = new Set();
+    let changed = false;
+    for (const e of entries) {
+      if (e.msgAt || Number.isInteger(e.msgIndex) || e.kind !== "chat") continue;
+      const messages = history[`agent:${e.agentId}:main`] || [];
+      for (let i = 0; i + 1 < messages.length; i++) {
+        const key = `${e.agentId}:${i}`;
+        if (used.has(key) || messages[i].role !== "user" || messages[i + 1].role !== "assistant") continue;
+        if (summarize(messages[i].content, 120) !== e.task) continue;
+        used.add(key);
+        e.msgIndex = i + 1;
+        changed = true;
+        break;
+      }
+    }
+    if (changed) save();
+  };
+
   try {
     entries = JSON.parse(fs.readFileSync(file, "utf8"));
     if (!Array.isArray(entries)) entries = [];
+    linkOld();
   } catch {
     backfill();
   }
 
   return {
     // Record a finished reply; returns the entry (broadcast it to the office).
-    add({ agentId, kind = "chat", task, text, summary }) {
+    // msgAt: the `at` of the reply in the chat history, so the office can jump to it.
+    add({ agentId, kind = "chat", task, text, summary, msgAt }) {
       const entry = {
-        id: newId(), agentId, kind, at: Date.now(),
+        id: newId(), agentId, kind, at: Date.now(), msgAt: msgAt ?? null,
         task: summarize(task, 120),
         // Meeting minutes keep their lines (Ringkasan / Keputusan / Action item).
         summary: kind === "meeting" ? String(summary || text || "").trim().slice(0, 1500) : summarize(summary || text),

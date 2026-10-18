@@ -85,10 +85,12 @@ export const buildOffice = (scene) => {
   const addDesk = (group, slot, i) => {
     const d = makeDesk(screenTex, i);
     d.position.set(slot.x, top, slot.z);
+    if (slot.flip) d.rotation.y = Math.PI; // turned around its corner (front-row offices)
     group.add(d);
     const seat = seatOf(slot);
     const c = makeChair();
     c.position.set(seat.x, top, seat.z);
+    if (slot.flip) c.rotation.y = Math.PI;
     group.add(c);
   };
   // Every private office is furnished from the start.
@@ -115,16 +117,16 @@ export const buildOffice = (scene) => {
 
   const rooms = addRooms(scene, top);
 
-  // furniture of the private offices: cabinet in the corner, a plant by the door
-  PRIVATE_OFFICES.forEach((room, i) => {
+  // furniture of the private offices: a cabinet in both corners of the far wall,
+  // so each room is symmetric around its centred desk and door
+  PRIVATE_OFFICES.forEach((room) => {
     const back = room.door.outside.z > room.door.inside.z;
-    const cab = makeCabinet();
-    cab.position.set(room.x1 - 0.4, top, back ? room.z0 + 0.4 : room.z1 - 0.45);
-    scene.add(cab);
-    const plant = makePlanter(300 + i);
-    plant.scale.setScalar(0.7);
-    plant.position.set(room.x1 - 0.45, top, back ? room.z1 - 0.5 : room.z0 + 0.5);
-    scene.add(plant);
+    for (const x of [room.x0 + 0.45, room.x1 - 0.45]) {
+      const cab = makeCabinet();
+      cab.position.set(x, top, back ? room.z0 + 0.32 : room.z1 - 0.32);
+      cab.rotation.y = back ? -Math.PI / 2 : Math.PI / 2; // drawers face the room
+      scene.add(cab);
+    }
   });
   addDecor(scene, top, animated);
 

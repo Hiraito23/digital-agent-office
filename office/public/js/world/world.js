@@ -146,13 +146,9 @@ export class World {
     });
   }
 
-  // Route to the agent's own desk. Private offices are entered through their
-  // door and then along the door column, so nobody walks through the desk.
+  // Route to the agent's own desk (private offices are entered through their door).
   seatRoute(a, fromRoom) {
-    const seat = a.seat;
-    const route = planRoute(a, seat, fromRoom, seat.room);
-    if (seat.viaX != null) route.splice(route.length - 1, 0, { x: seat.viaX, z: seat.z });
-    return route;
+    return planRoute(a, a.seat, fromRoom, a.seat.room);
   }
 
   // Free activity spots (sofa, arcade, coffee, ...) that no agent is using or walking to.
@@ -182,7 +178,6 @@ export class World {
       a.meeting = place;
       a.room = null;
       a.route = planRoute(a, place, from, MEETING.room);
-      if (fromDesk && a.seat.viaX != null) a.route.unshift({ x: a.seat.viaX, z: a.seat.z }); // step out from behind the desk
       a.mode = "toMeeting";
     }
   }
@@ -231,7 +226,7 @@ export class World {
       if (a.seat.room) {
         // out of the private office into the corridor
         const exit = doorOf(a.seat.room);
-        a.route = [{ x: a.seat.viaX ?? exit.inside.x, z: a.seat.z }, ...planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room)];
+        a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
         a.mode = "wander";
       } else {
         a.mode = "idle";
@@ -303,7 +298,7 @@ export class World {
       const inMeeting = a.mode === "meeting" && !moving && a.meeting;
       // face the desk when seated, the prop at an activity, the camera side when idle
       let targetHeading = a.heading;
-      if (sitting) targetHeading = Math.PI;
+      if (sitting) targetHeading = a.seat?.heading ?? Math.PI; // facing the desk
       else if (inMeeting) targetHeading = a.meeting.heading;
       else if (atSpot) targetHeading = a.spot.heading;
       else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);

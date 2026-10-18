@@ -74,6 +74,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #4e9a34; col
 .msg.user { align-self: flex-end; background: #d0ebff; color: var(--ink); max-width: 85%; }
 .msg.assistant { align-self: flex-start; background: #fffef5; color: var(--ink); max-width: 92%; }
 .msg.error { background: #ffe3e3; color: #862e2e; }
+/* the reply opened from 📋 RINGKASAN (and its question) */
+.msg.focused { outline: 3px solid var(--accent); box-shadow: 0 0 0 6px rgba(255, 212, 59, .3); }
+.msg.focused-question { outline: 2px dashed var(--accent); }
+.msg.focused, .msg.focused-question { transition: outline-color .4s, box-shadow .4s; }
 .chat-form { display: flex; gap: 8px; padding: 10px 12px; border-top: 2px solid rgba(143,191,106,.5); }
 .chat-form textarea { flex: 1; resize: none; font: 13.5px var(--chat-font); padding: 6px 8px; border: 2px solid var(--ink); background: #fffef5; color: var(--ink); }
 .chat-form button { font: 600 13.5px var(--chat-font); padding: 0 14px; background: var(--accent); color: var(--ink); border: 2px solid var(--ink); cursor: pointer; box-shadow: 2px 2px 0 var(--ink); }

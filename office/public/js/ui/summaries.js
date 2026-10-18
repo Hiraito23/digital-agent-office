@@ -69,7 +69,7 @@ export const initSummaries = ({ gw, nameOf, onOpen }) => {
     const li = e.target.closest("li[data-agent]");
     if (!li) return;
     const box = e.target.closest(".sm-check");
-    if (!box) return onOpen(li.dataset.agent);
+    if (!box) return onOpen(entries.find((x) => x.id === li.dataset.id) ?? { agentId: li.dataset.agent });
     // the checkbox only marks read/unread; it never opens the chat
     e.stopPropagation();
     if (e.target.tagName !== "INPUT") return; // the label forwards the click to its input

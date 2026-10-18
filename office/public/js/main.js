@@ -245,7 +245,7 @@ gw.addEventListener("tool", (e) => {
 });
 
 // 📋 RINGKASAN (left): a short summary each time an agent finishes a reply.
-const summaryPanel = initSummaries({ gw, nameOf, onOpen: (id) => openChat(id) });
+const summaryPanel = initSummaries({ gw, nameOf, onOpen: (entry) => openChat(entry.agentId, entry) });
 
 // 💬 Rapat: team meetings in the meeting room, closed with minutes by Hermes.
 initMeeting({
@@ -291,15 +291,41 @@ const renderLiveRun = (runId, text) => {
   renderChat();
 };
 
-const renderChat = () => {
+// Plain text for matching a summary to its reply (same cleanup as server/summaries.js).
+const plainText = (s) => String(s || "").replace(/```[\s\S]*?```/g, " [kode] ").replace(/`([^`]*)`/g, "$1")
+  .replace(/^#+\s*/gm, "").replace(/[*_>|]/g, "").replace(/\s+/g, " ").trim();
+
+// The message a 📋 RINGKASAN entry is about: by its time, its place in the
+// history, or (older entries) the start of the summary text.
+const findMessage = (list, focus) => {
+  let i = focus.msgAt ? list.findIndex((m) => m.at === focus.msgAt) : -1;
+  if (i < 0 && Number.isInteger(focus.msgIndex)) i = list.findIndex((m) => m.i === focus.msgIndex);
+  if (i < 0 && focus.summary) {
+    const head = plainText(focus.summary).replace(/…$/, "").slice(0, 60);
+    i = list.findLastIndex((m) => m.role !== "user" && plainText(m.content).includes(head));
+  }
+  return i;
+};
+
+// focus (optional): a summary entry; the chat scrolls to that reply and highlights it.
+const renderChat = (focus = null) => {
   const list = chats.get(selected) || [];
   chatLog.innerHTML = list.length
     ? list.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.content || "…")}</div>`).join("")
     : `<p class="muted">Belum ada percakapan. Kirim tugas pertama!</p>`;
-  chatLog.scrollTop = chatLog.scrollHeight;
+  const target = focus ? chatLog.children[findMessage(list, focus)] : null;
+  if (!target) {
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return;
+  }
+  target.classList.add("focused");
+  const question = target.previousElementSibling?.classList.contains("user") ? target.previousElementSibling : null;
+  question?.classList.add("focused-question");
+  (question ?? target).scrollIntoView({ block: "start" });
+  setTimeout(() => { target.classList.remove("focused"); question?.classList.remove("focused-question"); }, 4000);
 };
 
-const openChat = async (agentId) => {
+const openChat = async (agentId, focus = null) => {
   selected = agentId;
   const a = agentsById.get(agentId);
   chatName.textContent = a?.name ?? agentId;
@@ -311,9 +337,11 @@ const openChat = async (agentId) => {
   if (!historyLoaded.has(agentId) && gw.connected) {
     try {
       const res = await gw.request("chat.history", { sessionKey: sessionKeyFor(agentId) });
+      // i = position in the server history, at = when it was saved (summaries point at these)
       const saved = (res.messages || [])
+        .map((m, i) => ({ ...m, i }))
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({ role: m.error ? "error" : m.role, content: String(m.content ?? "") }));
+        .map((m) => ({ role: m.error ? "error" : m.role, content: String(m.content ?? ""), at: m.at ?? null, i: m.i }));
       const live = (chats.get(agentId) || []).filter((m) => m.runId && liveRuns.has(m.runId));
       chats.set(agentId, [...saved, ...live]);
       historyLoaded.add(agentId);
@@ -321,8 +349,8 @@ const openChat = async (agentId) => {
       if (!chats.has(agentId)) chats.set(agentId, []);
     }
   }
-  renderChat();
-  chatInput.focus();
+  renderChat(focus);
+  if (!focus) chatInput.focus();
 };
 
 voiceTestBtn.onclick = () => {
