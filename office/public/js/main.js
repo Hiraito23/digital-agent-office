@@ -14,6 +14,7 @@ import { initProjectPicker } from "./ui/projects.js";
 import { initApprovals } from "./ui/approvals.js";
 import { initSummaries } from "./ui/summaries.js";
 import { initMeeting } from "./ui/meeting.js";
+import { initUsage } from "./ui/usage.js";
 
 const jukebox = initJukebox();
 
@@ -254,6 +255,9 @@ initMeeting({
   agents: () => [...agentsById.values()],
   getProject: () => document.getElementById("project-select").value || null,
 });
+
+// 📊 Pemakaian: token usage per agent and model (daily / weekly / monthly).
+initUsage({ agents: () => [...agentsById.values()], nameOf });
 
 // PERSETUJUAN: risky commands wait here for your answer.
 initApprovals({

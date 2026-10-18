@@ -129,6 +129,6 @@ export const windowTexture = () =>
 
 export const signTexture = (text) => canvasTexture(128, 16, (ctx) => {
   ctx.fillStyle = "#1a2138"; ctx.fillRect(0, 0, 128, 16);
-  ctx.fillStyle = "#ffd43b"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffd43b"; ctx.font = "bold 10px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(text, 64, 8);
 });

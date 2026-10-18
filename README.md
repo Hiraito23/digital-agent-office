@@ -41,4 +41,6 @@ docker compose up -d --build office   # build ulang setelah mengubah apa pun di 
 
 Setelah login provider, salin juga `API_SERVER_KEY` ke `.env` milik Hermes (langkah 3 di bagian "Memilih provider dan model AI" di [PANDUAN](docs/PANDUAN.md)); tanpa itu API port 8642 tidak menyala.
 
+Model AI tiap agen dipilih dari dropdown **Model AI** di panel **⚙ Agen** (kunci `model` di `team.json`; kosong = model default Hermes). Syaratnya sekali per komputer: `docker exec hermes hermes config set platforms.api_server.extra.direct_model_requests true`, lalu `docker compose restart hermes`. Panel **📊 Pemakaian** menampilkan token per agen dan model (harian, mingguan, bulanan). Cara memakai model berbayar (kredit Nous Portal atau API key Anthropic) ada di [PANDUAN](docs/PANDUAN.md#memakai-model-berbayar).
+
 Data Hermes ada di volume Docker `digital-agent-office_hermes-data`, riwayat chat kantor di `digital-agent-office_office-data`.

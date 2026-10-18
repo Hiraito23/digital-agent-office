@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agentic Digital Office</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Poppins:wght@400;500;600&family=Silkscreen&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
   <script type="importmap">
     { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
@@ -20,6 +20,7 @@
     <div id="roster" class="roster"></div>
     <select id="project-select" class="chip project" title="Proyek yang dikerjakan agen"><option value="">📁 Pilih proyek…</option></select>
     <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
+    <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
     <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
     <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
     <button id="voice-toggle" class="chip music" title="Agen membacakan balasan">🔊 Suara</button>
@@ -47,6 +48,19 @@
     </div>
     <div id="meeting-status" class="agents-status"></div>
     <div id="meeting-body" class="agents-body"></div>
+  </aside>
+
+  <aside id="usage" class="hud agents usage hidden">
+    <div class="chat-head">
+      <div class="agents-tabs">
+        <button data-range="daily" class="active">Harian</button>
+        <button data-range="weekly">Mingguan</button>
+        <button data-range="monthly">Bulanan</button>
+      </div>
+      <button id="usage-close" title="Tutup">✕</button>
+    </div>
+    <div id="usage-status" class="agents-status"></div>
+    <div id="usage-body" class="agents-body"></div>
   </aside>
 
   <aside id="summaries" class="hud summaries">

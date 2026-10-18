@@ -95,6 +95,16 @@ export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
     const v = look.voice ?? { gender: "female", pitch: 1, rate: 1 };
     await voice.whenReady();
     const voiceList = voice.availableVoices();
+    const catalog = await api("GET", "/api/models").catch(() => ({ groups: [] }));
+    const known = new Set(catalog.groups.flatMap((g) => g.models.map((m) => m.value)));
+    const cur = agent?.model || "";
+    const modelOpt = (m) => `<option value="${esc(m.value)}"${m.value === cur ? " selected" : ""}>${esc(m.id)}</option>`;
+    const modelGroups = catalog.groups.map((g) => {
+      const free = g.models.filter((m) => m.free);
+      const paid = g.models.filter((m) => !m.free);
+      return `${free.length ? `<optgroup label="${esc(g.name)} · gratis">${free.map(modelOpt).join("")}</optgroup>` : ""}`
+        + `${paid.length ? `<optgroup label="${esc(g.name)} · berbayar">${paid.map(modelOpt).join("")}</optgroup>` : ""}`;
+    }).join("");
     body.innerHTML = `
       <form class="agent-form" autocomplete="off">
         <h3>${isNew ? "Agen baru" : `Ubah ${esc(agent.name)}`}</h3>
@@ -103,7 +113,17 @@ export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
         <label>Nama *<input name="name" maxlength="40" required value="${esc(agent?.name)}"></label>
         <label>Peran<input name="role" maxlength="60" value="${esc(agent?.role)}" placeholder="mis. Data Analyst"></label>
         <label>Instruksi / kepribadian<textarea name="instructions" rows="6" maxlength="4000" placeholder="Kamu adalah …, tugasmu …, gaya bicaramu …">${esc(agent?.instructions)}</textarea></label>
-        <label>Batasan<textarea name="boundaries" rows="2" maxlength="1000" placeholder="mis. Jangan menghapus file tanpa konfirmasi.">${esc(agent?.boundaries)}</textarea></label>`}
+        <label>Batasan<textarea name="boundaries" rows="2" maxlength="1000" placeholder="mis. Jangan menghapus file tanpa konfirmasi.">${esc(agent?.boundaries)}</textarea></label>
+        <label>Model AI <small>(menentukan biaya token agen ini)</small>
+          <select name="model">
+            <option value=""${cur ? "" : " selected"}>Ikut model default Hermes${catalog.default ? ` (${esc(catalog.default)})` : ""}</option>
+            ${modelGroups}
+            ${cur && !known.has(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)} (tersimpan)</option>` : ""}
+            <option value="__custom__">✎ Ketik model lain…</option>
+          </select>
+          <input name="modelCustom" maxlength="120" placeholder="mis. anthropic/claude-haiku-4.5" style="display:none">
+          ${catalog.error ? `<small>Daftar model tidak bisa dimuat (${esc(catalog.error)}); pilih "Ketik model lain".</small>` : ""}
+        </label>`}
         <fieldset><legend>Tampilan</legend>
           <label>Kostum <small>(menggantikan rambut dan pakaian; anime tetap berambut)</small><select name="costume">${costumeOptions(look.costume ?? "")}</select></label>
           <div class="row3">
@@ -172,6 +192,10 @@ export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
       };
     }
 
+    if (f.model) {
+      f.model.onchange = () => { f.modelCustom.style.display = f.model.value === "__custom__" ? "" : "none"; };
+    }
+
     form.onsubmit = async (e) => {
       e.preventDefault();
       const payload = { look: collectLook() };
@@ -180,6 +204,7 @@ export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
         payload.role = f.role.value;
         payload.instructions = f.instructions.value;
         payload.boundaries = f.boundaries.value;
+        payload.model = f.model.value === "__custom__" ? f.modelCustom.value.trim() : f.model.value;
       }
       if (isNew && f.id.value.trim()) payload.id = f.id.value.trim();
       try {

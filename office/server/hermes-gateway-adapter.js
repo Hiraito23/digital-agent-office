@@ -30,6 +30,7 @@ const fs = require("fs");
 const path = require("path");
 const { createSummaries } = require("./summaries");
 const { createMeetings } = require("./meetings");
+const { createUsage } = require("./usage");
 const { WebSocketServer } = require("ws");
 
 function loadDotenvFile(filePath) {
@@ -248,6 +249,27 @@ const activeSendEventFns = new Set();
 const HISTORY_FILE = path.join(HOME, ".hermes", "clawd3d-history.json");
 // 📋 RINGKASAN: one short summary per finished reply (server/summaries.js).
 const summaries = createSummaries({ file: path.join(HOME, ".hermes", "office-summaries.json"), historyFile: HISTORY_FILE });
+
+// 📊 Pemakaian: token usage per agent and model (server/usage.js).
+const usage = createUsage({ file: path.join(HOME, ".hermes", "office-usage.json") });
+let defaultModelCache = { name: "", at: 0 };
+// Hermes' own "hermes-agent" is an alias for whatever model its config uses; record the real name.
+async function actualModel(model) {
+  if (model && model !== HERMES_MODEL) return model;
+  if (defaultModelCache.name && Date.now() - defaultModelCache.at < 60_000) return defaultModelCache.name;
+  try {
+    const res = await fetch(`${process.env.HERMES_DASHBOARD_URL || "http://hermes:9119"}/api/model/info`);
+    const info = res.ok ? await res.json() : null;
+    if (info?.model) defaultModelCache = { name: info.model, at: Date.now() };
+  } catch { /* keep the cached name */ }
+  return defaultModelCache.name || HERMES_MODEL;
+}
+function recordUsage(agentId, result) {
+  const u = result?.usage;
+  if (!u) return;
+  actualModel(result.model).then((model) => usage.record({ agentId, model, input: u.prompt_tokens, output: u.completion_tokens }));
+}
+
 function recordSummary(input) {
   const entry = summaries.add(input);
   if (entry) broadcastEvent({ type: "event", event: "summary", payload: entry });
@@ -255,7 +277,7 @@ function recordSummary(input) {
 
 // 💬 Rapat: team meetings in the meeting room (server/meetings.js).
 const meetings = createMeetings({
-  agentRegistry, orchestratorId: AGENT_ID, model: HERMES_MODEL, streamOneTurn,
+  agentRegistry, orchestratorId: AGENT_ID, model: HERMES_MODEL, streamOneTurn, recordUsage,
   systemPromptFor: (agent) => withProjectContext(agent?.id === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt || ""),
   broadcast: broadcastEvent, forwarder: hermesEventForwarder, sanitize: sanitizeErrorMessage,
   onMinutes: (m, minutes) => {
@@ -427,8 +449,11 @@ async function resolveHermesModel(requestedModel) {
   try {
     const models = await fetchHermesModels();
     if (models.length === 0) {
-      return normalized || trimmed || HERMES_MODEL;
+      return trimmed || HERMES_MODEL;
     }
+    // An explicit per-agent model id (e.g. anthropic/claude-haiku-4.5) goes to Hermes as is; it
+    // honors it because direct_model_requests is on. Only the "hermes-agent" alias is resolved here.
+    if (trimmed && trimmed !== HERMES_MODEL && !models.includes(trimmed)) return trimmed;
     const candidates = [trimmed, normalized, HERMES_MODEL]
       .map((value) => (typeof value === "string" ? value.trim() : ""))
       .filter(Boolean);
@@ -442,7 +467,7 @@ async function resolveHermesModel(requestedModel) {
     }
     return models[0];
   } catch {
-    return normalized || trimmed || HERMES_MODEL;
+    return trimmed || HERMES_MODEL;
   }
 }
 
@@ -492,7 +517,7 @@ async function completeOneTurn(messages, model, tools) {
         };
       })
     : [];
-  return { textContent, toolCalls, finishReason, resolvedModel };
+  return { textContent, toolCalls, finishReason, resolvedModel, usage: payload?.usage || null, model: resolvedModel };
 }
 
 // ---------------------------------------------------------------------------
@@ -525,6 +550,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
 
   let textContent = "";
   let finishReason = "stop";
+  let usageInfo = null; // the last chunk carries prompt/completion token counts
   /** @type {Record<number, {id: string, name: string, argsStr: string}>} */
   const toolCallAccum = {};
   let buffer = "";
@@ -548,6 +574,7 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
         }
         try {
           const data = JSON.parse(trimmed.slice(6));
+          if (data?.usage) usageInfo = data.usage;
           const choice = data?.choices?.[0];
           if (!choice) continue;
           if (typeof choice.finish_reason === "string" && choice.finish_reason) {
@@ -583,17 +610,20 @@ async function streamOneTurn(messages, model, tools, onTextDelta, abortCheck, on
     return { id: tc.id, name: tc.name, args };
   });
 
-  if (abortCheck && abortCheck()) return { textContent, toolCalls, finishReason };
+  if (abortCheck && abortCheck()) return { textContent, toolCalls, finishReason, usage: usageInfo, model: resolvedModel };
   if (!textContent.trim() && toolCalls.length === 0 && finishReason === "stop") {
     const fallback = await completeOneTurn(messages, resolvedModel, tools);
+    const sum = (k) => (usageInfo?.[k] || 0) + (fallback.usage?.[k] || 0);
     return {
       textContent: fallback.textContent,
       toolCalls: fallback.toolCalls,
       finishReason: fallback.finishReason,
+      usage: usageInfo || fallback.usage ? { prompt_tokens: sum("prompt_tokens"), completion_tokens: sum("completion_tokens") } : null,
+      model: resolvedModel,
     };
   }
 
-  return { textContent, toolCalls, finishReason };
+  return { textContent, toolCalls, finishReason, usage: usageInfo, model: resolvedModel };
 }
 
 // ---------------------------------------------------------------------------
@@ -749,6 +779,7 @@ async function execDelegateTask(args) {
       responseText = partial;
       emitSub("delta", { message: { role: "assistant", content: partial } });
     }, null, hermesEventForwarder(targetId, sessionKey));
+    recordUsage(targetId, result);
     clearApprovalsFor(sessionKey);
     responseText = result.textContent;
 
@@ -890,9 +921,11 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
 
   while (round < MAX_TOOL_ROUNDS) {
     round++;
-    const { textContent, toolCalls, finishReason } = await streamOneTurn(
+    const turn = await streamOneTurn(
       messages, model, tools, emitDelta, abortCheck, hermesEventForwarder(agentId, sessionKey)
     );
+    const { textContent, toolCalls, finishReason } = turn;
+    recordUsage(agentId, turn);
     clearApprovalsFor(sessionKey);
 
     if (finishReason === "tool_calls" && toolCalls.length > 0) {
@@ -1564,4 +1597,4 @@ loadTeamFromDisk();
 loadHistoryFromDisk();
 startAdapter();
 
-module.exports = { team, TEAM_FILE };
+module.exports = { team, TEAM_FILE, usage };

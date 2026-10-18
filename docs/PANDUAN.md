@@ -11,7 +11,7 @@ Agentic Digital Office adalah tim agen AI (dipimpin orkestrator Hermes, anggotan
 | Container `office` | Kantor 3D (three.js) + adapter Hermes | http://localhost:3000 |
 | Container `hermes` | Hermes Agent resmi dari Nous Research: otak agen, API, dashboard | Dashboard http://127.0.0.1:9119, API http://127.0.0.1:8642 |
 | Volume `digital-agent-office_hermes-data` | Konfigurasi, login provider AI, memori, skill Hermes | (di dalam Docker) |
-| Volume `digital-agent-office_office-data` | Riwayat chat tiap agen di kantor | (di dalam Docker) |
+| Volume `digital-agent-office_office-data` | Riwayat chat tiap agen dan catatan pemakaian token di kantor | (di dalam Docker) |
 
 Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta memakai tools. Hermes tersambung ke Nous Portal dengan model gratis `poolside/laguna-s-2.1:free` (lihat [Memilih provider dan model AI](#memilih-provider-dan-model-ai)).
 
@@ -69,9 +69,44 @@ Hermes butuh satu provider AI. Semua perintah di bawah dijalankan di PowerShell,
     ```
     docker exec hermes sh -c 'grep -q "^API_SERVER_KEY=" /opt/data/.env || printf "\nAPI_SERVER_KEY=%s\n" "$API_SERVER_KEY" >> /opt/data/.env'
     ```
-4. **Restart dan uji:** `docker compose restart hermes`, tunggu sekitar 20 detik, lalu kirim pesan ke agen di kantor.
+4. **Aktifkan model per agen.** Tanpa ini Hermes mengabaikan model yang dipilih di panel ⚙ Agen dan semua agen memakai model default:
+    ```
+    docker exec hermes hermes config set platforms.api_server.extra.direct_model_requests true
+    ```
+5. **Restart dan uji:** `docker compose restart hermes`, tunggu sekitar 20 detik, lalu kirim pesan ke agen di kantor.
 
-Mengecek status login: `docker exec hermes hermes auth list`. Mengganti model nanti cukup ulangi langkah 2 lalu `docker compose restart hermes`.
+Mengecek status login: `docker exec hermes hermes auth list`. Mengganti model default nanti cukup ulangi langkah 2 lalu `docker compose restart hermes`.
+
+### Memakai model berbayar
+
+Model per agen dipilih dari dropdown di panel ⚙ Agen (lihat [Model AI per agen](#model-ai-per-agen)). Yang perlu disiapkan hanya akses ke model berbayarnya, lewat salah satu jalur:
+
+**Jalur A: kredit Nous Portal** (paling sederhana, model Claude ada di daftarnya).
+
+1. Isi kredit atau berlangganan di https://portal.nousresearch.com.
+2. Hermes mencatat kredensial yang ditolak karena saldo habis sebagai *exhausted* dengan masa tunggu. Hapus statusnya supaya langsung dipakai lagi:
+    ```
+    docker exec hermes hermes auth reset nous
+    ```
+3. Cek statusnya dengan `docker exec hermes hermes auth list`, lalu pilih model berbayar di dropdown **Model AI** agen. Tidak perlu restart. Kalau masih "Billing or credits exhausted", cek saldo di portal, lalu coba `docker exec hermes hermes auth refresh nous`.
+
+**Jalur B: API key Anthropic langsung.** Langganan Claude (Pro/Max) dan API Anthropic ditagih terpisah: Hermes memanggil model lewat API, jadi yang dipakai adalah saldo di console.anthropic.com, bukan langganan. Login OAuth langganan di aplikasi pihak ketiga sebaiknya dihindari karena bisa melanggar ketentuan Anthropic; periksa ketentuan terbarunya.
+
+1. Isi kredit di console.anthropic.com (**Billing**) dan buat key di **API Keys**.
+2. Daftarkan key di terminal (key diketik tersembunyi, jangan ditempel ke chat):
+    ```
+    docker exec -it hermes hermes auth add anthropic --type api-key
+    ```
+3. Cek dengan `docker exec hermes hermes auth list`. Dropdown **Model AI** lalu punya grup **Anthropic** (daftar model di-cache 5 menit, refresh halaman bila belum muncul). Model provider selain default tersimpan dengan format `provider::model`.
+
+Perintah di atas tidak mengubah model default Hermes. Hermes sebagai ketua tim dan agen yang kolom modelnya kosong tetap memakai model default; ubah dengan `docker exec hermes hermes config set model.default "<model>"` lalu `docker compose restart hermes`.
+
+**Mengatur biaya.** Setiap balasan membawa sekitar 12.000 token input (prompt sistem, tools, dan riwayat), jadi model default yang mahal cepat menguras saldo.
+
+- Pasang model murah atau gratis sebagai default.
+- Beri model kuat hanya ke agen yang butuh penalaran berat (misalnya Kenji, Haruto, Akane).
+- Pantau di [📊 Pemakaian](#pemakaian-token--pemakaian). Panel itu hanya menampilkan token; saldo asli dilihat di portal Nous atau console Anthropic.
+- Hindari **💬 Rapat** dengan banyak putaran dan peserta untuk topik sepele: setiap giliran bicara dihitung sebagai satu balasan penuh.
 
 ### Perintah harian
 
@@ -227,6 +262,7 @@ Semua pengelolaan agen dilakukan dari kantor, tanpa edit file dan tanpa restart.
 | --- | --- |
 | Tambah agen | Tab **Tim** → **＋ Agen baru**, isi nama, peran, instruksi, tampilan, suara → **Simpan**. Karakternya langsung muncul di kantor |
 | Ubah agen | Tab **Tim** → **Ubah** di agen itu → ubah persona, tampilan, atau suara → **Simpan** |
+| Ganti model AI agen | **Ubah** → dropdown **Model AI** → pilih → **Simpan**. Berlaku langsung tanpa restart |
 | Hapus agen | **Ubah** → **Hapus agen** → konfirmasi. Riwayat chat agen itu ikut terhapus |
 | Update soul (semua agen) | Tab **Soul** → edit → **Simpan SOUL.md** |
 | Lihat tools yang tersedia | Tab **🧰 Tools** (pengaturannya di dashboard Hermes) |
@@ -235,6 +271,30 @@ Semua pengelolaan agen dilakukan dari kantor, tanpa edit file dan tanpa restart.
 | Coba suara | Di form agen → **🔊 Tes suara** (pakai pengaturan yang belum disimpan) |
 
 Hermes (orkestrator) tidak bisa dihapus; personanya diatur lewat SOUL.md, tapi tampilan dan suaranya bisa diubah. Data tersimpan di `config/team.json` dan `config/people.json`, jadi tetap ada setelah restart.
+
+### Model AI per agen
+
+Tiap agen bisa memakai model AI sendiri, supaya biaya token bisa diatur: model kuat untuk pekerjaan berat, model murah atau gratis untuk yang ringan. Di form agen, dropdown **Model AI** berisi:
+
+- **Ikut model default Hermes** (pilihan awal; nama modelnya tampil di dalam kurung).
+- Daftar model asli dari Hermes, dikelompokkan **gratis** dan **berbayar** per provider.
+- **✎ Ketik model lain…** untuk memasukkan id model secara manual.
+
+Pilihan disimpan di `config/team.json` (kunci `model`) dan berlaku saat pesan berikutnya. Syaratnya `direct_model_requests` aktif (langkah 4 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai)). Model Hermes sendiri mengikuti `model.default` di config Hermes dan tidak diatur dari panel.
+
+Model berbayar hanya bisa dipakai kalau akunnya punya saldo; lihat [Memakai model berbayar](#memakai-model-berbayar). Contoh pembagian untuk menghemat token: Sonnet untuk Kenji, Haruto, dan Akane; Haiku atau model gratis untuk Yui dan Sakura.
+
+## Pemakaian token (📊 Pemakaian)
+
+Tombol **📊 Pemakaian** di header membuka panel jumlah token per agen dan per model AI, dengan tab **Harian** (7 hari), **Mingguan** (8 minggu, mulai Senin), dan **Bulanan** (6 bulan).
+
+- Ringkasan di atas: total token, token masuk (prompt), token keluar (jawaban), dan jumlah balasan.
+- Tiap agen punya kartu: total, rincian masuk/keluar/balasan, grafik batang per periode (arahkan kursor untuk rincian), dan daftar model yang dipakai. Agen yang belum aktif tampil redup.
+- Angkanya berasal dari `usage` yang dikirim Hermes di setiap balasan (chat, delegasi, dan rapat). Token "masuk" termasuk prompt sistem dan riwayat chat yang dikirim ulang, jadi jauh lebih besar daripada token "keluar".
+- Hermes tercatat dengan nama model aslinya (bukan alias `hermes-agent`).
+- Data disimpan di `office-usage.json` (volume `office-data`), jadi tetap ada setelah restart dan rebuild. Pemakaian sebelum fitur ini ada tidak tercatat.
+- Zona waktu pengelompokan hari adalah `Asia/Jakarta`; ubah dengan variabel lingkungan `OFFICE_TZ` di service `office`.
+- Panel hanya menampilkan token, bukan biaya. Lihat saldo dan tagihan di portal Nous atau console Anthropic.
 
 ## Skill
 
@@ -363,6 +423,9 @@ Peta lengkap untuk developer ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 | Agen baru tidak muncul | Halaman belum menerima pembaruan | Refresh browser; kalau team.json diedit manual, `docker compose restart office` |
 | Simpan SOUL.md gagal | Login dashboard salah atau container hermes mati | Cek `DASH_USER`/`DASH_PASS` di `.env`, lalu `docker compose up -d` |
 | Tampilan lama setelah edit | Image belum di-build ulang, atau cache browser | `docker compose up -d --build office`, lalu Ctrl+F5 |
+| Model yang dipilih di panel ⚙ Agen tidak dipakai (semua agen memakai model default) | `direct_model_requests` belum aktif di Hermes (config ada di volume, tidak ikut GitHub) | Jalankan langkah 4 di [Memilih provider dan model AI](#memilih-provider-dan-model-ai), lalu `docker compose restart hermes` |
+| Sudah isi kredit tapi masih "Billing or credits exhausted" | Kredensial Nous masih tercatat *exhausted* | `docker exec hermes hermes auth reset nous`, lalu cek saldo di portal |
+| Agen mengulang pesan error lama padahal modelnya sudah diganti | Balasan error tersimpan di riwayat chat dan ikut dibaca model | Kosongkan riwayatnya: hentikan `office`, isi `clawd3d-history.json` di volume `office-data` dengan `{}`, lalu nyalakan lagi |
 | Musik tidak bunyi | Browser butuh interaksi pertama, atau file MP3 belum disalin | Klik di mana saja di kantor; kalau jukebox bilang file belum ada, salin MP3 ke `office/public/audio/` lalu `docker compose up -d --build office` |
 | Agen tidak bersuara / berlogat asing | Tidak ada suara Indonesia di browser | Buka di Microsoft Edge, atau pasang paket suara Indonesia |
 | Agen diam lama tanpa membalas | Hermes menunggu persetujuan perintah | Jawab di panel PERSETUJUAN (kanan bawah) |

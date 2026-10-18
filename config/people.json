@@ -41,11 +41,13 @@
     "skin": "#a9714b",
     "top": "#495057",
     "shirt": "#dee2e6",
+    "tie": "#c92a2a",
     "pants": "#1c3d5a",
     "shoes": "#212529",
     "voice": {
       "lang": "id-ID",
       "gender": "male",
+      "prefer": [],
       "pitch": 0.85,
       "rate": 0.95
     }

@@ -112,6 +112,7 @@ const cleanPersona = (body, { requireName }) => ({
   role: text(body.role, 60, "peran"),
   instructions: text(body.instructions, 4000, "instruksi"),
   boundaries: text(body.boundaries, 1000, "batasan"),
+  model: text(body.model, 120, "model"),
 });
 
 // ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
       if (!m || typeof m.id !== "string" || m.id === team.ORCHESTRATOR_ID) continue;
       list.push({
         id: m.id, name: m.name ?? m.id, role: m.role ?? "", instructions: m.instructions ?? "",
-        boundaries: m.boundaries ?? "", builtin: false, look: people[m.id] ?? {},
+        boundaries: m.boundaries ?? "", model: m.model ?? "", builtin: false, look: people[m.id] ?? {},
       });
     }
     return list;
@@ -194,8 +195,29 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
     writeJson(PEOPLE_FILE, people);
   };
 
+  // Models Hermes can use, straight from its dashboard (grouped by provider). A model of
+  // a non-default provider is written "provider::model", which Hermes understands per request.
+  let modelsCache = { at: 0, data: null };
+  const modelCatalog = async () => {
+    if (modelsCache.data && Date.now() - modelsCache.at < 300_000) return modelsCache.data;
+    try {
+      const raw = await dashFetch("/api/model/options");
+      const groups = (raw.providers || [])
+        .filter((p) => p.authenticated !== false && Array.isArray(p.models) && p.models.length)
+        .map((p) => ({
+          provider: p.slug, name: p.name || p.slug, current: Boolean(p.is_current),
+          models: p.models.map((id) => ({ id, value: p.is_current ? id : `${p.slug}::${id}`, free: /:free$/.test(id) })),
+        }));
+      modelsCache = { at: Date.now(), data: { default: raw.model || "", groups } };
+      return modelsCache.data;
+    } catch (err) {
+      return { default: "", groups: [], error: err.message };
+    }
+  };
+
   return async (req, res, urlPath) => {
     try {
+      if (urlPath === "/api/models" && req.method === "GET") return send(res, 200, await modelCatalog());
       if (urlPath === "/api/soul") {
         if (req.method === "GET") {
           const data = await dashFetch("/api/profiles/default/soul");
@@ -230,6 +252,7 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
           const look = cleanLook(body.look);
           const member = { id, ...persona };
           if (!member.boundaries) delete member.boundaries;
+          if (!member.model) delete member.model;
           members.push(member);
           writeJson(TEAM_FILE, members);
           saveLook(id, look);
@@ -254,6 +277,7 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
             const persona = cleanPersona(body, { requireName: true });
             const member = { ...members[index], ...persona };
             if (!member.boundaries) delete member.boundaries;
+          if (!member.model) delete member.model;
             members[index] = member;
             writeJson(TEAM_FILE, members);
             saveLook(id, look);

@@ -2,6 +2,7 @@
 // Office server (one Node process inside the `office` container).
 //
 //   browser ──HTTP──▶ /api/projects  projects.js     (📁 project picker)
+//                     /api/usage    usage.js        (📊 token usage per agent and model)
 //                     /api/*        agents-api.js   (agent panel, SOUL.md)
 //                     /people.json  config/people.json (looks + voices)
 //                     everything else  static-files.js (UI, three.js, MP3)
@@ -31,8 +32,15 @@ const servePeople = (res) => {
   });
 };
 
+const serveUsage = (req, res) => {
+  const range = new URL(req.url, "http://x").searchParams.get("range") || "daily";
+  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(adapter.usage.report(range)));
+};
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
+  if (urlPath === "/api/usage" && req.method === "GET") return serveUsage(req, res);
   if (urlPath.startsWith("/api/projects")) return handleProjectsApi(req, res, urlPath);
   if (urlPath.startsWith("/api/")) return handleAgentsApi(req, res, urlPath);
   if (urlPath === "/people.json") return servePeople(res);

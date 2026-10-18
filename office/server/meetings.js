@@ -14,7 +14,7 @@ const MAX_PARTICIPANTS = 5;
 const MAX_ROUNDS = 3;
 const TURN_IDLE_MS = 90_000; // a speaker whose model goes silent this long is skipped
 
-const createMeetings = ({ agentRegistry, orchestratorId, model, streamOneTurn, systemPromptFor, broadcast, onMinutes, forwarder, sanitize }) => {
+const createMeetings = ({ agentRegistry, orchestratorId, model, streamOneTurn, recordUsage, systemPromptFor, broadcast, onMinutes, forwarder, sanitize }) => {
   let current = null; // { id, topic, participants, rounds, transcript, state, stopped, minutes }
 
   const nameOf = (id) => agentRegistry.get(id)?.name ?? id;
@@ -57,6 +57,7 @@ Jangan menjalankan tools, perintah terminal, atau mengubah file selama rapat; in
       TURN_IDLE_MS,
     );
     m.speaking = null;
+    if (recordUsage) recordUsage(agentId, result);
     const text = plain(result.textContent);
     if (m.stopped) return null;
     m.transcript.push({ agentId, text, at: Date.now() });

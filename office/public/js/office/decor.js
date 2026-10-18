@@ -118,7 +118,7 @@ export const addDecor = (scene, top, animated) => {
   // --- neon sign (back wall) ---
   const neonTex = canvasTexture(128, 20, (ctx) => {
     ctx.fillStyle = "#1a2138"; ctx.fillRect(0, 0, 128, 20);
-    ctx.font = "bold 11px monospace"; ctx.textBaseline = "middle";
+    ctx.font = "bold 11px Poppins, sans-serif"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#ff8cc6"; ctx.fillText("AGENTIC DIGITAL", 4, 10);
     ctx.fillStyle = "#74c0fc"; ctx.fillText("OFFICE", 92, 10);
   });
