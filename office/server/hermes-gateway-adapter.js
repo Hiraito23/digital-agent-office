@@ -1547,13 +1547,24 @@ function broadcastRoster() {
 // sub-agents that Hermes delegates to.
 let activeProject = null; // { name, path }
 
+// Where finished files must end up. Hermes' own folders (/opt/data, cache/scratch, /tmp) live
+// inside the container and are invisible to the user, so every result goes to /workspace
+// (the user's PROJECTS_DIR). Without an active project that is a shared fallback folder.
+const FALLBACK_DIR = "/workspace/hasil-agen";
+const filesRule = (dir) => `
+- Simpan SEMUA file hasil kerja (kode, dokumen, gambar, SVG, desain, laporan) langsung di ${dir}, bukan di /opt/data, /tmp, atau cache/scratch: folder itu tidak terlihat oleh pengguna. Kalau berkas yang mau diubah ada di luar folder ini (mis. dari percakapan sebelumnya), salin dulu ke sini, lanjutkan di sini, dan sebutkan path lengkapnya (di bawah /workspace) di jawaban.`;
+
 const projectContext = () => {
-  if (!activeProject) return "";
+  if (!activeProject) {
+    return `
+
+Tidak ada proyek aktif. Folder hasil kerja bersama: ${FALLBACK_DIR} (folder milik pengguna; buat kalau belum ada, mis. \`mkdir -p ${FALLBACK_DIR}\`).${filesRule(FALLBACK_DIR)}`;
+  }
   const { name, path: dir } = activeProject;
   return `
 
 Proyek aktif: "${name}" di folder ${dir} (folder milik pengguna yang di-mount ke container).
-- Kerjakan semua file dan perintah terminal di folder ini: pakai path absolut atau jalankan \`cd ${dir}\` lebih dulu.
+- Kerjakan semua file dan perintah terminal di folder ini: pakai path absolut atau jalankan \`cd ${dir}\` lebih dulu.${filesRule(dir)}
 - Baca struktur folder dan README proyek sebelum mengubah apa pun, lalu ikuti konvensi yang sudah ada.
 - Aturan git (wajib): sebelum mengubah file, jalankan \`git status\` dan \`git branch --show-current\`.
   Kalau branch aktif belum diawali "agent/", buat satu branch kerja bersama untuk tugas ini:
