@@ -19,7 +19,7 @@ Status per hari ini: semua komponen jalan dan agen sudah bisa menjawab serta mem
 
 | Mau | Caranya |
 | --- | --- |
-| Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Haruto kerjakan frontend, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
+| Mengerjakan project kode | Pilih repo di dropdown **📁 Proyek** → klik **Hermes** → beri tugas besar ("Yui susun kebutuhan, Naruto kerjakan frontend, Luffy API-nya, Takumi buat test") → pantau Aktivitas dan panel PERSETUJUAN → cek hasil dengan `git status` / `git diff` di branch `agent/...` |
 | Diskusi tanpa mengubah file | Pilih **📁 Pilih proyek…** (kosong) → klik **Hermes** → "Ajak Yui, Sakura, dan Akane diskusi ide X, lalu rangkum dan beri rekomendasi" |
 | Ngobrol dengan satu agen | Klik karakternya (atau namanya di header) lalu ketik pesan |
 
@@ -86,32 +86,32 @@ Kedua container memakai `restart: unless-stopped`, jadi ikut menyala sendiri set
 
 ## Cara kerja agen
 
-Setiap pesan dari kantor diteruskan ke mesin Hermes, yang meminta jawaban dari model AI memakai API key Anda. Jawabannya mengalir balik sedikit demi sedikit, dan itulah yang menggerakkan karakter.
+Setiap pesan dari kantor diteruskan ke mesin Hermes, yang meminta jawaban dari model AI di provider pilihan Anda dan menjalankan tools bila perlu. Jawabannya mengalir balik sedikit demi sedikit, dan itulah yang menggerakkan karakter.
 
 ```mermaid
 flowchart LR
   B["Kantor 3D<br/>localhost:3000<br/>chat, label, animasi"]
   subgraph O["Container office"]
-    S["server.js<br/>web + proxy /ws"]
-    A["Adapter<br/>Hermes = orkestrator<br/>Sari, Budi, Dewi, Rina"]
+    S["Server kantor<br/>web + proxy /ws"]
+    A["Adapter<br/>Hermes = orkestrator<br/>+ tim dev (team.json)"]
   end
   subgraph H["Container hermes"]
     G["Hermes Agent<br/>API :8642<br/>SOUL.md + memori<br/>skill + tools"]
   end
-  M["Model AI<br/>OpenRouter, Anthropic, dll.<br/>(API key Anda)"]
+  M["Model AI<br/>Nous Portal, OpenRouter, dll."]
   B -- "1" --> S -- "2" --> A -- "3" --> G -- "4" --> M
-  M -. "5 jawaban mengalir balik: sedang bekerja, lalu selesai" .-> B
+  M -. "5 jawaban + event tool mengalir balik" .-> B
 ```
 
-1. **Anda mengetik di kantor** (klik karakter, kirim pesan). Browser mengirimnya lewat WebSocket ke `server.js`.
-2. **Adapter menentukan siapa yang menjawab.** Pesan ke Hermes diproses dengan kemampuan orkestrator; pesan ke Sari/Budi/Dewi/Rina memakai persona mereka dari `team.json`.
-3. **Adapter memanggil Hermes Agent** (`/v1/chat/completions` di port 8642). Hermes menambahkan identitas `SOUL.md`, memori, dan skill/tools yang relevan.
-4. **Hermes meminta model AI** di provider yang Anda pilih saat `hermes setup`. Di sinilah biaya token terjadi.
-5. **Jawaban mengalir balik** sebagai event `delta` (sedang menulis) lalu `final` (selesai). Kantor memakai event ini untuk: karakter berjalan ke meja dan duduk mengetik, menampilkan gelembung kata, membacakan balasan dengan suara agen, mencatat di Aktivitas Terbaru, lalu kembali bersantai setelah selesai.
+1. **Anda mengetik di kantor** (klik karakter, kirim pesan). Browser mengirimnya lewat WebSocket ke server kantor.
+2. **Adapter menentukan siapa yang menjawab.** Pesan ke Hermes diproses dengan kemampuan orkestrator; pesan ke anggota tim (Naruto, Luffy, Sakura, Yui, Takumi, Akane, Daichi) memakai persona mereka dari `team.json`, ditambah folder proyek aktif dan aturan git.
+3. **Adapter memanggil Hermes Agent** (`/v1/chat/completions` di port 8642). Hermes menambahkan identitas `SOUL.md`, memori, dan skill, lalu menjalankan tools (terminal, file, web, ...) di container `hermes`.
+4. **Hermes meminta model AI** di provider yang Anda pilih lewat `hermes model`. Di sinilah biaya token terjadi (gratis untuk model `:free`).
+5. **Jawaban mengalir balik** sebagai event `delta` (sedang menulis) lalu `final` (selesai), ditambah event tool dan permintaan persetujuan. Kantor memakai event ini untuk: karakter berjalan ke meja dan duduk mengetik, menampilkan gelembung kata dan ikon tool, membacakan balasan dengan suara agen, mencatat di Aktivitas Terbaru, lalu kembali bersantai setelah selesai.
 
 ### Hermes sebagai orkestrator
 
-Hermes punya enam alat tim yang tidak dimiliki agen lain: `spawn_agent` (merekrut agen baru), `delegate_task` (memberi tugas ke anggota tim), `list_team`, `configure_agent`, `dismiss_agent`, dan `read_agent_context` (membaca pekerjaan anggota lain). Jadi cukup beri Hermes tujuan besar, misalnya "buat rencana peluncuran produk kopi". Hermes membaginya ke Sari (rencana), Budi (riset), dan Rina (copy), lalu merangkum hasilnya. Setiap delegasi terlihat di kantor sebagai karakter yang mulai bekerja.
+Hermes punya enam alat tim yang tidak dimiliki agen lain: `spawn_agent` (merekrut agen baru), `delegate_task` (memberi tugas ke anggota tim), `list_team`, `configure_agent`, `dismiss_agent`, dan `read_agent_context` (membaca pekerjaan anggota lain). Jadi cukup beri Hermes tujuan besar, misalnya "buat fitur login". Hermes membaginya ke Yui (kebutuhan), Sakura (desain), Naruto (frontend), Luffy (backend), dan Takumi (test), lalu merangkum hasilnya. Setiap delegasi terlihat di kantor sebagai karakter yang mulai bekerja.
 
 Agen yang direkrut Hermes saat chat hanya hidup sampai container `office` restart. Agen tetap dibuat lewat panel **⚙ Agen** (tersimpan di `config/team.json`).
 
@@ -143,8 +143,8 @@ Contoh isi singkat: "Kamu bagian dari tim Agentic Digital Office. Selalu jawab d
 
 Isi kolom **Instruksi / kepribadian** dan **Batasan** di panel ⚙ Agen. Resep persona yang efektif:
 
-- **Siapa dan untuk apa:** "Kamu adalah Budi, peneliti pasar untuk UMKM makanan di Indonesia."
-- **Cara kerja:** langkah yang selalu dia ikuti, misalnya "selalu sertakan sumber dan tanggal data".
+- **Siapa dan untuk apa:** "Kamu adalah Takumi, QA Engineer yang menguji aplikasi web React + NestJS."
+- **Cara kerja:** langkah yang selalu dia ikuti, misalnya "selalu tulis langkah reproduksi dan hasil yang diharapkan".
 - **Gaya bicara:** satu sampai dua ciri khas, misalnya "suka memakai perumpamaan" atau "to the point, pakai poin-poin".
 - **Batasan:** apa yang tidak boleh dilakukan, misalnya "jangan menghapus file tanpa konfirmasi".
 - **Format hasil:** misalnya "akhiri dengan ringkasan tiga poin".
@@ -253,10 +253,13 @@ Cari dengan `hermes skills search <kata kunci>` lalu pilih yang paling cocok.
 | Agen | Peran | Kata kunci pencarian | Skill buatan sendiri yang berguna |
 | --- | --- | --- | --- |
 | Hermes | Orkestrator | planning, project management | Cara membagi tugas ke tim dan format laporan akhir |
-| Sari | Project Manager | planning, meeting notes, todo | Template rencana mingguan dan notulen |
-| Budi | Researcher | research, web search, summarize | Prosedur riset dengan sumber + tanggal |
-| Dewi | Software Engineer | github, code review, testing | Standar kode dan checklist review tim |
-| Rina | Copywriter & Designer | writing, marketing, social media | Panduan gaya brand dan contoh caption |
+| Naruto | Frontend Developer | react, nextjs, tailwind | Struktur folder dan pola komponen proyek |
+| Luffy | Backend Developer | nestjs, express, api | Standar endpoint, DTO, dan validasi |
+| Sakura | UI/UX Designer | figma, design system, ux | Checklist aksesibilitas dan design token |
+| Yui | Product Manager | planning, prd, user story | Template PRD dan user story |
+| Takumi | QA Engineer | testing, playwright, jest | Checklist regresi dan format laporan bug |
+| Akane | Cyber Security Engineer | security, owasp, audit | Checklist review keamanan |
+| Daichi | Infra & Database Engineer | docker, mysql, ci | Prosedur migrasi database dan deploy |
 
 **Catatan skill per agen:** semua agen di kantor berbagi satu mesin Hermes. Kalau suatu saat butuh skill, memori, atau model yang benar-benar terpisah per agen, langkahnya adalah membuat profil Hermes per agen (`hermes profile create`), masing-masing dengan port API sendiri, lalu mengarahkan agen itu ke profilnya. Ini perubahan lanjutan pada adapter.
 
@@ -276,13 +279,16 @@ Setiap agen membacakan balasannya dengan suaranya sendiri, memakai suara bawaan 
 
 Atur di panel ⚙ Agen → Ubah → bagian **Suara** (jenis, nada, kecepatan, suara pilihan, plus tombol Tes suara). Tersimpan di `config/people.json` → `voice`.
 
-| Agen | Jenis | Suara yang dicari | Nada (`pitch`) | Kecepatan (`rate`) |
-| --- | --- | --- | --- | --- |
-| Hermes | Pria | Ardi | 1.0 | 1.0 |
-| Sari | Wanita | Gadis | 1.0 | 0.95 |
-| Budi | Pria | Andika, Ardi | 0.8 | 0.9 |
-| Dewi | Wanita | Gadis, Damayanti | 1.1 | 1.15 |
-| Rina | Wanita | Damayanti, Gadis | 1.3 | 1.05 |
+| Agen | Jenis | Nada (`pitch`) | Kecepatan (`rate`) |
+| --- | --- | --- | --- |
+| Hermes | Wanita | 1.0 | 1.0 |
+| Naruto | Pria | 1.05 | 1.1 |
+| Luffy | Pria | 0.85 | 0.95 |
+| Sakura | Wanita | 1.2 | 1.0 |
+| Yui | Wanita | 1.0 | 0.95 |
+| Takumi | Pria | 1.0 | 1.0 |
+| Akane | Wanita | 0.9 | 1.05 |
+| Daichi | Pria | 0.8 | 0.9 |
 
 **Suara pilihan** berupa daftar suara yang benar-benar ada di browser Anda (suara Indonesia di atas). Pilih **Otomatis** agar kantor memilih suara Indonesia terbaik sesuai jenis. Di file, kolomnya: `lang` = bahasa (`id-ID`), `gender` = `male` atau `female`, `prefer` = nama suara yang dipilih, `pitch` dan `rate` = 0.5 sampai 2 (1 = normal). Kalau hanya ada satu suara Indonesia, agen tetap terdengar berbeda lewat nada dan kecepatan.
 
@@ -302,7 +308,7 @@ Jukebox memutar playlist dari file lokal di `office/public/audio/`, tanpa intern
 1. `asuka-city.mp3`: Title / Asuka City, Digimon World 3 OST
 2. `littleroot-town.mp3`: Littleroot Town, Pokémon Omega Ruby & Alpha Sapphire
 
-Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu sudah berjalan lebih dari 3 detik), ▶/❚❚ putar/jeda, ⏭ lagu berikutnya, mode ulang (🔁 ulangi semua, 🔂 ulangi lagu ini, ➡ tanpa ulang, berhenti setelah lagu terakhir), bilah progres dengan waktu berjalan dan sisa waktu (klik untuk melompat), serta volume. Pilihan lagu, mode ulang, dan volume diingat browser. Menambah lagu: salin MP3 ke `office/public/audio/`, lalu tambahkan satu baris di daftar `PLAYLIST` di `office/public/js/jukebox.js`.
+Kontrol di panel jukebox: ⏮ lagu sebelumnya (atau ulang dari awal kalau lagu sudah berjalan lebih dari 3 detik), ▶/❚❚ putar/jeda, ⏭ lagu berikutnya, mode ulang (🔁 ulangi semua, 🔂 ulangi lagu ini, ➡ tanpa ulang, berhenti setelah lagu terakhir), bilah progres dengan waktu berjalan dan sisa waktu (klik untuk melompat), serta volume. Pilihan lagu, mode ulang, dan volume diingat browser. Menambah lagu: salin MP3 ke `office/public/audio/`, lalu tambahkan satu baris di daftar `PLAYLIST` di `office/public/js/ui/jukebox.js`.
 
 - Musik menyala otomatis: langsung saat halaman dibuka kalau browser mengizinkan, atau pada klik/tombol/scroll pertama kalau diblokir. Untuk benar-benar tanpa klik, izinkan **Sound** (Edge: **Media autoplay**) untuk `localhost:3000` di Site settings browser.
 - **♪ Musik** membuka panel kecil berisi Putar/Jeda dan volume. Musik hanya mati kalau Anda menekan Jeda, dan pilihan itu diingat.
