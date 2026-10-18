@@ -283,6 +283,7 @@ export class World {
   standUp(a, now) {
     a.nextWander = now + 2500;
     const exit = a.seat.room ? doorOf(a.seat.room) : null;
+    if (!exit && !a.isMain && Math.random() < 0.7 && this.callHighFive(a, now)) return;
     if (exit) {
       a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
       a.mode = "wander";
@@ -302,7 +303,7 @@ export class World {
         const dx = target.x - a.x;
         const dz = target.z - a.z;
         const dist = Math.hypot(dx, dz);
-        const step = (dt / 1000) * (a.mode === "toSeat" ? 3.4 : 1.9); // an agent with work to do hurries to the computer
+        const step = (dt / 1000) * (a.mode === "toSeat" ? 3.4 : a.mode === "toHi5" ? 2.8 : 1.9); // an agent with work to do hurries to the computer
         if (dist <= step) {
           a.x = target.x;
           a.z = target.z;
@@ -311,6 +312,7 @@ export class World {
           if (!a.route.length && a.mode === "toMeeting") { a.mode = "meeting"; a.room = MEETING.room; }
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
           if (!a.route.length && a.mode === "toChat") a.mode = "chat";
+          if (!a.route.length && a.mode === "toHi5") this.highFive(a, now);
           if (!a.route.length && a.mode === "toSpot") {
             a.room = a.spot.room ?? null;
             a.mode = "activity";
@@ -339,8 +341,9 @@ export class World {
       } else if (a.mode === "idle" && now > a.nextWander) {
         const spots = this.freeSpots();
         const wantsActivity = spots.length && Math.random() < (a.isMain ? 0.3 : 0.6);
-        if (wantsActivity) {
-          a.spot = spots[Math.floor(Math.random() * spots.length)];
+        const spot = wantsActivity ? this.pickSpot(a, spots, now) : null;
+        if (spot) {
+          a.spot = spot;
           a.route = planRoute(a, a.spot, null, a.spot.room);
           a.mode = "toSpot";
         } else if (a.isMain) {
@@ -380,6 +383,62 @@ export class World {
     }
     this.updateGreetings(now);
     this.updateChatter(now);
+  }
+
+  // Picks a free activity spot. Ping-pong needs two players: another idle agent is invited to the
+  // other side of the table, and without a partner a different spot is chosen.
+  pickSpot(a, spots, now) {
+    const spot = spots[Math.floor(Math.random() * spots.length)];
+    if (spot.pose !== "pingpong") return spot;
+    const prefix = spot.id.split("/")[0];
+    const other = spots.find((s) => s !== spot && s.id.split("/")[0] === prefix);
+    const mate = [...this.agents.values()]
+      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture)
+      .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z))[0];
+    if (!other || !mate) {
+      const rest = spots.filter((s) => s.pose !== "pingpong");
+      return rest.length ? rest[Math.floor(Math.random() * rest.length)] : null;
+    }
+    mate.spot = other;
+    mate.route = planRoute(mate, other, null, other.room);
+    mate.mode = "toSpot";
+    this.onSay?.(a.id, "Main pingpong yuk! 🏓", 2600);
+    setTimeout(() => this.onSay?.(mate.id, "Ayo, siapa takut! 😄", 2600), 1100);
+    return spot;
+  }
+
+  // A task is done: a free colleague walks over for a high five.
+  callHighFive(a, now) {
+    const mate = [...this.agents.values()]
+      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture && Math.hypot(x.x - a.x, x.z - a.z) < 14)
+      .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z))[0];
+    if (!mate) return false;
+    const side = a.seat.heading === 0 ? -1 : 1; // the free side of the desk
+    const stand = { x: a.seat.x, z: a.seat.z + side * 0.6 };
+    mate.route = planRoute(mate, { x: stand.x + 0.9, z: stand.z });
+    mate.mode = "toHi5";
+    mate.hi5With = a;
+    a.route = [stand];
+    a.mode = "idle";
+    a.nextWander = now + 14000; // waits here for the colleague
+    return true;
+  }
+
+  highFive(m, now) {
+    const a = m.hi5With;
+    m.hi5With = null;
+    m.mode = "idle";
+    m.nextWander = now + 3000;
+    if (!a || a.mode === "toSeat" || a.mode === "sitting" || Math.hypot(a.x - m.x, a.z - m.z) > 3) return;
+    for (const [x, y] of [[m, a], [a, m]]) {
+      x.gesture = "hi5";
+      x.gestureUntil = now + 1800;
+      x.pauseUntil = now + 1800;
+      x.greetWith = y;
+    }
+    this.onSay?.(m.id, `Kerja bagus, ${a.name}! 🙌`, 2800);
+    setTimeout(() => this.onSay?.(a.id, "Tos! 🙌 Makasih ya!", 2600), 900);
+    a.nextWander = now + 4000;
   }
 
   // Two agents who pass close to each other wave and say hi (bubbles only, no voice).

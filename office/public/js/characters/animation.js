@@ -108,6 +108,11 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false, gestu
   if (gesture === "wave") {
     arms[1].rotation.set(0, 0, 2.55 + Math.sin(k * 11) * 0.3);
     head.rotation.z = 0.08;
+  } else if (gesture === "hi5") {
+    // high five: right hand up in front, a quick slap
+    arms[1].rotation.set(-2.5 + Math.max(0, Math.sin(k * 9)) * 0.25, 0, -0.15);
+    head.rotation.x = -0.12;
+    body.position.y += Math.abs(Math.sin(k * 7)) * 0.03;
   } else if (gesture === "stretch") {
     arms[0].rotation.set(-2.8, 0, 0.15);
     arms[1].rotation.set(-2.8, 0, -0.15);
