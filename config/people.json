@@ -137,5 +137,62 @@
       "pitch": 0.8,
       "rate": 0.9
     }
+  },
+  "mio-uiux": {
+    "hair": "bob",
+    "outfit": "hoodie",
+    "hairColor": "#7048e8",
+    "skin": "#f1c7a3",
+    "top": "#12b886",
+    "shirt": "#e6fcf5",
+    "tie": "#0ca678",
+    "pants": "#364fc7",
+    "shoes": "#f8f9fa",
+    "accessory": "glasses",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "female",
+      "prefer": [],
+      "pitch": 1.1,
+      "rate": 1
+    }
+  },
+  "ren-frontend": {
+    "hair": "spiky",
+    "outfit": "hoodie",
+    "hairColor": "#1e1e24",
+    "skin": "#e8b48a",
+    "top": "#1c7ed6",
+    "shirt": "#e7f5ff",
+    "tie": "#1864ab",
+    "pants": "#343a40",
+    "shoes": "#212529",
+    "accessory": "headset",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "prefer": [],
+      "pitch": 0.95,
+      "rate": 1.05
+    }
+  },
+  "dario-backend": {
+    "hair": "short",
+    "outfit": "shirt",
+    "hairColor": "#3b2416",
+    "skin": "#c68b5e",
+    "top": "#495057",
+    "shirt": "#f1f3f5",
+    "tie": "#2b2f3a",
+    "pants": "#212529",
+    "shoes": "#111111",
+    "accessory": "glasses",
+    "voice": {
+      "lang": "id-ID",
+      "gender": "male",
+      "prefer": [],
+      "pitch": 0.85,
+      "rate": 0.95
+    }
   }
 }
