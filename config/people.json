@@ -83,6 +83,7 @@
     "voice": {
       "lang": "id-ID",
       "gender": "female",
+      "prefer": [],
       "pitch": 1,
       "rate": 0.95
     }

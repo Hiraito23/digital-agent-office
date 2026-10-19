@@ -8,8 +8,9 @@
 
 // Add your own MP3s to office/public/audio and list them here.
 const PLAYLIST = [
-  { src: "/audio/asuka-city.mp3", title: "Title / Asuka City — Digimon World 3 OST" },
-  { src: "/audio/littleroot-town.mp3", title: "Littleroot Town — Pokémon Omega Ruby & Alpha Sapphire" },
+  { src: "/audio/title - asuka city.mp3", title: "Title - Asuka City" },
+  { src: "/audio/title - harvest moon.mp3", title: "Main Theme Harvest Moon" },
+  { src: "/audio/littleroot - pokemon.mp3", title: "Littleroot - Pokemon" },
 ];
 
 const REPEAT_MODES = [
@@ -22,10 +23,18 @@ const STORE_KEY = "kantor-hermes-jukebox";
 const DUCK_LEVEL = 0.25; // music volume while an agent is speaking
 
 const loadState = () => {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+  } catch {
+    return {};
+  }
 };
 const saveState = (state) => {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable */
+  }
 };
 
 // 75.4 → "1:15"
@@ -89,9 +98,13 @@ export const initJukebox = () => {
   const renderTime = () => {
     const duration = audio.duration;
     const known = Number.isFinite(duration) && duration > 0;
-    el.bar.style.width = known ? `${(audio.currentTime / duration) * 100}%` : "0%";
+    el.bar.style.width = known
+      ? `${(audio.currentTime / duration) * 100}%`
+      : "0%";
     el.elapsed.textContent = formatTime(audio.currentTime);
-    el.remaining.textContent = known ? `-${formatTime(duration - audio.currentTime)}` : "-0:00";
+    el.remaining.textContent = known
+      ? `-${formatTime(duration - audio.currentTime)}`
+      : "-0:00";
   };
 
   // ---- playback ---------------------------------------------------------------
@@ -106,10 +119,15 @@ export const initJukebox = () => {
   };
 
   const play = () => {
-    audio.play().then(() => {
-      state.wantPlay = true;
-      saveState(state);
-    }).catch(() => { /* needs a user gesture first */ });
+    audio
+      .play()
+      .then(() => {
+        state.wantPlay = true;
+        saveState(state);
+      })
+      .catch(() => {
+        /* needs a user gesture first */
+      });
   };
 
   const pause = () => {
@@ -160,7 +178,10 @@ export const initJukebox = () => {
   const seek = (event) => {
     if (!Number.isFinite(audio.duration)) return;
     const rect = el.progress.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const ratio = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / rect.width),
+    );
     audio.currentTime = ratio * audio.duration;
   };
 
@@ -177,7 +198,9 @@ export const initJukebox = () => {
   });
 
   // ♪ Musik shows/hides the panel; the music keeps playing either way.
-  el.toggle.addEventListener("click", () => el.panel.classList.toggle("hidden"));
+  el.toggle.addEventListener("click", () =>
+    el.panel.classList.toggle("hidden"),
+  );
   el.close.addEventListener("click", () => el.panel.classList.add("hidden"));
   el.play.addEventListener("click", () => (audio.paused ? play() : pause()));
   el.prev.addEventListener("click", previous);
@@ -203,12 +226,17 @@ export const initJukebox = () => {
       if (event?.target?.closest?.("#jukebox button, #jb-progress")) return;
       if (audio.paused) play();
     };
-    audio.play().then(() => {
-      state.wantPlay = true;
-      saveState(state);
-    }).catch(() => {
-      events.forEach((e) => window.addEventListener(e, resume, { capture: true, passive: true }));
-    });
+    audio
+      .play()
+      .then(() => {
+        state.wantPlay = true;
+        saveState(state);
+      })
+      .catch(() => {
+        events.forEach((e) =>
+          window.addEventListener(e, resume, { capture: true, passive: true }),
+        );
+      });
   }
 
   // Lower the music while an agent speaks (called from main.js).

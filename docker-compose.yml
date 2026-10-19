@@ -7,7 +7,7 @@ services:
   hermes:
     image: nousresearch/hermes-agent:latest
     container_name: hermes
-    restart: unless-stopped
+    restart: no
     command: gateway run
     ports:
       - "127.0.0.1:8642:8642"   # API server
