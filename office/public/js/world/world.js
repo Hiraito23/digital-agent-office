@@ -4,11 +4,12 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, LEVELS, LIFT, MEETING, PORTAL, ROOMS, WANDER, levelTop, wanderOn } from "../office/layout.js";
+import { ACTIVITY_SPOTS, CENTER, LEVELS, LIFT, MEETING, PORTAL, ROOMS, WANDER, levelTop, roomAt, wanderOn } from "../office/layout.js";
 import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
 import { doorOf, planRoute } from "./routing.js";
+import { prepareFade, setFade } from "../office/helpers.js";
 import { Environment } from "./environment.js";
 import { makeConversation } from "./chatter.js";
 
@@ -82,10 +83,10 @@ export class World {
     this.scene.fog = new THREE.Fog("#a8dcff", 70, 140);
 
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 260);
-    this.camera.position.set(CENTER.x + 25, 26, CENTER.z + 27);
+    this.camera.position.set(CENTER.x + 22, 22, CENTER.z + 25);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(CENTER.x, 3.2, CENTER.z);
+    this.controls.target.set(CENTER.x, 0.6, CENTER.z + 1);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.minDistance = 6;
@@ -120,7 +121,8 @@ export class World {
     this.appearances = {};
     this.raycaster = new THREE.Raycaster();
     this.pixelMode = 1;
-    this.maxLevel = LEVELS.length - 1; // "Lantai" buttons: levels above this one are hidden
+    this.viewLevel = 0; // the level shown by the floor tabs (null = all three levels stacked)
+    this.viewBeforeFocus = null;
     this.editLevel = 0; // the level the layout editor works on
     this.followEnabled = true; // 🎥 Sorot: the camera looks at agents who interact
     this.focus = null; // { key, target, dist } the camera is following
@@ -165,6 +167,7 @@ export class World {
   makeModel(id, look, a) {
     const model = createPerson(look);
     model.userData.agentId = id;
+    prepareFade(model);
     model.position.set(a.x, a.y, a.z);
     model.rotation.y = a.heading ?? Math.PI / 4;
     this.scene.add(model);
@@ -251,7 +254,7 @@ export class World {
       if (!a || !place) continue;
       // inside a room (an activity, or the desk in a private office): leave through its door
       const fromDesk = a.mode === "sitting" && a.seat?.room;
-      const from = a.mode === "activity" ? a.room : fromDesk ? a.seat.room : null;
+      const from = a.mode === "activity" ? a.room : fromDesk ? a.seat.room : this.insideRoom(a);
       a.spot = null;
       a.meeting = place;
       a.room = null;
@@ -276,9 +279,15 @@ export class World {
     }
   }
 
+  // The room (with a door) an agent is standing in right now, or null.
+  insideRoom(a) {
+    const r = roomAt(a.x, a.z, a.level);
+    return r && r.door ? r.id : null;
+  }
+
   leaveSpot(a) {
     a.spot = null;
-    a.leavingRoom = a.room;
+    a.leavingRoom = a.room ?? this.insideRoom(a); // an agent still walking to a spot inside a room leaves by its door too
     a.room = null;
     if (a.mode === "activity" || a.mode === "toSpot") a.mode = "idle";
   }
@@ -426,7 +435,17 @@ export class World {
     const rider = [...this.agents.values()].find((a) => a.riding);
     if (rider) this.office.lift.set(rider.y);
     this.applyVisibility();
-    this.setFocus(this.followEnabled ? this.interactionFocus() : null);
+    // 🎥 Sorot: an interaction on another level switches the floor tab for its duration
+    const f = this.followEnabled ? this.interactionFocus() : null;
+    if (f && this.viewLevel !== null && f.level !== this.viewLevel && f.key !== this.ignoreFocusKey) {
+      this.viewBeforeFocus = this.viewLevel;
+      this.setViewLevel(f.level, { camera: false });
+    }
+    this.setFocus(f);
+    if (!f && this.viewBeforeFocus !== null) {
+      this.setViewLevel(this.viewBeforeFocus, { camera: false });
+      this.viewBeforeFocus = null;
+    }
   }
 
   // Picks a free activity spot. Ping-pong needs two players: another idle agent is invited to the
@@ -587,17 +606,34 @@ export class World {
 
   // ---- levels (the "Lantai" buttons) ------------------------------------------
 
-  // Shows level 0 up to `max` (0 to 2); the levels above are hidden so the ones below can be seen.
-  setVisibleLevels(max) {
-    this.maxLevel = Math.max(0, Math.min(LEVELS.length - 1, max));
+  // The floor tabs: shows one level (0 to 2), or all of them stacked (null). The camera glides to the
+  // middle of that level unless `camera` is false (a focus switches level while it moves the camera).
+  setViewLevel(level, { camera = true } = {}) {
+    this.viewLevel = level === null ? null : Math.max(0, Math.min(LEVELS.length - 1, level));
+    if (camera) {
+      this.viewBeforeFocus = null;
+      this.userMoved();
+      const y = this.viewLevel === null ? levelTop(1) : levelTop(this.viewLevel) + 0.6;
+      this.camGoal = { target: new THREE.Vector3(CENTER.x, y, CENTER.z + 1), dist: this.viewLevel === null ? 46 : 38 };
+      this.camSmooth = 0.8;
+    }
     this.applyVisibility();
+    window.dispatchEvent(new CustomEvent("levelchange"));
   }
 
   applyVisibility() {
-    const limit = levelTop(this.maxLevel) + 0.5;
-    this.office.levelGroups.forEach((g, l) => { g.visible = l <= this.maxLevel; });
-    for (const a of this.agents.values()) a.model.visible = a.y <= limit;
-    this.office.lift.car.visible = this.office.lift.y <= limit;
+    const v = this.viewLevel;
+    // the level on show is opaque; the others stay visible at 50% opacity
+    const alphaOf = (l) => (v === null || l === v ? 1 : 0.5);
+    this.office.levelGroups.forEach((g, l) => {
+      const alpha = alphaOf(l);
+      if ((g.userData.fadeAlpha ?? 1) !== alpha) setFade(g, alpha);
+    });
+    const onView = (y) => v === null || Math.abs(y - levelTop(v)) < 1.7;
+    for (const a of this.agents.values()) {
+      const alpha = onView(a.y) ? 1 : 0.5;
+      if ((a.model.userData.fadeAlpha ?? 1) !== alpha) setFade(a.model, alpha);
+    }
   }
 
   // ---- camera focus (🎥 Sorot) ------------------------------------------------------
@@ -637,15 +673,15 @@ export class World {
   // pair that is chatting, or the two giving each other a high five. null = nothing going on.
   interactionFocus() {
     const agents = [...this.agents.values()];
-    const shown = (level) => level <= this.maxLevel;
+    const shown = () => true; // an interaction on another level switches the tab (see update)
     if (this.meetingOn && shown(MEETING.level) && agents.some((a) => a.mode === "meeting")) {
       const room = ROOMS.find((r) => r.id === MEETING.room);
-      if (room) return { key: "meeting", x: (room.x0 + room.x1) / 2, y: levelTop(MEETING.level) + 0.9, z: (room.z0 + room.z1) / 2 + 1.5, dist: 17 };
+      if (room) return { key: "meeting", level: MEETING.level, x: (room.x0 + room.x1) / 2, y: levelTop(MEETING.level) + 0.9, z: (room.z0 + room.z1) / 2 + 1.5, dist: 17 };
     }
     const ch = this.chatter.active;
-    if (ch && ch.state === "talk" && shown(ch.a.level)) return { key: `chat:${ch.a.id}:${ch.b.id}`, x: (ch.a.x + ch.b.x) / 2, y: ch.a.y + 0.9, z: (ch.a.z + ch.b.z) / 2, dist: 11 };
+    if (ch && ch.state === "talk" && shown(ch.a.level)) return { key: `chat:${ch.a.id}:${ch.b.id}`, level: ch.a.level, x: (ch.a.x + ch.b.x) / 2, y: ch.a.y + 0.9, z: (ch.a.z + ch.b.z) / 2, dist: 11 };
     const hi5 = agents.find((a) => a.gesture === "hi5" && a.greetWith && shown(a.level));
-    if (hi5) return { key: `hi5:${hi5.id}`, x: (hi5.x + hi5.greetWith.x) / 2, y: hi5.y + 0.9, z: (hi5.z + hi5.greetWith.z) / 2, dist: 10 };
+    if (hi5) return { key: `hi5:${hi5.id}`, level: hi5.level, x: (hi5.x + hi5.greetWith.x) / 2, y: hi5.y + 0.9, z: (hi5.z + hi5.greetWith.z) / 2, dist: 10 };
     return null;
   }
 
@@ -676,7 +712,8 @@ export class World {
     const hidden = this.hiddenByFloors();
     for (const a of this.agents.values()) {
       const sitting = a.mode === "sitting" && !a.route.length;
-      if (!a.model.visible || hidden.has(a.id)) continue;
+      if (hidden.has(a.id)) continue;
+      if (this.viewLevel !== null && Math.abs(a.y - levelTop(this.viewLevel)) >= 1.7) continue; // agents on the faded levels have no tag
       v.set(a.x, a.y + (sitting ? 1.45 : 1.38), a.z);
       v.project(this.camera);
       if (v.z > 1) continue;
@@ -694,8 +731,8 @@ export class World {
     const hidden = new Set();
     const ray = new THREE.Raycaster();
     const head = new THREE.Vector3();
+    if (this.viewLevel !== null) { this.hiddenIds = hidden; return hidden; } // one level on show: the others are see-through
     for (const a of this.agents.values()) {
-      if (!a.model.visible) continue;
       const floor = LEVELS.reduce((best, _, l) => (levelTop(l) <= a.y + 0.2 ? l : best), 0);
       const meshes = this.office.slabs.filter((s) => s.level > floor && s.mesh.parent.visible).map((s) => s.mesh);
       if (!meshes.length) continue;
@@ -725,13 +762,13 @@ export class World {
 
   pickFurniture(clientX, clientY) {
     this.setRay(clientX, clientY);
-    return this.office.furniture.pick(this.raycaster);
+    return this.office.furniture.pick(this.raycaster, this.viewLevel === null ? null : this.editLevel);
   }
 
   hitTest(clientX, clientY) {
     const ndc = new THREE.Vector2((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    const models = [...this.agents.values()].filter((a) => a.model.visible).map((a) => a.model);
+    const models = [...this.agents.values()].map((a) => a.model);
     const hit = this.raycaster.intersectObjects(models, true)[0];
     if (!hit) return null;
     let obj = hit.object;

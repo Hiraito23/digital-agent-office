@@ -526,3 +526,13 @@ body.chat-collapsed .party { max-height: calc(100vh - var(--panel-top) - 76px); 
 .pp-foot span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pp-foot div { display: flex; gap: 6px; }
 .pp-note { display: block; margin-top: 8px; color: var(--muted); line-height: 1.4; }
+
+/* floor tabs: one storey at a time */
+.level-tabs { position: fixed; z-index: 2; top: var(--panel-top); left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; max-width: calc(100vw - 24px);
+  background: var(--panel); border: 2px solid var(--panel-edge); border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,216,107,.22), 0 4px 14px rgba(0,0,0,.55); }
+.level-tabs button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px; font: 600 13px var(--chat-font); color: var(--muted); cursor: pointer;
+  background: rgba(40,32,22,.9); border: 1px solid color-mix(in srgb, var(--panel-edge) 45%, transparent); border-radius: 5px; }
+.level-tabs button small { font: 500 10.5px var(--chat-font); opacity: .8; }
+.level-tabs button:hover { color: var(--text); border-color: var(--accent); }
+.level-tabs button.active { color: #2a1d08; background: linear-gradient(180deg, #ffe08a, #d9a93a); border-color: #7a5a16; }
+@media (max-width: 1150px) { .level-tabs button small { display: none; } .level-tabs { top: calc(var(--panel-top) + 4px); } }

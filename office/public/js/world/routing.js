@@ -12,7 +12,14 @@ const at = (p, level) => ({ x: p.x, z: p.z, level });
 
 // Walking on one level from a to b (both are the lift door, a door's outside point or a free spot).
 const walk = (level, a, b) => {
-  if (level === 0) return [at(b, 0)];
+  if (level === 0) {
+    // the lift door is in the strip beside the canteen wall: step out into the open lobby first
+    const route = [];
+    if (a === LIFT.door) route.push(at(LIFT.lobby, 0));
+    if (b === LIFT.door) route.push(at(LIFT.lobby, 0));
+    route.push(at(b, 0));
+    return route;
+  }
   return [{ x: a.x, z: CORRIDOR_Z, level }, { x: b.x, z: CORRIDOR_Z, level }, at(b, level)];
 };
 

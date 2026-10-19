@@ -27,7 +27,6 @@ export const loadLayout = async () => {
 export const initLayoutEditor = ({ world, canvas }) => {
   const furn = world.office.furniture;
   const levelsEl = document.getElementById("layout-levels");
-  const levelBtn = document.getElementById("level-toggle");
   const panel = document.getElementById("layout");
   const statusEl = document.getElementById("layout-status");
   const catalogEl = document.getElementById("layout-catalog");
@@ -163,9 +162,8 @@ export const initLayoutEditor = ({ world, canvas }) => {
   };
   const setEditLevel = (level) => {
     world.editLevel = level;
-    if (world.maxLevel < level) world.setVisibleLevels(level);
+    if (world.viewLevel !== null && world.viewLevel !== level) world.setViewLevel(level); // edit what you see
     renderLevels();
-    levelBtn?.dispatchEvent(new CustomEvent("levels-changed"));
   };
 
   const select = (id) => {
@@ -380,8 +378,17 @@ export const initLayoutEditor = ({ world, canvas }) => {
     if (saveTimer) { clearTimeout(saveTimer); save(); }
   };
 
+  // switching the floor tab while editing moves the editor to that level
+  window.addEventListener("levelchange", () => {
+    if (!active || world.viewLevel === null || world.viewLevel === world.editLevel) return;
+    world.editLevel = world.viewLevel;
+    if (!held) select(null);
+    renderLevels();
+  });
+
   const enter = () => {
     active = true;
+    world.editLevel = world.viewLevel ?? world.editLevel;
     panel.classList.remove("hidden");
     document.body.classList.add("editing");
     toggleBtn.classList.add("playing");

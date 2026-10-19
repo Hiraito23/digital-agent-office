@@ -2,8 +2,8 @@
 // Units: 1 world unit = 1 floor tile. x runs west -> east, z north -> south, y is up.
 // Change the floor plan here; the scene, routing and agents all read from it.
 //
-//   Level 0 (Lantai 1): lobby (open, gate on the south side), the game room and the canteen
-//                        (kantin) in a wing to the north-west.
+//   Level 0 (Lantai 1): lobby (open, along the south side, with the gate), the canteen (kantin)
+//                        and the game room, both north of the lobby with a door onto it.
 //   Level 1 (Lantai 2): a corridor with 12 private rooms, one per agent (desk i is in room i).
 //   Level 2 (Lantai 3): the meeting room and the server room, plus an open terrace.
 //
@@ -17,20 +17,21 @@ export const LEVEL_NAMES = ["Lantai 1", "Lantai 2", "Lantai 3"];
 
 // Footprint of every storey as rectangles [x0, x1, z0, z1]; their union is the floor.
 export const LEVELS = [
-  { rects: [[6, 32, 14, 28], [6, 18, 8, 14]] }, // lobby + game room, canteen wing
+  // all three levels have the same footprint (26 x 10 tiles)
+  { rects: [[6, 32, 14, 24]] }, // lobby, canteen, game room
   { rects: [[6, 32, 14, 24]] }, // corridor and the agents' rooms
-  { rects: [[6, 28, 14, 24]] }, // meeting room, server room, terrace
+  { rects: [[6, 32, 14, 24]] }, // meeting room, server room, terrace
 ];
 // Edges of a storey that are a low glass railing instead of a wall (the terrace on level 2).
-export const RAIL_ZONES = [null, null, { x0: 6, x1: 28, z0: 20, z1: 24 }];
+export const RAIL_ZONES = [null, null, { x0: 6, x1: 32, z0: 20, z1: 24 }];
 
 // Bounds of the whole building, for the garden around it.
-export const OFFICE = { x0: 6, x1: 32, z0: 8, z1: 28 };
+export const OFFICE = { x0: 6, x1: 32, z0: 14, z1: 24 };
 export const CENTER = { x: (OFFICE.x0 + OFFICE.x1) / 2, z: (OFFICE.z0 + OFFICE.z1) / 2 };
 
 // The lift: a glass tower against the west wall. On every level a doorway in the west wall (z 18 to 20)
 // leads into the cabin; `door` is the point just inside the building, `cabin` the stop in the cabin.
-export const LIFT = { cabin: { x: 4.4, z: 19 }, door: { x: 7.6, z: 19 }, gap: [18, 20], speed: 4 };
+export const LIFT = { cabin: { x: 4.4, z: 19 }, door: { x: 7.6, z: 19 }, lobby: { x: 9, z: 20.8 }, gap: [18, 20], speed: 4 };
 // The corridors of level 1 and 2 run along z = CORRIDOR_Z from the lift to the east end.
 export const CORRIDOR_Z = 19;
 
@@ -43,14 +44,18 @@ const open = (id, name, floor, level, x0, x1, z0, z1, sign) => ({ id, name, floo
 const gapAt = (c, half = 0.7) => [[c - half, c + half]];
 
 const rooms = [
-  // ---- level 0: lobby, game room, canteen ----
-  open("lobby", "LOBBY", "marble", 0, 6, 20, 14, 28, { x: 15, z: 27.45 }),
-  room("kantin", "KANTIN", "wood", 0, [6, 18, 8, 14], [
-    { along: "x", at: 14, from: 6, to: 18, gaps: [[11.3, 12.7]] },
-  ], { inside: { x: 12, z: 13.3 }, outside: { x: 12, z: 15.2 } }),
-  room("game", "RUANG GAME", "carpet", 0, [20, 32, 14, 28], [
-    { along: "z", at: 20, from: 14, to: 28, gaps: [[21.3, 22.7]] },
-  ], { inside: { x: 20.7, z: 22 }, outside: { x: 18.6, z: 22 } }),
+  // ---- level 0: the lobby is the south band (z 19 to 24) plus the strip by the lift; the canteen and
+  // the game room are north of it, each with a door in its south wall ----
+  open("lobby", "LOBBY", "marble", 0, 6, 32, 19, 24, { x: 19, z: 23.45 }),
+  open("lobby-lift", "", "marble", 0, 6, 8, 14, 19, null),
+  room("kantin", "KANTIN", "wood", 0, [8, 18, 14, 19], [
+    { along: "x", at: 19, from: 8, to: 18, gaps: gapAt(13) },
+    { along: "z", at: 8, from: 14, to: 19 },
+    { along: "z", at: 18, from: 14, to: 19 },
+  ], { inside: { x: 13, z: 18.3 }, outside: { x: 13, z: 20.2 } }),
+  room("game", "RUANG GAME", "carpet", 0, [18, 32, 14, 19], [
+    { along: "x", at: 19, from: 18, to: 32, gaps: gapAt(25) },
+  ], { inside: { x: 25, z: 18.3 }, outside: { x: 25, z: 20.2 } }),
 ];
 
 // ---- level 1: twelve private rooms along the corridor (six north, six south of it) ----
@@ -74,10 +79,10 @@ rooms.push(
     { along: "x", at: 18, from: 6, to: 18, gaps: gapAt(12) },
     { along: "z", at: 18, from: 14, to: 18 },
   ], { inside: { x: 12, z: 17.3 }, outside: { x: 12, z: CORRIDOR_Z } }),
-  room("server", "RUANG SERVER", "dark", 2, [18, 28, 14, 18], [
-    { along: "x", at: 18, from: 18, to: 28, gaps: gapAt(23) },
-  ], { inside: { x: 23, z: 17.3 }, outside: { x: 23, z: CORRIDOR_Z } }),
-  open("terrace", "TERAS", "tile", 2, 6, 28, 20, 24, { x: 17, z: 23.45 }),
+  room("server", "RUANG SERVER", "dark", 2, [18, 32, 14, 18], [
+    { along: "x", at: 18, from: 18, to: 32, gaps: gapAt(25) },
+  ], { inside: { x: 25, z: 17.3 }, outside: { x: 25, z: CORRIDOR_Z } }),
+  open("terrace", "TERAS", "tile", 2, 6, 32, 20, 24, { x: 19, z: 23.45 }),
 );
 
 export const ROOMS = rooms;
@@ -85,9 +90,9 @@ export const ROOMS = rooms;
 export const PRIVATE_OFFICES = [];
 
 // Front gate in the south wall of level 0 (opens into the lobby).
-export const GATE = { x0: 11, x1: 15, level: 0 };
+export const GATE = { x0: 10, x1: 14, z: 24, level: 0 };
 export const roomAt = (x, z, level = 0) => ROOMS.find((r) => r.level === level && x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1) ?? null;
-export const PORTAL = { x: 13, z: 25.2, level: 0 };
+export const PORTAL = { x: 12, z: 21.9, level: 0 };
 
 // Is (x, z) on the floor of this level?
 export const onFloor = (x, z, level) => LEVELS[level].rects.some(([x0, x1, z0, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
@@ -103,11 +108,11 @@ export const seatOf = (slot) => slot.flip
 // Walking points for idle agents (also where two agents meet to chat): [x, z, level].
 export const WANDER = [
   // lobby (level 0)
-  [8.5, 16], [12, 17], [16, 16.5], [9, 22], [12.5, 21], [17, 21], [9.5, 25.5], [17, 25.5],
+  [7, 16], [7, 21.5], [10.5, 21], [16, 21.8], [20, 20.8], [24, 21.8], [28, 21], [30.5, 22.8], [16, 23.2], [22, 23.2],
   // corridor of level 1
   [9, 19, 1], [14, 19, 1], [19, 19, 1], [24, 19, 1], [29, 19, 1],
   // corridor and terrace of level 2
-  [10, 19, 2], [16, 19, 2], [22, 19, 2], [10, 22, 2], [17, 22.4, 2], [24, 22, 2],
+  [10, 19, 2], [16, 19, 2], [22, 19, 2], [28, 19, 2], [10, 22, 2], [17, 22.4, 2], [24, 22, 2], [29.5, 22, 2],
 ].map(([x, z, level = 0]) => ({ x, z, level }));
 export const wanderOn = (level) => WANDER.filter((w) => w.level === level);
 

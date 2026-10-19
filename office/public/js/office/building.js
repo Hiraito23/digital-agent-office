@@ -84,7 +84,7 @@ export const buildBuilding = (scene) => {
     for (const run of boundaryRuns(level.rects)) {
       const gaps = [];
       if (run.axis === "z" && run.at === 6) gaps.push(LIFT.gap); // the lift doorway
-      if (l === GATE.level && run.axis === "x" && run.at === 28) gaps.push([GATE.x0, GATE.x1]); // the front gate
+      if (l === GATE.level && run.axis === "x" && run.at === GATE.z) gaps.push([GATE.x0, GATE.x1]); // the front gate
       // split the run where it turns into a railing (the terrace)
       const zone = RAIL_ZONES[l];
       const cuts = [run.a];

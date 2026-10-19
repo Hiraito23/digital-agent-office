@@ -22,7 +22,6 @@
       <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
       <button id="time-toggle" class="chip" title="Waktu">🕒 Waktu</button>
       <button id="weather-toggle" class="chip" title="Cuaca">☀ Cerah</button>
-      <button id="level-toggle" class="chip" title="Tampilkan lantai: semua, atau hanya sampai lantai tertentu (lantai di atasnya disembunyikan)">🏢 Semua lantai</button>
       <button id="follow-toggle" class="chip" title="Kamera menyorot agen yang sedang berinteraksi (rapat, ngobrol)">🎥 Sorot</button>
       <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
       <button id="files-toggle" class="chip" title="Lihat dan unduh file hasil kerja agen">📂 Berkas</button>
@@ -36,6 +35,14 @@
   </header>
 
   <!-- Team list (like an MMO party frame): status of every agent, click to talk -->
+  <!-- Floor tabs: one storey at a time -->
+  <nav id="level-tabs" class="hud level-tabs">
+    <button type="button" data-level="0" title="Lobby, ruang game, kantin">Lantai 1 <small>Lobby · Game · Kantin</small></button>
+    <button type="button" data-level="1" title="Satu ruangan per agen">Lantai 2 <small>Ruang agen</small></button>
+    <button type="button" data-level="2" title="Ruang rapat, ruang server, teras">Lantai 3 <small>Rapat · Server</small></button>
+    <button type="button" data-level="all" title="Semua lantai bertumpuk">Semua</button>
+  </nav>
+
   <aside id="party" class="hud party">
     <div class="party-title">👥 TIM</div>
     <div id="roster" class="roster"></div>

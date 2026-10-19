@@ -202,17 +202,17 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
-Kantor adalah **gedung tiga lantai** di tengah taman, dengan menara **lift** kaca di sisi barat. Tiap ruang punya tembok dan pintu sendiri (dinding bawah solid, bagian atas kaca):
+Kantor adalah **gedung tiga lantai** (tiap lantai berukuran sama, 26 x 10 tile) di tengah taman, dengan menara **lift** kaca di sisi barat. Tiap ruang punya tembok dan pintu sendiri (dinding bawah solid, bagian atas kaca):
 
 | Lantai | Isi |
 | --- | --- |
-| **Lantai 1** | **Lobby** (portal Hermes, area tunggu, gerbang masuk), **Ruang Game** (arcade, dua meja ping-pong, bean bag), dan **Kantin** (konter kopi, dispenser, meja makan, akuarium) di sayap barat laut |
+| **Lantai 1** | **Lobby** di sisi depan (portal Hermes, area tunggu, gerbang masuk), lalu di belakangnya **Kantin** (konter kopi, dispenser, meja makan, akuarium) dan **Ruang Game** (arcade, dua meja ping-pong, bean bag), masing-masing dengan pintu ke lobby |
 | **Lantai 2** | Lorong dengan **12 ruang pribadi**: tiap agen punya ruangan sendiri berisi meja kerja, lemari, dan tanaman. Nama agen tampil di papan atas pintunya |
 | **Lantai 3** | **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server** (rak server dan kristal), dan teras terbuka |
 
 **Satu agen satu ruangan:** Hermes mendapat ruangan pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **berlari ke ruangannya** (naik lift bila perlu), duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol di lobi, kantin, atau lorong. Layout bawaan punya 12 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Saat rapat, semua peserta naik lift ke Ruang Rapat di lantai 3.
 
-Tombol **🏢 Semua lantai** di header menyembunyikan lantai atas supaya lantai di bawahnya terlihat (semua lantai → lantai 1–2 → hanya lantai 1). Name tag agen yang tertutup lantai di atasnya ikut tersembunyi.
+**Tab lantai** di bagian atas layar menampilkan satu lantai sekali waktu: mulai dari **Lantai 1** (lobby, game, kantin), lalu pilih **Lantai 2** (ruang agen) atau **Lantai 3** (rapat dan server). Lantai lain tetap terlihat dengan **opasitas 50%** (tidak disembunyikan). Tab **Semua** menampilkan ketiga lantai penuh. Kamera meluncur halus ke lantai yang dipilih. Kalau 🎥 Sorot menyorot rapat atau obrolan di lantai lain, tab berpindah sementara ke lantai itu lalu kembali setelah selesai.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 

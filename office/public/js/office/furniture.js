@@ -7,8 +7,8 @@
 // Activity spots (sofa, arcade, chairs, ...) and desk seats belong to their furniture
 // and move with it, so agents keep using whatever the layout looks like now.
 import * as THREE from "three";
-import { box, canvasTexture, cone, mat } from "./helpers.js";
-import { ACTIVITY_SPOTS, LEVELS, LIFT, MEETING, PORTAL, ROOMS, levelTop, roomAt } from "./layout.js";
+import { box, canvasTexture, cone, mat, prepareFade, setFade } from "./helpers.js";
+import { ACTIVITY_SPOTS, GATE, LEVELS, LIFT, MEETING, PORTAL, ROOMS, levelTop, roomAt } from "./layout.js";
 
 // Bump this when the floor plan changes: layouts saved for an older plan are ignored.
 export const LAYOUT_VERSION = 3;
@@ -322,33 +322,31 @@ export const defaultLayout = () => {
   const add = (level, type, x, z, r = 0, variant) => items.push({ type, level, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
 
   // ---- level 0 ----
-  // lobby: waiting corner, reception cabinets, plants
-  add(0, "rug", 16.8, 17.3);
-  add(0, "coffee-table", 16.8, 17.3);
-  add(0, "sofa", 16.8, 18.65, 1);
-  add(0, "beanbag", 14.9, 15.5, 0, 0);
-  add(0, "beanbag", 18.7, 15.5, 0, 1);
-  add(0, "cabinet", 7.1, 22.4);
-  add(0, "cabinet", 7.1, 23.2);
-  add(0, "cooler", 19.3, 27.2);
-  for (const [x, z] of [[9, 14.6], [7.1, 26.9], [9.5, 26.9], [19.3, 24.5]]) add(0, "plant", x, z);
-  // kantin: pantry counters on the north wall, dining tables, aquarium
-  add(0, "counter", 8, 8.6, 3);
-  add(0, "counter", 9.5, 8.6, 3);
-  add(0, "cooler", 11.4, 8.5);
-  add(0, "aquarium", 6.4, 11.6);
-  add(0, "dining-table", 9.5, 11.3);
-  add(0, "dining-table", 13, 11.3);
-  add(0, "dining-table", 16.4, 11.3);
-  add(0, "plant", 17.3, 8.7);
-  add(0, "plant", 6.7, 13.4);
+  // lobby (south band): waiting corner, plants, a water cooler
+  add(0, "rug", 19, 21.9);
+  add(0, "coffee-table", 19, 21.9);
+  add(0, "sofa", 19, 23.25, 1);
+  add(0, "beanbag", 16.4, 21.2, 0, 0);
+  add(0, "beanbag", 21.6, 21.2, 0, 1);
+  add(0, "cooler", 31.3, 20.6);
+  for (const [x, z] of [[7.1, 23.5], [15, 23.5], [24.5, 23.5], [31.2, 23.5], [7.1, 15]]) add(0, "plant", x, z);
+  // kantin: pantry counters on the north wall, a cooler, dining tables, aquarium
+  add(0, "counter", 9.4, 14.6, 3);
+  add(0, "counter", 10.9, 14.6, 3);
+  add(0, "counter", 12.4, 14.6, 3);
+  add(0, "cooler", 14.3, 14.5);
+  add(0, "aquarium", 17.6, 16.6);
+  add(0, "dining-table", 10.5, 17.1);
+  add(0, "dining-table", 15.4, 17.1);
+  add(0, "plant", 8.5, 18.4);
+  add(0, "plant", 17.5, 14.5);
   // game room: arcade row on the east wall, two ping-pong tables, bean bags
-  [15.5, 16.5, 17.5, 18.5].forEach((z, i) => add(0, "arcade", 31.4, z, 0, i));
-  add(0, "pingpong", 26, 23.2);
-  add(0, "pingpong", 26, 26.2);
-  [22.6, 24.1, 25.6].forEach((x, i) => add(0, "beanbag", x, 16.3, 0, i));
-  add(0, "plant", 21.1, 26.9);
-  add(0, "plant", 31.2, 26.9);
+  [14.7, 15.7, 16.7, 17.7].forEach((z, i) => add(0, "arcade", 31.4, z, 0, i));
+  add(0, "pingpong", 22.5, 16.5);
+  add(0, "pingpong", 27, 16.5);
+  [19.5, 20.5, 21.5].forEach((x, i) => add(0, "beanbag", x, 14.6, 0, i));
+  add(0, "plant", 18.6, 18.4);
+  add(0, "plant", 30.8, 18.4);
 
   // ---- level 1: one room per agent; agent i sits at desk i (Hermes first) ----
   const roomW = 26 / 6;
@@ -372,13 +370,13 @@ export const defaultLayout = () => {
   add(2, "bookshelf", 6.35, 15.4);
   add(2, "plant", 17.4, 14.6);
   add(2, "plant", 6.7, 17.4);
-  [20.5, 21.6, 22.7, 23.8, 24.9, 26].forEach((x) => add(2, "rack", x, 14.5));
+  [20.5, 21.6, 22.7, 23.8, 24.9, 26, 27.1, 28.2, 29.3].forEach((x) => add(2, "rack", x, 14.5));
   // terrace
   add(2, "sofa", 13, 22.9, 1);
   add(2, "coffee-table", 13, 21.8);
   add(2, "beanbag", 19.5, 22.4, 0, 2);
   add(2, "beanbag", 21.5, 22.4, 0, 3);
-  for (const [x, z] of [[7, 20.9], [10, 23.4], [16.5, 23.4], [26.3, 20.9], [26.8, 23.4]]) add(2, "plant", x, z);
+  for (const [x, z] of [[7, 20.9], [10, 23.4], [16.5, 23.4], [26.3, 20.9], [26.8, 23.4], [30.8, 20.9], [31.2, 23.4]]) add(2, "plant", x, z);
   return withIds(items);
 };
 
@@ -422,7 +420,7 @@ for (const room of ROOMS) {
   }
 }
 for (let l = 0; l < LEVEL_COUNT; l += 1) BLOCK_RECTS[l].push(rectOf(LIFT.door.x - 1.6, LIFT.door.x + 0.4, LIFT.gap[0] - 0.1, LIFT.gap[1] + 0.1)); // in front of the lift doorway
-BLOCK_RECTS[0].push(rectOf(PORTAL.x - 1.4, PORTAL.x + 1.4, PORTAL.z - 1.1, 28)); // summoning circle + gate path
+BLOCK_RECTS[0].push(rectOf(PORTAL.x - 1.4, PORTAL.x + 1.4, PORTAL.z - 1.1, GATE.z)); // summoning circle + gate path
 
 const overlap = (a, b) => a.x0 < b.x1 - EPS && a.x1 > b.x0 + EPS && a.z0 < b.z1 - EPS && a.z1 > b.z0 + EPS;
 
@@ -472,7 +470,10 @@ export const createFurniture = ({ groups, animated, screenTex, rooms, makeAutoDe
     const def = CATALOG[item.type];
     const group = def.build(ctx, item);
     group.userData.furnitureId = item.id;
-    parentOf(item).add(group);
+    prepareFade(group);
+    const parent = parentOf(item);
+    if ((parent.userData.fadeAlpha ?? 1) < 1) setFade(group, parent.userData.fadeAlpha); // a piece added to a faded level fades too
+    parent.add(group);
     objects.set(item.id, { group });
     place(item);
   };
@@ -656,13 +657,15 @@ export const createFurniture = ({ groups, animated, screenTex, rooms, makeAutoDe
 
   // The item under the pointer ray (nearest first); levels that are hidden cannot be picked.
   const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
-  api.pick = (raycaster) => {
+  // onlyLevel: pick only among the pieces of that level (the others are faded and cannot be touched).
+  api.pick = (raycaster, onlyLevel = null) => {
     const hits = raycaster.intersectObjects([...objects.values()].map((o) => o.group), true);
     for (const hit of hits) {
       if (!shown(hit.object)) continue;
       let o = hit.object;
       while (o && !o.userData.furnitureId) o = o.parent;
-      if (o) return api.get(o.userData.furnitureId);
+      const item = o ? api.get(o.userData.furnitureId) : null;
+      if (item && (onlyLevel === null || levelOf(item) === onlyLevel)) return item;
     }
     return null;
   };

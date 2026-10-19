@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { buildBuilding } from "./building.js";
 import { addDecor } from "./decor.js";
 import { createFurniture } from "./furniture.js";
-import { box, mat, rand } from "./helpers.js";
+import { box, mat, prepareFade, rand } from "./helpers.js";
 import { DESK_SLOTS, GATE, N, OFFICE, PORTAL, isPath, levelTop, seatOf } from "./layout.js";
 import { makeBush, makeChair, makeDesk, makeLamp, makePine, makePlanter, makeRoundTree } from "./props.js";
 import { addRooms } from "./rooms.js";
@@ -61,7 +61,7 @@ export const buildOffice = (scene, layout, { name } = {}) => {
     new THREE.MeshLambertMaterial({ color: "#74c0fc", emissive: "#1c7ed6", emissiveIntensity: 0.8, flatShading: true }),
   );
   crystal.scale.set(1, 1.6, 1);
-  crystal.position.set(23, top2 + 1.95, 16);
+  crystal.position.set(25, top2 + 1.95, 16);
   groups[2].add(crystal);
   const crystalLight = new THREE.PointLight("#74c0fc", 1.2, 5, 1.5);
   crystalLight.position.copy(crystal.position);
@@ -148,6 +148,8 @@ export const buildOffice = (scene, layout, { name } = {}) => {
     b.position.set(x, 0, z);
     scene.add(b);
   }
+
+  groups.forEach((g) => prepareFade(g)); // every level can be faded on its own
 
   return {
     update: (t) => animated.forEach((fn) => fn(t)),

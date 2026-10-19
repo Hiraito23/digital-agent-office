@@ -39,7 +39,7 @@ export const addRooms = (groups) => {
       }
       group.add(sign);
       if (room.private) signs.set(room.id, signMat);
-    } else {
+    } else if (room.name) {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshBasicMaterial({ map: signTexture(room.name), transparent: true }));
       sign.rotation.x = -Math.PI / 2;
       sign.position.set(room.sign?.x ?? (room.x0 + room.x1) / 2, y + 0.015, room.sign?.z ?? room.z1 - 0.45);

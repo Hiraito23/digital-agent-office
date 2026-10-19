@@ -109,19 +109,20 @@ followBtn.addEventListener("click", () => {
   try { localStorage.setItem("kantor-hermes-follow", follow ? "1" : "0"); } catch { /* ignore */ }
 });
 
-// 🏢 Lantai: show all three storeys, the lower two or only the ground floor (the ones above are hidden).
-const levelBtn = document.getElementById("level-toggle");
-const LEVEL_LABELS = ["🏢 Lantai 1", "🏢 Lantai 1–2", "🏢 Semua lantai"];
-const renderLevel = () => {
-  levelBtn.textContent = LEVEL_LABELS[world.maxLevel];
-  levelBtn.classList.toggle("playing", world.maxLevel < 2);
+// 🏢 Floor tabs: one storey at a time (Lantai 1 first), or all three stacked.
+const levelTabs = document.getElementById("level-tabs");
+const renderLevelTabs = () => {
+  for (const b of levelTabs.querySelectorAll("button")) {
+    const l = b.dataset.level === "all" ? null : Number(b.dataset.level);
+    b.classList.toggle("active", l === world.viewLevel);
+  }
 };
-renderLevel();
-levelBtn.addEventListener("click", () => {
-  world.setVisibleLevels((world.maxLevel + 2) % 3); // all → 1–2 → 1 → all
-  renderLevel();
+renderLevelTabs();
+levelTabs.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-level]");
+  if (b) world.setViewLevel(b.dataset.level === "all" ? null : Number(b.dataset.level));
 });
-levelBtn.addEventListener("levels-changed", renderLevel);
+window.addEventListener("levelchange", renderLevelTabs);
 
 // Pixel look toggle (HD / Pixel / Retro), remembered per browser.
 let pixelMode = 1;

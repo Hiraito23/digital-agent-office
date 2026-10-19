@@ -54,3 +54,34 @@ export const canvasTexture = (w, h, draw) => {
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 };
+
+// ---- fading a level (the floor tabs show the other levels at 50% opacity) ----
+// Materials are cached and shared between levels, so every mesh gets its own copy once
+// (prepareFade); setFade then changes the opacity of that copy without touching the others.
+export const prepareFade = (root) => {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material || o.userData.fadeReady) return;
+    o.userData.fadeReady = true;
+    const copy = (m) => {
+      const c = m.clone();
+      c.userData.base = { transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite };
+      return c;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(copy) : copy(o.material);
+  });
+  return root;
+};
+
+export const setFade = (root, alpha) => {
+  root.userData.fadeAlpha = alpha;
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      const base = m.userData.base;
+      if (!base) continue;
+      m.transparent = alpha < 1 || base.transparent;
+      m.opacity = base.opacity * alpha;
+      m.depthWrite = alpha < 1 ? false : base.depthWrite;
+    }
+  });
+};
