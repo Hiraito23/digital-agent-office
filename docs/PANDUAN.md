@@ -42,7 +42,7 @@ Yang dibutuhkan: Windows 10/11 dengan WSL2, Docker Desktop, Git, koneksi interne
     - `API_SERVER_KEY`: kunci acak. Buat di PowerShell dengan `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')`, lalu tempel hasilnya.
     - `DASH_USER`: biarkan `admin`.
     - `DASH_PASS`: password dashboard pilihan Anda (juga dipakai panel ⚙ Agen untuk menyimpan SOUL.md).
-    - `OFFICE_NAME` (opsional): nama kantor di header, tab browser, dan papan neon. Kosongkan untuk "Agentic Digital Office".
+    - `OFFICE_NAME` (opsional): nama kantor di header, tab browser, dan papan neon di dinding. Kosongkan untuk "Agentic Digital Office".
     - `PROJECTS_DIR`: folder berisi proyek yang boleh dikerjakan agen, misalnya `D:/Coding` (lihat bagian Mengerjakan proyek). Kosongkan untuk memakai folder `projects/` di repo ini.
 
     File ini rahasia dan tidak ikut ke GitHub.
@@ -202,9 +202,17 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
-Kantor berbentuk persegi kompak (16 x 16 tile) di sebuah pulau melayang berisi taman. Empat ruang punya tembok dan pintu sendiri: **Ruang Rapat** (kiri atas: meja rapat, whiteboard, rak buku), **Ruang Server** (kanan atas: rak server dan kristal), **Pantry & Lounge** (kiri bawah: kopi, akuarium, sofa) dan **Ruang Game** (kanan bawah: arcade, ping-pong). **Lobby** (bawah tengah: portal Hermes dan gerbang masuk) berupa zona terbuka. Di tengah ada dua baris meja kerja dan tiga lorong jalan; agen keluar-masuk ruang lewat pintunya.
+Kantor adalah **gedung tiga lantai** di tengah taman, dengan menara **lift** kaca di sisi barat. Tiap ruang punya tembok dan pintu sendiri (dinding bawah solid, bagian atas kaca):
 
-**Satu agen satu meja:** Hermes mendapat meja pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **langsung berlari ke mejanya**, duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol. Layout bawaan punya 10 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Agen berjalan lewat tiga lorong (utara, tengah, selatan) dan berpindah lorong lewat lorong samping.
+| Lantai | Isi |
+| --- | --- |
+| **Lantai 1** | **Lobby** (portal Hermes, area tunggu, gerbang masuk), **Ruang Game** (arcade, dua meja ping-pong, bean bag), dan **Kantin** (konter kopi, dispenser, meja makan, akuarium) di sayap barat laut |
+| **Lantai 2** | Lorong dengan **12 ruang pribadi**: tiap agen punya ruangan sendiri berisi meja kerja, lemari, dan tanaman. Nama agen tampil di papan atas pintunya |
+| **Lantai 3** | **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server** (rak server dan kristal), dan teras terbuka |
+
+**Satu agen satu ruangan:** Hermes mendapat ruangan pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **berlari ke ruangannya** (naik lift bila perlu), duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol di lobi, kantin, atau lorong. Layout bawaan punya 12 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Saat rapat, semua peserta naik lift ke Ruang Rapat di lantai 3.
+
+Tombol **🏢 Semua lantai** di header menyembunyikan lantai atas supaya lantai di bawahnya terlihat (semua lantai → lantai 1–2 → hanya lantai 1). Name tag agen yang tertutup lantai di atasnya ikut tersembunyi.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 
@@ -259,19 +267,62 @@ Agar kantor tidak kaku, dua agen yang sedang santai (berdiri atau berjalan di au
 
 Obrolan ini tidak memanggil model AI (kalimat dan polanya ada di `office/public/js/world/chatter.js`; fakta dan berita diambil dari internet), jadi tidak memakai token dan tidak mengubah riwayat chat agen. Obrolan berhenti sendiri bila salah satu agen mendapat tugas atau ada rapat. Tambah topik baru dengan menambah baris di `GENERIC`, `BY_ROLE`, `WEATHER`, atau `PERIOD` di berkas itu. Animasi hanya berjalan saat tab browser terlihat.
 
-## Suasana malam, cuaca, dan kamera
+## Waktu dan cuaca
 
-Kantor **selalu malam**: langit gelap berbintang, bulan, lampu taman dan jendela menyala. Tombol **☀ Cuaca** di header berganti antara **Cerah**, **Berawan**, **Hujan**, **Badai** (hujan deras + kilat), dan **Kabut**; pilihannya diingat per browser.
+Tombol **🕒 Waktu** dan **☀ Cuaca** di header mengubah suasana kantor. Tombol **🎥 Sorot** membuat kamera menyorot agen yang sedang berinteraksi (rapat di Ruang Rapat, dua agen yang mengobrol, atau tos) dengan transisi halus, lalu kembali ke posisi Anda setelah selesai; menggeser atau memutar kamera sendiri menghentikan sorotan itu (klik lagi untuk mematikan: **🎥 Manual**). Tiap klik berpindah ke pilihan berikutnya, dan pilihannya diingat per browser.
 
-Kamera berupa sudut isometrik tetap (tidak bisa diputar). Geser dengan seret mouse atau tombol panah, zoom dengan roda mouse, **Home** untuk kembali ke posisi awal. Tombol **🎥 Sorot** membuat kamera menyorot agen yang sedang berinteraksi (rapat di Ruang Rapat, dua agen yang sedang mengobrol, atau tos) dengan transisi halus, lalu kembali ke posisi Anda setelah selesai. Kalau Anda menggeser atau zoom sendiri saat itu, kamera berhenti mengikuti. Klik lagi untuk mematikan (**🎥 Manual**).
+| Tombol | Pilihan | Efek |
+| --- | --- | --- |
+| 🕒 Waktu | **Otomatis** (mengikuti jam komputer; labelnya menampilkan bagian hari saat ini) | Langit, matahari/bulan, dan cahaya bergeser mulus sepanjang hari |
+| | **Pagi** (±07.15) | Cahaya hangat keemasan, langit biru muda |
+| | **Siang** (±12.30, mode terang) | Terang penuh, bayangan pendek |
+| | **Sore** (±17.30) | Cahaya jingga, bayangan panjang, langit senja |
+| | **Malam** (±22.00, mode malam) | Langit gelap berbintang, bulan, lampu taman dan jendela menyala |
+| ☀ Cuaca | **Cerah**, **Berawan**, **Hujan**, **Badai** (hujan deras + kilat), **Kabut** | Awan bergerak, hujan turun, cahaya meredup dan langit mengabu, kabut menebal. Cuaca bisa digabung dengan waktu mana pun |
 
-Nama kantor di header, judul tab browser, dan papan neon di dinding bisa diganti lewat `OFFICE_NAME` di `.env` (lalu `docker compose up -d`).
+Berpindah waktu secara manual memutar jam dengan cepat (seperti time-lapse) menuju waktu tujuan. Pada mode Otomatis perpindahan mengikuti jam asli, jadi pagi, sore, dan malam terjadi sesuai jam komputer.
+
+## Progress bar tugas
+
+Saat agen mengerjakan tugas, di **bawah label namanya** muncul progress bar dengan keterangan waktu berjalan dan tool yang sedang dipakai (mis. "0:42 · terminal"). Bar-nya adalah **perkiraan**, karena model AI tidak melaporkan persentase asli: bar naik perlahan seiring waktu dan melompat setiap agen memakai tool, tetapi berhenti di sekitar 94% sampai tugas benar-benar selesai. Setelah selesai bar penuh berwarna hijau ("Selesai ✓ 1:05") dan hilang beberapa detik kemudian; kalau gagal menjadi merah ("Gagal ✕"). Agen yang sedang bekerja juga ditandai titik kuning di nama header dan bingkai label kuning. Agen yang didelegasikan Hermes mendapat bar sendiri.
+
+## Mengatur layout kantor (🛠 Layout)
+
+Mode edit seperti *build mode* di The Sims: klik **🛠 Layout** di header untuk memindah, memutar, menambah, atau menghapus furnitur. Perubahan tersimpan otomatis dan tetap ada setelah restart.
+
+| Mau | Caranya |
+| --- | --- |
+| Memindah benda | Klik benda, lalu seret ke tempat baru dan lepas. Benda menempel ke grid, dinding, dan benda di sebelahnya |
+| Memutar | Pilih benda lalu tekan **R** (atau tombol **↻ Putar**); tiap tekan memutar 90° |
+| Menambah benda | Klik jenisnya di **Tambah benda**, gerakkan kursor ke lantai (benda mengikuti kursor), lalu **klik** untuk menaruh. **Esc** membatalkan |
+| Menggandakan | Pilih benda lalu **D** (atau **⧉ Gandakan**), lalu klik untuk menaruh salinannya |
+| Mengganti warna atau varian | Pilih benda lalu **🎨 Varian** (bean bag, mesin arcade, dan barang pribadi di meja kerja) |
+| Menghapus | Pilih benda lalu **Del** (atau **🗑 Hapus**) |
+| Urungkan / ulangi | **Ctrl+Z** / **Ctrl+Y** (atau tombol **↶ Urungkan** / **↷ Ulangi**) |
+| Memilih lantai yang diedit | Di panel **Lantai yang diedit** pilih Lantai 1, 2, atau 3; benda baru ditaruh di lantai itu |
+| Mengatur kamera | Seret lantai kosong untuk memutar, klik kanan + seret untuk menggeser, roda mouse untuk zoom. Seret di atas benda berarti memindah benda |
+| Kembali ke tata letak awal | **Kembalikan ke bawaan** (bisa diurungkan dengan Ctrl+Z) |
+| Selesai | **✓ Selesai**, tombol ✕, atau klik **🛠 Layout** lagi |
+
+**Hijau atau merah.** Selama benda dipegang, jejaknya di lantai berwarna hijau kalau tempatnya bebas dan merah kalau terhalang: di luar lantai kantor, menutup jalan masuk atau lingkaran panggil di lobi, atau menimpa benda lain (karpet boleh berada di bawah benda lain). Alasannya tampil di bagian atas panel. Benda yang dilepas di tempat merah kembali ke posisi semula.
+
+**Yang ikut berpindah.** Titik duduk agen mengikuti bendanya: sofa, bean bag, pantry, akuarium, rak buku, mesin arcade, meja ping-pong, rak server, dan kursi meja rapat. Agen yang sedang santai langsung memakai posisi baru, dan rapat memakai kursi di meja rapat di mana pun ia berada. **Meja kerja** adalah tempat duduk milik agen: meja pertama di daftar milik Hermes, dan seterusnya (urutan sama dengan agen). Memindah meja memindahkan kursinya, dan agen yang sedang duduk berjalan ke tempat barunya.
+
+**Menambah agen.** Setiap agen butuh satu meja. Kalau agen lebih banyak daripada meja, sisanya otomatis mendapat meja terbuka di aula (seperti sebelumnya). Tambah meja kerja dari katalog kalau ingin menempatkannya sendiri.
+
+Batas dan catatan:
+
+- Yang bisa diubah hanya furnitur. Ukuran lantai dan zona (warna lantai dan papan nama) tetap, diatur di `OFFICE` dan `ROOMS` di `office/layout.js`. Layout yang tersimpan untuk denah lama (versi lebih rendah) otomatis diabaikan dan diganti layout bawaan.
+- Hanya ada satu meja rapat; tombolnya nonaktif selama sudah ada satu. Rapat memakai maksimal 5 kursi/posisi di meja itu dan selalu dihitung di Ruang Rapat.
+- Whiteboard, papan neon, jam dinding, jendela, lampu, taman, dan lingkaran panggil adalah bagian bangunan dan tidak bisa dipindah.
+- Layout disimpan di `config/layout.json` (ikut ke GitHub seperti `team.json`; file ini baru ada setelah Anda mengubah sesuatu). Tab browser lain baru menampilkan perubahan setelah di-refresh.
+- Agen berjalan lurus dari koridor ke tujuannya tanpa mencari jalan memutar, jadi jangan menutup koridor dengan terlalu banyak furnitur.
 
 ## Mengerjakan proyek (📁 Proyek)
 
 Agen bisa membaca dan menulis kode di proyek Anda. Folder `PROJECTS_DIR` di `.env` (misalnya `D:/Coding`) di-mount ke container Hermes sebagai `/workspace`.
 
-1. Klik tombol **📁 Pilih proyek…** di header untuk membuka penjelajah folder. Jelajahi folder di bawah `PROJECTS_DIR`, lalu klik **Pilih** pada sebuah folder (atau **✔ Pilih folder ini**) untuk menjadikannya proyek aktif; folder apa pun boleh, tidak harus repo git. Repo git juga muncul sebagai pintasan **Repo git cepat**, lengkap dengan branch aktifnya. Aturan git di bawah hanya diberikan kalau folder yang dipilih adalah repo git. Folder di luar `PROJECTS_DIR` tidak terjangkau: ubah `PROJECTS_DIR` di `.env` lalu jalankan ulang `docker compose up -d`.
+1. Klik tombol **📁 Pilih proyek…** di header untuk membuka penjelajah folder. Jelajahi folder di bawah `PROJECTS_DIR`, lalu klik **Pilih** pada sebuah folder (atau **✔ Pilih folder ini**) untuk menjadikannya proyek aktif; folder apa pun boleh, tidak harus repo git. Repo git juga muncul sebagai pintasan **Repo git cepat**, lengkap dengan branch aktifnya. Aturan git di bawah hanya diberikan kalau folder yang dipilih adalah repo git. Folder di luar `PROJECTS_DIR` tidak terjangkau: ubah `PROJECTS_DIR` di `.env` lalu jalankan ulang `docker compose up -d`. Daftar repo git: folder di `PROJECTS_DIR` yang punya git, plus repo git satu tingkat di bawahnya (misalnya `Kalla/oase-tanjung`), lengkap dengan branch aktifnya. 
 2. Beri tugas ke Hermes atau langsung ke agen, misalnya "Tambahkan halaman daftar pelanggan sesuai struktur folder yang ada". Semua agen, termasuk yang didelegasikan Hermes, otomatis tahu folder proyeknya.
 3. Cek hasilnya di folder proyek dengan `git status`, `git log`, dan `git diff`.
 

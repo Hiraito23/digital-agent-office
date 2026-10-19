@@ -8,7 +8,7 @@
 // and move with it, so agents keep using whatever the layout looks like now.
 import * as THREE from "three";
 import { box, canvasTexture, cone, mat } from "./helpers.js";
-import { ACTIVITY_SPOTS, MEETING, OFFICE, PORTAL, ROOMS, roomAt } from "./layout.js";
+import { ACTIVITY_SPOTS, LEVELS, LIFT, MEETING, PORTAL, ROOMS, levelTop, roomAt } from "./layout.js";
 
 // Bump this when the floor plan changes: layouts saved for an older plan are ignored.
 export const LAYOUT_VERSION = 3;
@@ -256,6 +256,32 @@ export const CATALOG = {
     rects: [{ x: 0, z: 0, w: 0.4, d: 0.4 }],
     build: () => makeCooler(),
   },
+  "dining-table": {
+    label: "Meja makan", icon: "🍜",
+    rects: [{ x: 0, z: 0, w: 1.6, d: 0.9 }, { x: -0.5, z: -0.75, w: 0.45, d: 0.45 }, { x: 0.5, z: -0.75, w: 0.45, d: 0.45 }, { x: -0.5, z: 0.75, w: 0.45, d: 0.45 }, { x: 0.5, z: 0.75, w: 0.45, d: 0.45 }],
+    // four chairs: agents sit and eat here
+    spots: [
+      { id: "1", dx: -0.5, dz: -0.75, heading: 0, pose: "meeting", icon: "🍜", chair: true },
+      { id: "2", dx: 0.5, dz: -0.75, heading: 0, pose: "meeting", icon: "🍜", chair: true },
+      { id: "3", dx: -0.5, dz: 0.75, heading: Math.PI, pose: "meeting", icon: "🍜", chair: true },
+      { id: "4", dx: 0.5, dz: 0.75, heading: Math.PI, pose: "meeting", icon: "🍜", chair: true },
+    ],
+    build: () => {
+      const g = new THREE.Group();
+      g.add(box(1.6, 0.06, 0.9, mat("#c08552"), 0, 0.55, 0));
+      for (const [x, z] of [[-0.74, -0.38], [0.74, -0.38], [-0.74, 0.38], [0.74, 0.38]]) g.add(box(0.06, 0.52, 0.06, mat("#8d5a2b"), x, 0.26, z));
+      g.add(box(0.2, 0.02, 0.2, mat("#f8f9fa"), -0.4, 0.59, 0)); // plates
+      g.add(box(0.2, 0.02, 0.2, mat("#f8f9fa"), 0.4, 0.59, 0));
+      g.add(box(0.08, 0.1, 0.08, mat("#e03131"), 0, 0.64, 0)); // a bottle
+      for (const s of CATALOG["dining-table"].spots) {
+        const chair = makeChair();
+        chair.position.set(s.dx, 0, s.dz);
+        chair.rotation.y = s.heading === 0 ? Math.PI : 0;
+        g.add(chair);
+      }
+      return g;
+    },
+  },
   "meeting-table": {
     label: "Meja rapat", icon: "🪑", max: 1,
     rects: [{ x: 0, z: 0, w: 2.2, d: 1.0 }, { x: -0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: -0.6, z: 0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: 0.95, w: 0.45, d: 0.45 }],
@@ -284,43 +310,75 @@ export const CATALOG = {
   },
 };
 
-export const CATALOG_ORDER = ["desk", "sofa", "coffee-table", "beanbag", "rug", "counter", "aquarium", "bookshelf", "arcade", "pingpong", "plant", "rack", "cabinet", "cooler", "meeting-table"];
+export const CATALOG_ORDER = ["desk", "sofa", "coffee-table", "dining-table", "beanbag", "rug", "counter", "aquarium", "bookshelf", "arcade", "pingpong", "plant", "rack", "cabinet", "cooler", "meeting-table"];
 
 // ---------------------------------------------------------------------------
-// Default layout (the office as it was built before the editor existed)
+// Default layout: lobby, game room and canteen (level 0), one room per agent (level 1),
+// meeting room, server room and terrace (level 2)
 // ---------------------------------------------------------------------------
 
 export const defaultLayout = () => {
   const items = [];
-  const add = (type, x, z, r = 0, variant) => items.push({ type, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
+  const add = (level, type, x, z, r = 0, variant) => items.push({ type, level, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
 
-  // desks: two rows in the middle of the hall; agent i takes desk i (Hermes first)
-  const columns = [12, 14, 16, 18, 20];
-  columns.forEach((x, i) => add("desk", x, 13.9, 0, i));
-  columns.forEach((x, i) => add("desk", x, 16.4, 0, i + 5));
-  // cabinets along the west wall
-  add("cabinet", 8.35, 14.2);
-  add("cabinet", 8.35, 15.0);
-  // meeting room (north-west) and library
-  add("meeting-table", 10.8, 9.9);
-  add("bookshelf", 8.25, 9.4);
-  // server room (north-east)
-  for (const x of [20, 21, 22]) add("rack", x, 8.45);
-  // pantry and lounge (south-west)
-  add("rug", 11, 22);
-  add("sofa", 11, 23.25, 1);
-  add("coffee-table", 11, 22);
-  add("beanbag", 9.75, 21.05, 0, 0);
-  add("beanbag", 12.25, 21.05, 0, 1);
-  add("counter", 8.35, 20.4);
-  add("aquarium", 8.3, 22.4);
-  add("cooler", 13.45, 19.8);
-  // game room (south-east)
-  add("arcade", 23.45, 19.8, 0, 0);
-  add("arcade", 23.45, 20.8, 0, 1);
-  add("pingpong", 20.6, 22.6);
-  // plants
-  for (const [x, z] of [[14.4, 8.7], [16.6, 8.7], [8.6, 17.4], [23.4, 13.2], [23.4, 17.4]]) add("plant", x, z);
+  // ---- level 0 ----
+  // lobby: waiting corner, reception cabinets, plants
+  add(0, "rug", 16.8, 17.3);
+  add(0, "coffee-table", 16.8, 17.3);
+  add(0, "sofa", 16.8, 18.65, 1);
+  add(0, "beanbag", 14.9, 15.5, 0, 0);
+  add(0, "beanbag", 18.7, 15.5, 0, 1);
+  add(0, "cabinet", 7.1, 22.4);
+  add(0, "cabinet", 7.1, 23.2);
+  add(0, "cooler", 19.3, 27.2);
+  for (const [x, z] of [[9, 14.6], [7.1, 26.9], [9.5, 26.9], [19.3, 24.5]]) add(0, "plant", x, z);
+  // kantin: pantry counters on the north wall, dining tables, aquarium
+  add(0, "counter", 8, 8.6, 3);
+  add(0, "counter", 9.5, 8.6, 3);
+  add(0, "cooler", 11.4, 8.5);
+  add(0, "aquarium", 6.4, 11.6);
+  add(0, "dining-table", 9.5, 11.3);
+  add(0, "dining-table", 13, 11.3);
+  add(0, "dining-table", 16.4, 11.3);
+  add(0, "plant", 17.3, 8.7);
+  add(0, "plant", 6.7, 13.4);
+  // game room: arcade row on the east wall, two ping-pong tables, bean bags
+  [15.5, 16.5, 17.5, 18.5].forEach((z, i) => add(0, "arcade", 31.4, z, 0, i));
+  add(0, "pingpong", 26, 23.2);
+  add(0, "pingpong", 26, 26.2);
+  [22.6, 24.1, 25.6].forEach((x, i) => add(0, "beanbag", x, 16.3, 0, i));
+  add(0, "plant", 21.1, 26.9);
+  add(0, "plant", 31.2, 26.9);
+
+  // ---- level 1: one room per agent; agent i sits at desk i (Hermes first) ----
+  const roomW = 26 / 6;
+  for (let i = 0; i < 12; i += 1) {
+    const north = i < 6;
+    const x0 = 6 + (i % 6) * roomW;
+    const cx = x0 + roomW / 2;
+    if (north) {
+      add(1, "desk", cx, 14.95, 0, i);
+      add(1, "cabinet", x0 + 0.45, 14.6);
+      add(1, "plant", x0 + roomW - 0.4, 17.55);
+    } else {
+      add(1, "desk", cx, 23.05, 2, i);
+      add(1, "cabinet", x0 + 0.45, 23.4);
+      add(1, "plant", x0 + roomW - 0.4, 20.45);
+    }
+  }
+
+  // ---- level 2 ----
+  add(2, "meeting-table", 12, 16);
+  add(2, "bookshelf", 6.35, 15.4);
+  add(2, "plant", 17.4, 14.6);
+  add(2, "plant", 6.7, 17.4);
+  [20.5, 21.6, 22.7, 23.8, 24.9, 26].forEach((x) => add(2, "rack", x, 14.5));
+  // terrace
+  add(2, "sofa", 13, 22.9, 1);
+  add(2, "coffee-table", 13, 21.8);
+  add(2, "beanbag", 19.5, 22.4, 0, 2);
+  add(2, "beanbag", 21.5, 22.4, 0, 3);
+  for (const [x, z] of [[7, 20.9], [10, 23.4], [16.5, 23.4], [26.3, 20.9], [26.8, 23.4]]) add(2, "plant", x, z);
   return withIds(items);
 };
 
@@ -336,15 +394,17 @@ const withIds = (items) => {
 };
 
 // ---------------------------------------------------------------------------
-// Placement rules: footprints, walls, doors, bounds
+// Placement rules: footprints, walls, doors, bounds (all per level)
 // ---------------------------------------------------------------------------
 
 const EPS = 0.015;
+const WALL_HALF = 0.09; // half the thickness of the outer walls: furniture stays inside them
 const rectOf = (x0, x1, z0, z1) => ({ x0, x1, z0, z1 });
+const LEVEL_COUNT = LEVELS.length;
 
-// Glass partitions as thin rectangles (door gaps left open) + door clearance + the summoning circle.
-const WALL_RECTS = [];
-const BLOCK_RECTS = [];
+// Partitions as thin rectangles (door gaps left open) + door clearance, per level.
+const WALL_RECTS = LEVELS.map(() => []);
+const BLOCK_RECTS = LEVELS.map(() => []);
 for (const room of ROOMS) {
   for (const wall of room.walls) {
     const gaps = [...(wall.gaps ?? [])].sort((a, b) => a[0] - b[0]);
@@ -354,16 +414,22 @@ for (const room of ROOMS) {
     pieces.push([cursor, wall.to]);
     for (const [a, b] of pieces) {
       if (b - a < 0.02) continue;
-      WALL_RECTS.push(wall.along === "x" ? rectOf(a, b, wall.at - 0.07, wall.at + 0.07) : rectOf(wall.at - 0.07, wall.at + 0.07, a, b));
+      WALL_RECTS[room.level].push(wall.along === "x" ? rectOf(a, b, wall.at - 0.07, wall.at + 0.07) : rectOf(wall.at - 0.07, wall.at + 0.07, a, b));
     }
     for (const [g0, g1] of gaps) {
-      BLOCK_RECTS.push(wall.along === "x" ? rectOf(g0 - 0.05, g1 + 0.05, wall.at - 0.8, wall.at + 0.8) : rectOf(wall.at - 0.8, wall.at + 0.8, g0 - 0.05, g1 + 0.05));
+      BLOCK_RECTS[room.level].push(wall.along === "x" ? rectOf(g0 - 0.05, g1 + 0.05, wall.at - 0.8, wall.at + 0.8) : rectOf(wall.at - 0.8, wall.at + 0.8, g0 - 0.05, g1 + 0.05));
     }
   }
 }
-BLOCK_RECTS.push(rectOf(PORTAL.x - 1.4, PORTAL.x + 1.4, PORTAL.z - 1.1, OFFICE.z1)); // summoning circle + gate path
+for (let l = 0; l < LEVEL_COUNT; l += 1) BLOCK_RECTS[l].push(rectOf(LIFT.door.x - 1.6, LIFT.door.x + 0.4, LIFT.gap[0] - 0.1, LIFT.gap[1] + 0.1)); // in front of the lift doorway
+BLOCK_RECTS[0].push(rectOf(PORTAL.x - 1.4, PORTAL.x + 1.4, PORTAL.z - 1.1, 28)); // summoning circle + gate path
 
 const overlap = (a, b) => a.x0 < b.x1 - EPS && a.x1 > b.x0 + EPS && a.z0 < b.z1 - EPS && a.z1 > b.z0 + EPS;
+
+// A footprint is on the floor of a level when it lies inside one of the level's rectangles
+// (shrunk by the thickness of the outer wall).
+const insideFloor = (b, level) => LEVELS[level].rects.some(([x0, x1, z0, z1]) =>
+  b.x0 >= x0 + WALL_HALF - EPS && b.x1 <= x1 - WALL_HALF + EPS && b.z0 >= z0 + WALL_HALF - EPS && b.z1 <= z1 - WALL_HALF + EPS);
 
 export const worldRects = (item) => {
   const def = CATALOG[item.type];
@@ -382,11 +448,9 @@ const bbox = (rects) => rects.reduce((b, r) => rectOf(Math.min(b.x0, r.x0), Math
 // Manager
 // ---------------------------------------------------------------------------
 
-export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAutoDesk, items: initial }) => {
-  const root = new THREE.Group();
-  scene.add(root);
+export const createFurniture = ({ groups, animated, screenTex, rooms, makeAutoDesk, items: initial }) => {
   const autoDesks = new THREE.Group(); // open desks for agents beyond the number of desks
-  scene.add(autoDesks);
+  groups[1].add(autoDesks);
   const ctx = { screenTex };
   const items = [];
   const objects = new Map(); // id -> { group }
@@ -395,10 +459,12 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
   const api = { items, onChange: null };
 
   const disposeGroup = (g) => g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  const levelOf = (item) => Math.min(LEVEL_COUNT - 1, Math.max(0, item.level ?? 0));
+  const parentOf = (item) => groups[levelOf(item)];
 
   const place = (item) => {
     const g = objects.get(item.id).group;
-    g.position.set(item.x, top, item.z);
+    g.position.set(item.x, levelTop(levelOf(item)), item.z);
     g.rotation.y = (norm(item.rot) * Math.PI) / 2;
   };
 
@@ -406,9 +472,15 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
     const def = CATALOG[item.type];
     const group = def.build(ctx, item);
     group.userData.furnitureId = item.id;
-    root.add(group);
+    parentOf(item).add(group);
     objects.set(item.id, { group });
     place(item);
+  };
+
+  const unmake = (id, item) => {
+    const o = objects.get(id);
+    o.group.parent?.remove(o.group);
+    disposeGroup(o.group);
   };
 
   const spotWorld = (item, s) => {
@@ -422,16 +494,17 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
     const seen = new Set();
     const seats = [];
     for (const item of items) {
+      const level = levelOf(item);
       for (const s of CATALOG[item.type].spots ?? []) {
         const w = spotWorld(item, s);
-        if (s.seat !== undefined) seats[s.seat] = { x: w.x, z: w.z, heading: w.heading, pose: s.pose, icon: s.icon };
+        if (s.seat !== undefined) seats[s.seat] = { x: w.x, z: w.z, level, heading: w.heading, pose: s.pose, icon: s.icon };
         if (s.activity === false) continue;
         const id = `${item.id}/${s.id}`;
         seen.add(id);
-        const room = roomAt(w.x, w.z)?.id ?? null;
+        const room = roomAt(w.x, w.z, level)?.id ?? null;
         const existing = spots.get(id);
-        if (existing) Object.assign(existing, { x: w.x, z: w.z, heading: w.heading, room });
-        else spots.set(id, { id, room, x: w.x, z: w.z, heading: w.heading, pose: s.pose, icon: s.icon });
+        if (existing) Object.assign(existing, { x: w.x, z: w.z, level, heading: w.heading, room });
+        else spots.set(id, { id, room, level, x: w.x, z: w.z, heading: w.heading, pose: s.pose, icon: s.icon });
       }
     }
     for (const id of [...spots.keys()]) if (!seen.has(id)) spots.delete(id);
@@ -444,14 +517,17 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
   const deskItems = () => items.filter((i) => i.type === "desk");
   const seatOfItem = (item) => {
     const s = spotWorld(item, CATALOG.desk.seat);
-    return { x: s.x, z: s.z, heading: s.heading, room: roomAt(s.x, s.z)?.id ?? null };
+    const level = levelOf(item);
+    return { x: s.x, z: s.z, level, heading: s.heading, room: roomAt(s.x, s.z, level)?.id ?? null };
   };
 
-  // people: [{ id, name }] in desk order (Hermes first). Returns one seat per person.
+  // people: [{ id, name }] in desk order (Hermes first). Returns one seat per person; the private
+  // room of each seat gets the person's name on its sign.
   api.setDesks = (list) => {
     people = list;
     const desks = deskItems();
     const seats = people.map((_, i) => (desks[i] ? seatOfItem(desks[i]) : null));
+    seats.forEach((seat, i) => { if (seat?.room) rooms?.setLabel(seat.room, people[i].name.toUpperCase()); });
     autoDesks.clear();
     const extra = Math.max(0, people.length - desks.length);
     if (extra && makeAutoDesk) makeAutoDesk(autoDesks, extra).forEach((seat, k) => { seats[desks.length + k] = seat; });
@@ -470,21 +546,21 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
   api.count = (type) => items.filter((i) => i.type === type).length;
 
   api.load = (list) => {
-    for (const { group } of objects.values()) { root.remove(group); disposeGroup(group); }
+    for (const id of [...objects.keys()]) unmake(id);
     objects.clear();
     items.length = 0;
     const clean = (Array.isArray(list) ? list : []).filter((i) => i && CATALOG[i.type] && Number.isFinite(i.x) && Number.isFinite(i.z))
-      .map((i) => ({ id: i.id, type: i.type, x: i.x, z: i.z, rot: norm(i.rot ?? 0), ...(i.variant === undefined ? {} : { variant: i.variant }) }));
+      .map((i) => ({ id: i.id, type: i.type, level: Math.min(LEVEL_COUNT - 1, Math.max(0, Math.round(i.level ?? 0))), x: i.x, z: i.z, rot: norm(i.rot ?? 0), ...(i.variant === undefined ? {} : { variant: i.variant }) }));
     withIds(clean);
     for (const item of clean) { items.push(item); make(item); }
     changed();
   };
 
   // silent: the caller (editor) decides when the change counts (after the placement is confirmed)
-  api.add = (type, x, z, r = 0, variant, { silent = false } = {}) => {
+  api.add = (type, x, z, r = 0, variant, { silent = false, level = 0 } = {}) => {
     const def = CATALOG[type];
     if (!def) return null;
-    const item = { type, x, z, rot: norm(r), ...(def.variants ? { variant: variant ?? api.count(type) % def.variants } : {}) };
+    const item = { type, level, x, z, rot: norm(r), ...(def.variants ? { variant: variant ?? api.count(type) % def.variants } : {}) };
     let n = 1;
     while (items.some((i) => i.id === `${type}-${n}`)) n += 1;
     item.id = `${type}-${n}`;
@@ -497,9 +573,7 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
   api.remove = (id, { silent = false } = {}) => {
     const i = items.findIndex((x) => x.id === id);
     if (i < 0) return;
-    const o = objects.get(id);
-    root.remove(o.group);
-    disposeGroup(o.group);
+    unmake(id);
     objects.delete(id);
     items.splice(i, 1);
     if (!silent) changed();
@@ -513,16 +587,14 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
       const g = objects.get(id).group;
       const x = patch.x ?? item.x;
       const z = patch.z ?? item.z;
-      g.position.set(x, top + 0.1, z);
+      g.position.set(x, levelTop(levelOf(item)) + 0.1, z);
       g.rotation.y = (norm(patch.rot ?? item.rot) * Math.PI) / 2;
       return;
     }
     Object.assign(item, patch, patch.rot === undefined ? {} : { rot: norm(patch.rot) });
     if (patch.variant !== undefined) {
       // the model depends on the variant (colour, desk item): rebuild it
-      const o = objects.get(id);
-      root.remove(o.group);
-      disposeGroup(o.group);
+      unmake(id);
       make(item);
     } else place(item);
     changed();
@@ -536,13 +608,14 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
   // Can this item stand here? { ok, reason }
   api.canPlace = (item, ignoreId = item.id) => {
     const def = CATALOG[item.type];
+    const level = levelOf(item);
     const rects = worldRects(item);
     const b = bbox(rects);
-    if (b.x0 < OFFICE.x0 - EPS || b.x1 > OFFICE.x1 + EPS || b.z0 < OFFICE.z0 - EPS || b.z1 > OFFICE.z1 + EPS) return { ok: false, reason: "Di luar lantai kantor" };
-    if (rects.some((r) => WALL_RECTS.some((w) => overlap(r, w)))) return { ok: false, reason: "Menabrak dinding" };
-    if (rects.some((r) => BLOCK_RECTS.some((w) => overlap(r, w)))) return { ok: false, reason: "Menutup pintu atau jalan masuk" };
+    if (!insideFloor(b, level)) return { ok: false, reason: "Di luar lantai kantor" };
+    if (rects.some((r) => WALL_RECTS[level].some((w) => overlap(r, w)))) return { ok: false, reason: "Menabrak dinding" };
+    if (rects.some((r) => BLOCK_RECTS[level].some((w) => overlap(r, w)))) return { ok: false, reason: "Menutup pintu atau jalan masuk" };
     for (const other of items) {
-      if (other.id === ignoreId) continue;
+      if (other.id === ignoreId || levelOf(other) !== level) continue;
       const od = CATALOG[other.type];
       if (def.floor !== od.floor) continue; // rugs lie under everything
       const orects = worldRects(other);
@@ -557,17 +630,21 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
     const g = 0.1;
     let nx = Math.round(x / g) * g;
     let nz = Math.round(z / g) * g;
+    const level = levelOf(item);
     const moved = { ...item, x: nx, z: nz };
     const b = bbox(worldRects(moved));
     const R = 0.14;
     let dx = null;
     let dz = null;
     const pickD = (cur, d) => (Math.abs(d) < R && (cur === null || Math.abs(d) < Math.abs(cur)) ? d : cur);
-    dx = pickD(dx, OFFICE.x0 - b.x0); dx = pickD(dx, OFFICE.x1 - b.x1);
-    dz = pickD(dz, OFFICE.z0 - b.z0); dz = pickD(dz, OFFICE.z1 - b.z1);
+    // the floor rectangle under the item (or the nearest one): flush to its inner wall faces
+    const floor = LEVELS[level].rects.find(([x0, x1, z0, z1]) => nx >= x0 && nx <= x1 && nz >= z0 && nz <= z1) ?? LEVELS[level].rects[0];
+    const [fx0, fx1, fz0, fz1] = floor;
+    dx = pickD(dx, fx0 + WALL_HALF - b.x0); dx = pickD(dx, fx1 - WALL_HALF - b.x1);
+    dz = pickD(dz, fz0 + WALL_HALF - b.z0); dz = pickD(dz, fz1 - WALL_HALF - b.z1);
     const def = CATALOG[item.type];
-    const targets = [...WALL_RECTS];
-    for (const other of items) if (other.id !== item.id && !CATALOG[other.type].floor && !def.floor) targets.push(...worldRects(other));
+    const targets = [...WALL_RECTS[level]];
+    for (const other of items) if (other.id !== item.id && levelOf(other) === level && !CATALOG[other.type].floor && !def.floor) targets.push(...worldRects(other));
     for (const t of targets) {
       if (t.z1 > b.z0 - 0.3 && t.z0 < b.z1 + 0.3) { dx = pickD(dx, t.x0 - b.x1); dx = pickD(dx, t.x1 - b.x0); }
       if (t.x1 > b.x0 - 0.3 && t.x0 < b.x1 + 0.3) { dz = pickD(dz, t.z0 - b.z1); dz = pickD(dz, t.z1 - b.z0); }
@@ -577,10 +654,12 @@ export const createFurniture = ({ scene, top, animated, screenTex, rooms, makeAu
     return { x: Math.round(nx * 1000) / 1000, z: Math.round(nz * 1000) / 1000 };
   };
 
-  // The item under the pointer ray (nearest first; rugs only when nothing else is hit).
+  // The item under the pointer ray (nearest first); levels that are hidden cannot be picked.
+  const shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   api.pick = (raycaster) => {
     const hits = raycaster.intersectObjects([...objects.values()].map((o) => o.group), true);
     for (const hit of hits) {
+      if (!shown(hit.object)) continue;
       let o = hit.object;
       while (o && !o.userData.furnitureId) o = o.parent;
       if (o) return api.get(o.userData.furnitureId);

@@ -1,15 +1,14 @@
-// The 3D world: renderer, fixed isometric camera, lights, the office scene
+// The 3D world: renderer, camera + orbit controls, lights, the office scene
 // and the agents (their seats, idle activities and movement). main.js feeds it
 // the roster and agent status from the gateway and asks it for tag positions.
 import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, MEETING, N, PORTAL, ROOMS, WANDER } from "../office/layout.js";
-import { CameraRig } from "./camera-rig.js";
-import { Outline } from "./outline.js";
+import { ACTIVITY_SPOTS, CENTER, LEVELS, LIFT, MEETING, PORTAL, ROOMS, WANDER, levelTop, wanderOn } from "../office/layout.js";
 import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
-import { corridorFor, doorOf, planRoute } from "./routing.js";
+import { doorOf, planRoute } from "./routing.js";
 import { Environment } from "./environment.js";
 import { makeConversation } from "./chatter.js";
 
@@ -19,8 +18,6 @@ export const PIXEL_MODES = [
   { label: "Pixel", ratio: () => 0.5 },
   { label: "Retro", ratio: () => 0.33 },
 ];
-
-const FACING_STEP = Math.PI / 4;
 
 // What an agent does at an activity spot: the sofa and bean bag can mean reading or a nap, the pantry
 // a snack instead of a drink. ms is extra time spent there (a nap lasts longer).
@@ -60,6 +57,18 @@ function pickGreeting(a, b, period) {
   return make(b.name);
 }
 
+// Critically damped spring (like Unity's SmoothDamp): starts slowly, speeds up, settles softly.
+const damp = (current, target, vel, key, smoothTime, dt) => {
+  const omega = 2 / Math.max(0.0001, smoothTime);
+  const x = omega * dt;
+  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = current - target;
+  const temp = (vel[key] + omega * change) * dt;
+  vel[key] = (vel[key] - omega * temp) * exp;
+  const out = target + (change + temp) * exp;
+  return Number.isFinite(out) ? out : target;
+};
+
 export class World {
   constructor(canvas, { layout, name } = {}) {
     this.canvas = canvas;
@@ -67,29 +76,38 @@ export class World {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.outline = new Outline(this.renderer); // dark silhouette lines (world/outline.js)
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#a8dcff");
-    this.scene.fog = new THREE.Fog("#a8dcff", 75, 150);
+    this.scene.fog = new THREE.Fog("#a8dcff", 70, 140);
 
-    // fixed isometric camera: pan and zoom only, no rotation (world/camera-rig.js)
-    this.rig = new CameraRig(canvas, CENTER, N);
-    this.camera = this.rig.camera;
+    this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 260);
+    this.camera.position.set(CENTER.x + 25, 26, CENTER.z + 27);
+
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.target.set(CENTER.x, 3.2, CENTER.z);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
+    this.controls.minDistance = 6;
+    this.controls.maxDistance = 90;
+    this.controls.maxPolarAngle = Math.PI / 2.25;
+    this.controls.minPolarAngle = Math.PI / 8;
+    this.controls.screenSpacePanning = false;
+    this.controls.update();
 
     // lighting: sky/ground fill + sun with shadows
     this.hemi = new THREE.HemisphereLight("#e3f2ff", "#4e7a34", 1.1);
     this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight("#fff4dc", 1.6);
-    sun.position.set(CENTER.x + 10, 22, CENTER.z + 6);
+    sun.position.set(CENTER.x + 14, 32, CENTER.z + 10);
     sun.target.position.set(CENTER.x, 0, CENTER.z);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -18;
-    sun.shadow.camera.right = 18;
-    sun.shadow.camera.top = 18;
-    sun.shadow.camera.bottom = -18;
-    sun.shadow.camera.far = 60;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -26;
+    sun.shadow.camera.right = 26;
+    sun.shadow.camera.top = 26;
+    sun.shadow.camera.bottom = -26;
+    sun.shadow.camera.far = 90;
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun, sun.target);
@@ -102,7 +120,16 @@ export class World {
     this.appearances = {};
     this.raycaster = new THREE.Raycaster();
     this.pixelMode = 1;
+    this.maxLevel = LEVELS.length - 1; // "Lantai" buttons: levels above this one are hidden
+    this.editLevel = 0; // the level the layout editor works on
     this.followEnabled = true; // 🎥 Sorot: the camera looks at agents who interact
+    this.focus = null; // { key, target, dist } the camera is following
+    this.savedView = null; // the user's own view, restored when the interaction is over
+    this.ignoreFocusKey = null; // an interaction the user moved away from (not followed again)
+    this.camVel = { x: 0, y: 0, z: 0, d: 0 };
+    this.camSmooth = 0.9;
+    this.camGoal = null; // { target: Vector3, dist }
+    this.controls.addEventListener("start", () => this.userMoved());
     // small talk between idle agents (world/chatter.js); main.js fills in the callbacks
     this.chatter = { active: null, nextAt: performance.now() + 9000, recent: [] };
     this.onSay = null; // (agentId, text, ms) -> speech bubble
@@ -120,11 +147,10 @@ export class World {
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const ratio = PIXEL_MODES[this.pixelMode].ratio();
-    this.renderer.setPixelRatio(ratio);
+    this.renderer.setPixelRatio(PIXEL_MODES[this.pixelMode].ratio());
     this.renderer.setSize(w, h, false);
-    this.rig.resize(w, h, Math.round(h * ratio));
-    this.outline.resize();
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
   }
 
   setAppearances(map) {
@@ -139,7 +165,7 @@ export class World {
   makeModel(id, look, a) {
     const model = createPerson(look);
     model.userData.agentId = id;
-    model.position.set(a.x, this.office.floorTop, a.z);
+    model.position.set(a.x, a.y, a.z);
     model.rotation.y = a.heading ?? Math.PI / 4;
     this.scene.add(model);
     return model;
@@ -163,10 +189,11 @@ export class World {
       const isMain = info.id === "hermes";
       const order = others.indexOf(info.id);
       const preset = isMain ? PRESETS[0] : PRESETS[1 + (order % (PRESETS.length - 1))];
-      const [sx, sz] = isMain ? [PORTAL.x - 0.6, PORTAL.z + 0.4] : WANDER[(order * 3) % WANDER.length];
+      const lobby = wanderOn(0);
+      const spawn = isMain ? { x: PORTAL.x - 0.6, z: PORTAL.z + 0.4 } : lobby[(order * 3) % lobby.length];
       const a = {
         id: info.id, name: info.name, role: info.role, isMain, preset, seat: null,
-        x: sx, z: sz, heading: Math.PI / 4, route: [], mode: "idle", status: "idle", spot: null,
+        x: spawn.x, z: spawn.z, level: 0, y: levelTop(0), heading: Math.PI / 4, route: [], mode: "idle", status: "idle", spot: null,
         nextWander: performance.now() + 1500 + Math.random() * 3000, lastActive: 0, phase: Math.random() * 10,
         gesture: "", gestureUntil: 0, pauseUntil: 0, greetWith: null, act: null,
       };
@@ -183,7 +210,7 @@ export class World {
     order.forEach((id, i) => {
       const a = this.agents.get(id);
       const seat = seats[i] ?? null;
-      const moved = a.seat && seat && (a.seat.x !== seat.x || a.seat.z !== seat.z);
+      const moved = a.seat && seat && (a.seat.x !== seat.x || a.seat.z !== seat.z || a.seat.level !== seat.level);
       a.seat = seat;
       if (moved && (a.mode === "sitting" || a.mode === "toSeat")) {
         a.mode = "toSeat";
@@ -239,9 +266,9 @@ export class World {
     for (const a of this.agents.values()) {
       if (!a.meeting) continue;
       a.meeting = null;
-      const exit = doorOf(MEETING.room) ?? { outside: { x: 12.5, z: 12.8 } }; // an open zone: leave towards the hall
+      const exit = doorOf(MEETING.room); // out of the meeting room onto the corridor of level 3
       a.route = a.mode === "meeting" || a.mode === "toMeeting"
-        ? planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.mode === "meeting" ? MEETING.room : null)
+        ? planRoute(a, { x: exit.outside.x, z: exit.outside.z, level: MEETING.level }, a.mode === "meeting" ? MEETING.room : null)
         : a.route;
       a.room = null;
       a.mode = "wander";
@@ -281,11 +308,11 @@ export class World {
     const exit = a.seat.room ? doorOf(a.seat.room) : null;
     if (!exit && !a.isMain && Math.random() < 0.7 && this.callHighFive(a, now)) return;
     if (exit) {
-      a.route = planRoute(a, { x: exit.outside.x, z: corridorFor(exit.outside.z) }, a.seat.room);
+      a.route = planRoute(a, { x: exit.outside.x, z: exit.outside.z, level: a.seat.level }, a.seat.room);
       a.mode = "wander";
     } else {
       a.mode = "idle";
-      a.route = [{ x: a.seat.x, z: a.seat.z + (a.seat.heading === 0 ? -0.6 : 0.6) }];
+      a.route = [{ x: a.seat.x, z: a.seat.z + (a.seat.heading === 0 ? -0.6 : 0.6), level: a.seat.level }];
     }
   }
 
@@ -294,7 +321,21 @@ export class World {
     this.environment.update(dt, now);
     for (const a of this.agents.values()) {
       let moving = false;
-      if (a.route.length && now >= a.pauseUntil) {
+      let riding = false;
+      if (a.route.length && now >= a.pauseUntil && (a.route[0].level ?? a.level) !== a.level) {
+        // the next waypoint is on another level at the same spot: ride the lift
+        const goalY = levelTop(a.route[0].level);
+        const stepY = (dt / 1000) * LIFT.speed;
+        riding = true;
+        if (Math.abs(goalY - a.y) <= stepY) {
+          a.y = goalY;
+          a.level = a.route[0].level;
+          a.route.shift();
+        } else {
+          a.y += Math.sign(goalY - a.y) * stepY;
+        }
+      } else if (a.route.length && now >= a.pauseUntil) {
+        a.y = levelTop(a.level);
         const target = a.route[0];
         const dx = target.x - a.x;
         const dz = target.z - a.z;
@@ -324,8 +365,8 @@ export class World {
       } else if (a.mode === "activity" && now > a.activityEnd) {
         // done with the sofa/arcade/...: step away and idle again
         const exit = doorOf(a.room);
-        const out = exit ? exit.outside : { x: a.x, z: corridorFor(a.z) };
-        a.route = planRoute(a, { x: out.x, z: corridorFor(out.z) }, a.room);
+        const out = exit ? exit.outside : { x: a.x, z: a.z };
+        a.route = planRoute(a, { x: out.x, z: out.z, level: a.level }, a.room);
         if (a.act?.pose === "sleep") { a.gesture = "stretch"; a.gestureUntil = now + 1800; a.pauseUntil = now + 1800; }
         a.act = null;
         a.spot = null;
@@ -344,19 +385,22 @@ export class World {
           a.mode = "toSpot";
         } else if (a.isMain) {
           const ang = Math.random() * Math.PI * 2;
-          a.route = [{ x: PORTAL.x + Math.cos(ang) * 1.2, z: PORTAL.z + Math.sin(ang) * 0.9 }];
+          a.route = planRoute(a, { x: PORTAL.x + Math.cos(ang) * 1.2, z: PORTAL.z + Math.sin(ang) * 0.9, level: 0 });
           a.mode = "wander";
         } else {
-          const [tx, tz] = Math.random() < 0.18
-            ? [PORTAL.x + (Math.random() - 0.5), PORTAL.z + (Math.random() - 0.5) * 0.6]
-            : WANDER[Math.floor(Math.random() * WANDER.length)];
-          a.route = planRoute(a, { x: tx, z: tz });
+          // mostly the lobby, now and then a walk along the corridors upstairs
+          const points = Math.random() < 0.65 ? wanderOn(0) : WANDER;
+          const w = Math.random() < 0.15
+            ? { x: PORTAL.x + (Math.random() - 0.5), z: PORTAL.z + (Math.random() - 0.5) * 0.6, level: 0 }
+            : points[Math.floor(Math.random() * points.length)];
+          a.route = planRoute(a, w);
           a.mode = "wander";
         }
         a.nextWander = now + 4000 + Math.random() * 7000;
       }
 
-      const sitting = a.mode === "sitting" && !moving;
+      a.riding = riding;
+      const sitting = a.mode === "sitting" && !moving && !riding;
       const atSpot = a.mode === "activity" && !moving && a.spot;
       const inMeeting = a.mode === "meeting" && !moving && a.meeting;
       // face the desk when seated, the prop at an activity, the camera side when idle
@@ -366,33 +410,23 @@ export class World {
       else if (a.mode === "chat" && !moving && a.chatPartner) targetHeading = Math.atan2(a.chatPartner.x - a.x, a.chatPartner.z - a.z); // face the other agent
       else if (atSpot) targetHeading = a.spot.heading;
       else if (a.greetWith && now < a.pauseUntil) targetHeading = Math.atan2(a.greetWith.x - a.x, a.greetWith.z - a.z); // turn to the one being greeted
-      else if (!moving) targetHeading = Math.atan2(this.rig.offset.x, this.rig.offset.z); // the camera never turns: face it
-      // like a sprite: only 8 facing directions, switched instantly
-      a.model.rotation.y = Math.round(targetHeading / FACING_STEP) * FACING_STEP;
-      a.model.position.set(a.x, this.office.floorTop, a.z);
-      const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
+      else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
+      let diff = targetHeading - a.model.rotation.y;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      a.model.rotation.y += diff * Math.min(1, dt / 120);
+      a.model.position.set(a.x, a.y, a.z);
+      const pose = moving || riding ?  "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
       a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? (a.act?.icon ?? a.spot.icon) : "";
       if (a.gesture && now > a.gestureUntil) a.gesture = "";
       animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking || a.chatSpeaking), a.gesture);
     }
     this.updateGreetings(now);
     this.updateChatter(now);
-    this.rig.setFocus(this.followEnabled ? this.interactionFocus() : null);
-  }
-
-  // Where the camera should look while agents interact: the meeting room during a meeting, the
-  // pair that is chatting, or the two giving each other a high five. null = nothing going on.
-  interactionFocus() {
-    const agents = [...this.agents.values()];
-    if (this.meetingOn && agents.some((a) => a.mode === "meeting")) {
-      const room = ROOMS.find((r) => r.id === MEETING.room);
-      if (room) return { key: "meeting", x: (room.x0 + room.x1) / 2, z: (room.z0 + room.z1) / 2, size: 13 };
-    }
-    const ch = this.chatter.active;
-    if (ch && ch.state === "talk") return { key: `chat:${ch.a.id}:${ch.b.id}`, x: (ch.a.x + ch.b.x) / 2, z: (ch.a.z + ch.b.z) / 2, size: 11 };
-    const hi5 = agents.find((a) => a.gesture === "hi5" && a.greetWith);
-    if (hi5) return { key: `hi5:${hi5.id}`, x: (hi5.x + hi5.greetWith.x) / 2, z: (hi5.z + hi5.greetWith.z) / 2, size: 10 };
-    return null;
+    const rider = [...this.agents.values()].find((a) => a.riding);
+    if (rider) this.office.lift.set(rider.y);
+    this.applyVisibility();
+    this.setFocus(this.followEnabled ? this.interactionFocus() : null);
   }
 
   // Picks a free activity spot. Ping-pong needs two players: another idle agent is invited to the
@@ -420,12 +454,12 @@ export class World {
   // A task is done: a free colleague walks over for a high five.
   callHighFive(a, now) {
     const mate = [...this.agents.values()]
-      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture && Math.hypot(x.x - a.x, x.z - a.z) < 14)
+      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture && x.level === a.level && Math.hypot(x.x - a.x, x.z - a.z) < 14)
       .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z))[0];
     if (!mate) return false;
     const side = a.seat.heading === 0 ? -1 : 1; // the free side of the desk
-    const stand = { x: a.seat.x, z: a.seat.z + side * 0.6 };
-    mate.route = planRoute(mate, { x: stand.x + 0.9, z: stand.z });
+    const stand = { x: a.seat.x, z: a.seat.z + side * 0.6, level: a.seat.level };
+    mate.route = planRoute(mate, { x: stand.x + 0.9, z: stand.z, level: stand.level });
     mate.mode = "toHi5";
     mate.hi5With = a;
     a.route = [stand];
@@ -439,7 +473,7 @@ export class World {
     m.hi5With = null;
     m.mode = "idle";
     m.nextWander = now + 3000;
-    if (!a || a.mode === "toSeat" || a.mode === "sitting" || Math.hypot(a.x - m.x, a.z - m.z) > 3) return;
+    if (!a || a.mode === "toSeat" || a.mode === "sitting" || a.level !== m.level || Math.hypot(a.x - m.x, a.z - m.z) > 3) return;
     for (const [x, y] of [[m, a], [a, m]]) {
       x.gesture = "hi5";
       x.gestureUntil = now + 1800;
@@ -463,7 +497,7 @@ export class World {
       for (let j = i + 1; j < list.length; j += 1) {
         const a = list[i];
         const b = list[j];
-        if (Math.hypot(a.x - b.x, a.z - b.z) > 2.4) continue;
+        if (a.level !== b.level || Math.hypot(a.x - b.x, a.z - b.z) > 2.4) continue;
         const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
         if (now < (this.greetCool.get(key) ?? 0)) continue;
         this.greetCool.set(key, now + 45000 + Math.random() * 45000);
@@ -487,17 +521,19 @@ export class World {
     const c = this.chatter;
     if (c.active) { this.stepChat(c.active, now); return; }
     if (now < c.nextAt || this.meetingOn || document.hidden) return;
-    const free = [...this.agents.values()].filter((a) => (a.mode === "idle" || a.mode === "wander") && !a.room && !a.speaking && a.status !== "working" && !a.meeting);
+    const free = [...this.agents.values()].filter((a) => (a.mode === "idle" || a.mode === "wander") && !a.room && !a.riding && !a.speaking && a.status !== "working" && !a.meeting);
     if (free.length < 2) { c.nextAt = now + 5000; return; }
     const a = free[Math.floor(Math.random() * free.length)];
-    const near = free.filter((x) => x !== a).sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 3);
+    const near = free.filter((x) => x !== a && x.level === a.level).sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 3);
+    if (!near.length) { c.nextAt = now + 5000; return; }
     const b = near[Math.floor(Math.random() * near.length)];
-    // meet at the walking point nearest to the middle between them
+    // meet at the walking point (on their level) nearest to the middle between them
     const mx = (a.x + b.x) / 2;
     const mz = (a.z + b.z) / 2;
-    const [rx, rz] = WANDER.slice().sort((p, q) => Math.hypot(p[0] - mx, p[1] - mz) - Math.hypot(q[0] - mx, q[1] - mz))[0];
+    const meet = wanderOn(a.level).slice().sort((p, q) => Math.hypot(p.x - mx, p.z - mz) - Math.hypot(q.x - mx, q.z - mz))[0];
+    const [rx, rz] = [meet.x, meet.z];
     const lines = makeConversation(a, b, { weather: this.environment?.weatherId, period: this.environment?.periodName() }, c.recent);
-    const place = (agent, x, partner) => { agent.route = planRoute(agent, { x, z: rz }); agent.mode = "toChat"; agent.chatPartner = partner; agent.chatSpeaking = false; };
+    const place = (agent, x, partner) => { agent.route = planRoute(agent, { x, z: rz, level: a.level }); agent.mode = "toChat"; agent.chatPartner = partner; agent.chatSpeaking = false; };
     place(a, rx - 0.5, b);
     place(b, rx + 0.5, a);
     c.active = { a, b, lines, i: 0, state: "approach", startedAt: now, nextLineAt: 0 };
@@ -544,8 +580,91 @@ export class World {
   }
 
   render() {
-    this.rig.update();
-    this.outline.render(this.scene, this.camera);
+    this.updateCamera();
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  // ---- levels (the "Lantai" buttons) ------------------------------------------
+
+  // Shows level 0 up to `max` (0 to 2); the levels above are hidden so the ones below can be seen.
+  setVisibleLevels(max) {
+    this.maxLevel = Math.max(0, Math.min(LEVELS.length - 1, max));
+    this.applyVisibility();
+  }
+
+  applyVisibility() {
+    const limit = levelTop(this.maxLevel) + 0.5;
+    this.office.levelGroups.forEach((g, l) => { g.visible = l <= this.maxLevel; });
+    for (const a of this.agents.values()) a.model.visible = a.y <= limit;
+    this.office.lift.car.visible = this.office.lift.y <= limit;
+  }
+
+  // ---- camera focus (🎥 Sorot) ------------------------------------------------------
+
+  // The user took the camera: stop following the interaction until a different one starts.
+  userMoved() {
+    this.camGoal = null;
+    if (!this.focus) return;
+    this.ignoreFocusKey = this.focus.key;
+    this.focus = null;
+    this.savedView = null;
+  }
+
+  // Look at a point from `dist` away, easing there slowly (ease in, ease out); null = back to the
+  // view the user had. Called every frame with the same key while the interaction lasts.
+  setFocus(f) {
+    if (!f) {
+      this.ignoreFocusKey = null;
+      if (!this.focus) return;
+      this.focus = null;
+      if (this.savedView) { this.camGoal = this.savedView; this.savedView = null; }
+      this.camSmooth = 0.9;
+      return;
+    }
+    if (f.key === this.ignoreFocusKey) return;
+    if (!this.focus) {
+      this.savedView = { target: this.controls.target.clone(), dist: this.camera.position.distanceTo(this.controls.target) };
+      this.camSmooth = 0.9;
+    } else if (f.key !== this.focus.key) {
+      this.camSmooth = 0.9;
+    }
+    this.focus = f;
+    this.camGoal = { target: new THREE.Vector3(f.x, f.y, f.z), dist: f.dist };
+  }
+
+  // Where the camera should look while agents interact: the meeting room during a meeting, the
+  // pair that is chatting, or the two giving each other a high five. null = nothing going on.
+  interactionFocus() {
+    const agents = [...this.agents.values()];
+    const shown = (level) => level <= this.maxLevel;
+    if (this.meetingOn && shown(MEETING.level) && agents.some((a) => a.mode === "meeting")) {
+      const room = ROOMS.find((r) => r.id === MEETING.room);
+      if (room) return { key: "meeting", x: (room.x0 + room.x1) / 2, y: levelTop(MEETING.level) + 0.9, z: (room.z0 + room.z1) / 2 + 1.5, dist: 17 };
+    }
+    const ch = this.chatter.active;
+    if (ch && ch.state === "talk" && shown(ch.a.level)) return { key: `chat:${ch.a.id}:${ch.b.id}`, x: (ch.a.x + ch.b.x) / 2, y: ch.a.y + 0.9, z: (ch.a.z + ch.b.z) / 2, dist: 11 };
+    const hi5 = agents.find((a) => a.gesture === "hi5" && a.greetWith && shown(a.level));
+    if (hi5) return { key: `hi5:${hi5.id}`, x: (hi5.x + hi5.greetWith.x) / 2, y: hi5.y + 0.9, z: (hi5.z + hi5.greetWith.z) / 2, dist: 10 };
+    return null;
+  }
+
+  updateCamera() {
+    const now = performance.now();
+    const dt = Math.min(100, now - (this.lastCamAt ?? now));
+    this.lastCamAt = now;
+    if (!this.camGoal) return;
+    const c = this.controls.target;
+    const g = this.camGoal;
+    const sec = dt / 1000;
+    const dir = this.camera.position.clone().sub(c).normalize();
+    const dist = damp(this.camera.position.distanceTo(c), g.dist, this.camVel, "d", this.camSmooth, sec);
+    c.x = damp(c.x, g.target.x, this.camVel, "x", this.camSmooth, sec);
+    c.y = damp(c.y, g.target.y, this.camVel, "y", this.camSmooth, sec);
+    c.z = damp(c.z, g.target.z, this.camVel, "z", this.camSmooth, sec);
+    this.camera.position.copy(c).addScaledVector(dir, dist);
+    // back at the user's view: stop driving the camera
+    if (!this.focus && c.distanceTo(g.target) < 0.03 && Math.abs(dist - g.dist) < 0.03) this.camGoal = null;
   }
 
   // Screen positions (CSS px) above each head, for DOM name tags/bubbles.
@@ -554,14 +673,41 @@ export class World {
     const v = new THREE.Vector3();
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const hidden = this.hiddenByFloors();
     for (const a of this.agents.values()) {
       const sitting = a.mode === "sitting" && !a.route.length;
-      v.set(a.x, this.office.floorTop + (sitting ? 1.45 : 1.38), a.z);
+      if (!a.model.visible || hidden.has(a.id)) continue;
+      v.set(a.x, a.y + (sitting ? 1.45 : 1.38), a.z);
       v.project(this.camera);
       if (v.z > 1) continue;
       out.push({ agent: a, x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h });
     }
     return out;
+  }
+
+  // Agents whose head is behind a floor slab of a higher level (seen from the camera): their name
+  // tag is hidden. Checked a few times a second.
+  hiddenByFloors() {
+    const now = performance.now();
+    if (this.hiddenIds && now - this.hiddenAt < 150) return this.hiddenIds;
+    this.hiddenAt = now;
+    const hidden = new Set();
+    const ray = new THREE.Raycaster();
+    const head = new THREE.Vector3();
+    for (const a of this.agents.values()) {
+      if (!a.model.visible) continue;
+      const floor = LEVELS.reduce((best, _, l) => (levelTop(l) <= a.y + 0.2 ? l : best), 0);
+      const meshes = this.office.slabs.filter((s) => s.level > floor && s.mesh.parent.visible).map((s) => s.mesh);
+      if (!meshes.length) continue;
+      head.set(a.x, a.y + 1.4, a.z);
+      const dir = head.clone().sub(this.camera.position);
+      const dist = dir.length();
+      ray.set(this.camera.position, dir.normalize());
+      ray.far = dist;
+      if (ray.intersectObjects(meshes, false).length) hidden.add(a.id);
+    }
+    this.hiddenIds = hidden;
+    return hidden;
   }
 
   // Layout editor: pointer ray, the floor point under the pointer and the furniture under it.
@@ -573,7 +719,7 @@ export class World {
   groundPoint(clientX, clientY) {
     this.setRay(clientX, clientY);
     const hit = new THREE.Vector3();
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.office.floorTop);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -levelTop(this.editLevel));
     return this.raycaster.ray.intersectPlane(plane, hit) ? hit : null;
   }
 
@@ -585,7 +731,7 @@ export class World {
   hitTest(clientX, clientY) {
     const ndc = new THREE.Vector2((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    const models = [...this.agents.values()].map((a) => a.model);
+    const models = [...this.agents.values()].filter((a) => a.model.visible).map((a) => a.model);
     const hit = this.raycaster.intersectObjects(models, true)[0];
     if (!hit) return null;
     let obj = hit.object;

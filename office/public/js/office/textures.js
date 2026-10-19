@@ -1,7 +1,7 @@
 // Pixel-art textures drawn on a canvas: grass/path ground, room floors,
 // monitor screens, windows and room name signs.
 import { canvasTexture, pixelTexture, rand } from "./helpers.js";
-import { N, OFFICE, ROOMS, isPath } from "./layout.js";
+import { LEVELS, N, ROOMS, isPath } from "./layout.js";
 
 export const TPX = 16; // texture pixels per tile
 
@@ -96,28 +96,35 @@ export const drawFloorTile = (ctx, ox, oz, style, size = TPX) => {
   else ctx.fillRect(ox + s(9), oz + s(10), s(2), 1);
 };
 
-// The whole office floor: the hall tiles first, then every room's own floor clipped to the
-// room's exact rectangle, so floors end precisely under the glass walls.
-export const floorTexture = () => {
-  const w = OFFICE.x1 - OFFICE.x0;
-  const h = OFFICE.z1 - OFFICE.z0;
-  return pixelTexture(w * FPX, h * FPX, (ctx) => {
+// Bounding box of the floor of one level.
+export const levelBounds = (level) => LEVELS[level].rects.reduce((b, [x0, x1, z0, z1]) => ({
+  x0: Math.min(b.x0, x0), x1: Math.max(b.x1, x1), z0: Math.min(b.z0, z0), z1: Math.max(b.z1, z1),
+}), { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity });
+
+// The floor texture of one level (covers its bounding box): the hall tiles first, then every room's
+// own floor clipped to the room's exact rectangle, so floors end precisely under the walls.
+export const floorTexture = (level) => {
+  const b = levelBounds(level);
+  const w = b.x1 - b.x0;
+  const h = b.z1 - b.z0;
+  return pixelTexture(Math.round(w * FPX), Math.round(h * FPX), (ctx) => {
     const pattern = (style) => {
       const cv = document.createElement("canvas");
-      cv.width = w * FPX;
-      cv.height = h * FPX;
+      cv.width = Math.round(w * FPX);
+      cv.height = Math.round(h * FPX);
       const c = cv.getContext("2d");
-      for (let tz = 0; tz < h; tz += 1) for (let tx = 0; tx < w; tx += 1) drawFloorTile(c, tx * FPX, tz * FPX, style, FPX);
+      for (let tz = 0; tz < Math.ceil(h); tz += 1) for (let tx = 0; tx < Math.ceil(w); tx += 1) drawFloorTile(c, tx * FPX, tz * FPX, style, FPX);
       return cv;
     };
     const cache = new Map();
     const get = (style) => { if (!cache.has(style)) cache.set(style, pattern(style)); return cache.get(style); };
     ctx.drawImage(get("tile"), 0, 0);
     for (const room of ROOMS) {
+      if (room.level !== level) continue;
       const style = room.floor ?? "tile";
       if (style === "tile") continue;
-      const x = Math.round((room.x0 - OFFICE.x0) * FPX);
-      const z = Math.round((room.z0 - OFFICE.z0) * FPX);
+      const x = Math.round((room.x0 - b.x0) * FPX);
+      const z = Math.round((room.z0 - b.z0) * FPX);
       const rw = Math.round((room.x1 - room.x0) * FPX);
       const rh = Math.round((room.z1 - room.z0) * FPX);
       ctx.drawImage(get(style), x, z, rw, rh, x, z, rw, rh);

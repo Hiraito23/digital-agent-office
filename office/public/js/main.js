@@ -109,6 +109,20 @@ followBtn.addEventListener("click", () => {
   try { localStorage.setItem("kantor-hermes-follow", follow ? "1" : "0"); } catch { /* ignore */ }
 });
 
+// 🏢 Lantai: show all three storeys, the lower two or only the ground floor (the ones above are hidden).
+const levelBtn = document.getElementById("level-toggle");
+const LEVEL_LABELS = ["🏢 Lantai 1", "🏢 Lantai 1–2", "🏢 Semua lantai"];
+const renderLevel = () => {
+  levelBtn.textContent = LEVEL_LABELS[world.maxLevel];
+  levelBtn.classList.toggle("playing", world.maxLevel < 2);
+};
+renderLevel();
+levelBtn.addEventListener("click", () => {
+  world.setVisibleLevels((world.maxLevel + 2) % 3); // all → 1–2 → 1 → all
+  renderLevel();
+});
+levelBtn.addEventListener("levels-changed", renderLevel);
+
 // Pixel look toggle (HD / Pixel / Retro), remembered per browser.
 let pixelMode = 1;
 try { pixelMode = Number(localStorage.getItem("kantor-hermes-pixel") ?? 1); } catch { /* ignore */ }

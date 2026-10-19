@@ -1,40 +1,41 @@
-// Walking routes for agents. The work area is a grid of desk rows: agents
-// walk along two corridors (between and in front of the desk rows) and switch
-// between them through the side aisles. Rooms are entered and left through
-// their door (ROOMS[].door in layout.js).
-import { ROOMS } from "../office/layout.js";
-
-// Three east-west lanes: north of the desks, between the two desk rows, and south of them.
-// Agents walk along a lane and switch lanes through the side aisles at both ends.
-export const LANES = [12.8, 15.5, 18.2];
-export const corridorFor = (z) => LANES.reduce((best, lane) => (Math.abs(lane - z) < Math.abs(best - z) ? lane : best), LANES[0]);
-export const AISLE_LEFT = 9.7;
-export const AISLE_RIGHT = 22.3;
-
-// Work-area route: detour around the desk rows using two corridors and the side aisles.
-export const corridorRoute = (from, to) => {
-  const route = [];
-  const c1 = corridorFor(from.z);
-  const c2 = corridorFor(to.z);
-  route.push({ x: from.x, z: c1 });
-  if (c1 !== c2) {
-    const side = Math.abs(from.x - AISLE_LEFT) + Math.abs(to.x - AISLE_LEFT) < Math.abs(from.x - AISLE_RIGHT) + Math.abs(to.x - AISLE_RIGHT) ? AISLE_LEFT : AISLE_RIGHT;
-    route.push({ x: side, z: c1 }, { x: side, z: c2 });
-  }
-  route.push({ x: to.x, z: c2 }, { x: to.x, z: to.z });
-  return route;
-};
+// Walking routes for agents across the three levels. Points carry a `level`: a route is a list of
+// waypoints { x, z, level }; when the level changes between two waypoints at the same spot the agent
+// rides the lift. Rooms are entered and left through their door (ROOMS[].door in layout.js).
+//   level 0: the lobby is one open space: straight lines between the doors, the lift and the spots
+//   levels 1 and 2: everything hangs off the corridor (z = CORRIDOR_Z) between the lift and the doors
+import { CORRIDOR_Z, LIFT, ROOMS } from "../office/layout.js";
 
 export const doorOf = (roomId) => ROOMS.find((r) => r.id === roomId)?.door ?? null;
+export const roomLevel = (roomId) => ROOMS.find((r) => r.id === roomId)?.level ?? 0;
 
-// Full route between two points, leaving/entering rooms through their doors.
+const at = (p, level) => ({ x: p.x, z: p.z, level });
+
+// Walking on one level from a to b (both are the lift door, a door's outside point or a free spot).
+const walk = (level, a, b) => {
+  if (level === 0) return [at(b, 0)];
+  return [{ x: a.x, z: CORRIDOR_Z, level }, { x: b.x, z: CORRIDOR_Z, level }, at(b, level)];
+};
+
+// Full route between two points, leaving/entering rooms through their doors and changing level by lift.
 export const planRoute = (from, to, fromRoom = null, toRoom = null) => {
-  if (fromRoom && fromRoom === toRoom) return [{ x: to.x, z: to.z }];
+  const fromLevel = from.level ?? 0;
+  const toLevel = to.level ?? 0;
+  if (fromRoom && fromRoom === toRoom) return [at(to, toLevel)];
   const exit = doorOf(fromRoom);
   const entry = doorOf(toRoom);
-  const route = exit ? [exit.inside, exit.outside] : [];
-  const start = exit ? exit.outside : from;
-  route.push(...corridorRoute(start, entry ? entry.outside : to));
-  if (entry) route.push(entry.inside, { x: to.x, z: to.z });
+  const route = [];
+  let cur = from;
+  if (exit) {
+    route.push(at(exit.inside, fromLevel), at(exit.outside, fromLevel));
+    cur = exit.outside;
+  }
+  const dest = entry ? entry.outside : to;
+  if (fromLevel !== toLevel) {
+    route.push(...walk(fromLevel, cur, LIFT.door));
+    route.push(at(LIFT.cabin, fromLevel), at(LIFT.cabin, toLevel), at(LIFT.door, toLevel)); // the ride: same spot, other level
+    cur = LIFT.door;
+  }
+  route.push(...walk(toLevel, cur, dest));
+  if (entry) route.push(at(entry.inside, toLevel), at(to, toLevel));
   return route;
 };

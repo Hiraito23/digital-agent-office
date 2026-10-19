@@ -55,15 +55,16 @@ office/                 image Docker "office"
       main.js           titik masuk UI: menyambungkan semua modul + state aplikasi
       net/gateway.js    klien WebSocket ke adapter (request/response + event)
       world/
-        camera-rig.js   kamera isometrik ortografik terkunci (hanya geser dan zoom)
-        world.js        renderer, cahaya, agen (meja, kegiatan, gerak, obrolan antar agen)
+        world.js        renderer, kamera, cahaya, agen (meja, kegiatan, gerak, obrolan antar agen)
         environment.js  langit, waktu (pagi/siang/sore/malam) dan cuaca (hujan, kabut, awan, ...)
         chatter.js      kalimat obrolan antar agen yang santai (tanpa AI)
-        routing.js      jalur jalan: tiga lorong timur-barat (LANES) dan lorong samping
+        routing.js      jalur jalan antar lantai: lobi terbuka, lorong lantai 2 dan 3, pintu ruang, dan lift
       office/           scene kantor
-        layout.js       DENAH: lantai 16x16 (OFFICE), ruang bertembok dan berpintu serta zona lobi (ROOMS), pagar (GATE), titik jalan (WANDER); ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js
+        layout.js       DENAH tiga lantai: bentuk lantai (LEVELS), ruang bertembok dan berpintu (ROOMS), lift (LIFT), gerbang (GATE), titik jalan (WANDER); ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js
         index.js        merakit seluruh scene (buildOffice)
-        rooms.js        papan nama zona di lantai
+        building.js     cangkang gedung: lantai tiap level, dinding luar dari bentuk denah, menara lift dan kabinnya
+        walls.js        potongan dinding (dasar solid + kaca), tiang pintu, railing
+        rooms.js        dinding sekat ruang dan papan nama di atas pintu
         furniture.js    furnitur yang bisa dipindah: katalog, layout bawaan, aturan penempatan, manajer
         decor.js        hiasan dinding (whiteboard, neon, jam)
         props.js        meja, kursi, lampu, pohon, rak server, ...
@@ -142,7 +143,7 @@ Furnitur adalah data, bukan kode: daftar `{ id, type, x, z, rot, variant? }` (`x
 - `setDesks(people)`: agen ke-*i* mendapat meja ke-*i* menurut urutan di daftar (meja pertama = Hermes). Kursi memakai `seat` milik katalog (`desk`), ruangnya dari `roomAt()`. Agen yang lebih banyak daripada meja tidak mendapat kursi (tambahkan meja lewat editor).
 - `onChange`: dipanggil setelah perubahan yang final; `World` memakainya untuk `refreshDesks()` sehingga agen yang duduk berjalan ke kursi barunya.
 
-**Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut menggeser kamera (`CameraRig`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
+**Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut memutar kamera (`OrbitControls`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
 
 **Server (`server/layout-api.js`).** Hanya memeriksa bentuk dan rentang (maks. 300 benda, id unik, posisi -5 sampai 60, rotasi 0 sampai 3); jenis benda divalidasi browser terhadap katalognya. Berkas ditulis atomik ke `config/layout.json` (`LAYOUT_FILE` bisa menggantinya).
 
@@ -158,7 +159,7 @@ Batasan: zona lantai dan ukuran kantor belum bisa diedit dari UI, rapat selalu d
 
 **Progress bar (`ui/name-tags.js`).** `startTask`/`taskStep`/`endTask`/`cancelTask` dipanggil `main.js` dari event `chat` (delta pertama, final, error) dan `tool`. Persentase adalah perkiraan: `1 - exp(-(menit * 1,1 + langkah * 0,2))` dibatasi 94% dan tidak pernah turun; hanya `endTask(ok)` yang mengisinya penuh.
 
-**Lantai (`office/textures.js`).** `floorTexture` memakai 20 px per tile dan menggambar lantai tiap zona yang dipotong tepat pada persegi panjang zonanya (`ROOMS`), sehingga batas zona yang berada di koordinat pecahan tetap tepat. Versi denah ada di `LAYOUT_VERSION` (`furniture.js`): layout tersimpan dengan versi lain diabaikan `loadLayout()`.
+**Lantai (`office/textures.js`).** `floorTexture(level)` memakai 20 px per tile dan menggambar lantai tiap zona pada lantai itu yang dipotong tepat pada persegi panjang zonanya (`ROOMS`), sehingga batas zona yang berada di koordinat pecahan tetap tepat. Versi denah ada di `LAYOUT_VERSION` (`furniture.js`): layout tersimpan dengan versi lain diabaikan `loadLayout()`.
 
 ## Delegasi Hermes ke agen kantor (MCP)
 
@@ -192,7 +193,7 @@ Setiap agen punya `mode`: `idle` → `wander` atau `toSpot` (berjalan ke propert
 
 | Ingin | Ubah |
 | --- | --- |
-| Mengubah ukuran kantor atau zona lantai | `OFFICE`, `ROOMS`, `GATE`, `PORTAL`, `WANDER` dan `LANES` (`world/routing.js`) di `office/layout.js`; naikkan `LAYOUT_VERSION` di `office/furniture.js` bila posisi furnitur bawaan berubah |
+| Mengubah ukuran kantor atau zona lantai | `LEVELS`, `ROOMS`, `LIFT`, `GATE`, `PORTAL` dan `WANDER` di `office/layout.js` (rute antar lantai ada di `world/routing.js`); setiap titik, benda, dan kursi punya `level` (0 sampai 2); naikkan `LAYOUT_VERSION` di `office/furniture.js` bila posisi furnitur bawaan berubah |
 | Mengubah susunan furnitur bawaan | `defaultLayout()` di `office/furniture.js` (meja berderet di `columns`) |
 | Menambah jenis furnitur | Entri baru di `CATALOG` dan `CATALOG_ORDER` (`office/furniture.js`): `build`, `rects` (jejak tabrakan), `spots` bila dipakai agen; tambahkan ke `defaultLayout()` bila perlu ada sejak awal |
 | Menambah pose untuk properti | Titik (`spots`) di entri katalognya, pose baru di `characters/animation.js` |

@@ -6,6 +6,7 @@
 // can be undone. Desks keep their agent, activity spots (sofa, arcade, ...) move along.
 import * as THREE from "three";
 import { CATALOG, CATALOG_ORDER, LAYOUT_VERSION, worldRects } from "../office/furniture.js";
+import { LEVEL_NAMES, levelTop } from "../office/layout.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const MAX_UNDO = 60;
@@ -25,7 +26,8 @@ export const loadLayout = async () => {
 
 export const initLayoutEditor = ({ world, canvas }) => {
   const furn = world.office.furniture;
-  const top = world.office.floorTop;
+  const levelsEl = document.getElementById("layout-levels");
+  const levelBtn = document.getElementById("level-toggle");
   const panel = document.getElementById("layout");
   const statusEl = document.getElementById("layout-status");
   const catalogEl = document.getElementById("layout-catalog");
@@ -67,10 +69,10 @@ export const initLayoutEditor = ({ world, canvas }) => {
       const cz = (r.z0 + r.z1) / 2;
       const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.32, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
       fill.rotation.x = -Math.PI / 2;
-      fill.position.set(cx, top + 0.03, cz);
+      fill.position.set(cx, levelTop(item.level ?? 0) + 0.03, cz);
       const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), new THREE.LineBasicMaterial({ color, depthTest: false }));
       edge.rotation.x = -Math.PI / 2;
-      edge.position.set(cx, top + 0.035, cz);
+      edge.position.set(cx, levelTop(item.level ?? 0) + 0.035, cz);
       fill.renderOrder = edge.renderOrder = 10; // drawn over the furniture so the footprint stays visible
       overlay.add(fill, edge);
     }
@@ -155,9 +157,21 @@ export const initLayoutEditor = ({ world, canvas }) => {
       </div>`;
   };
 
+  // The level the editor works on: new pieces go there and only that level and the ones below it are shown.
+  const renderLevels = () => {
+    levelsEl.innerHTML = LEVEL_NAMES.map((name, l) => `<button type="button" data-level="${l}"${l === world.editLevel ? ' class="primary"' : ""}>${esc(name)}</button>`).join("");
+  };
+  const setEditLevel = (level) => {
+    world.editLevel = level;
+    if (world.maxLevel < level) world.setVisibleLevels(level);
+    renderLevels();
+    levelBtn?.dispatchEvent(new CustomEvent("levels-changed"));
+  };
+
   const select = (id) => {
     selected = id;
     const item = id ? furn.get(id) : null;
+    if (item && (item.level ?? 0) !== world.editLevel) setEditLevel(item.level ?? 0);
     if (item && !held) showOverlay(item, "sel");
     else if (!held) clearOverlay();
     renderSelected();
@@ -216,7 +230,7 @@ export const initLayoutEditor = ({ world, canvas }) => {
     const centre = world.groundPoint(window.innerWidth / 2, window.innerHeight / 2);
     const x = from?.x ?? centre?.x ?? 20;
     const z = from?.z ?? centre?.z ?? 12;
-    const item = furn.add(type, x, z, from?.rot ?? 0, from?.variant, { silent: true });
+    const item = furn.add(type, x, z, from?.rot ?? 0, from?.variant, { silent: true, level: world.editLevel });
     startHold(item, { isNew: true, before: snapshotWithout(item.id), moved: true });
     select(item.id);
   };
@@ -334,6 +348,12 @@ export const initLayoutEditor = ({ world, canvas }) => {
     const btn = e.target.closest("button[data-type]");
     if (btn && !btn.disabled) startPlacing(btn.dataset.type);
   });
+  levelsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-level]");
+    if (!btn || held) return;
+    setEditLevel(Number(btn.dataset.level));
+    select(null);
+  });
   selectedEl.addEventListener("click", (e) => {
     const act = e.target.closest("button[data-act]")?.dataset.act;
     if (act === "rotate") rotateSelected();
@@ -366,6 +386,7 @@ export const initLayoutEditor = ({ world, canvas }) => {
     document.body.classList.add("editing");
     toggleBtn.classList.add("playing");
     setStatus("");
+    renderLevels();
     renderCatalog();
     renderTools();
     select(null);

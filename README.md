@@ -43,7 +43,7 @@ Setelah login provider, salin juga `API_SERVER_KEY` ke `.env` milik Hermes (lang
 
 Tim bawaan (7 agen dengan soul detail per peran) dan 8 skill tim ada di `config/team.json` dan `config/skills/`, jadi clone baru langsung lengkap tanpa membuat agen satu per satu (detail di [PANDUAN](docs/PANDUAN.md#tim-bawaan-soul-dan-skill-per-peran)). Tool tulis file Hermes diizinkan menulis ke folder proyek lewat `HERMES_WRITE_SAFE_ROOT` di `docker-compose.yml`.
 
-Kantor berupa denah persegi kompak dengan empat ruang bertembok dan berpintu. Agen yang santai saling mengobrol (200+ topik, fakta dari Wikipedia, dan berita tren); di tab Kantor pada kotak chat Anda bisa ikut ngobrol dan satu agen akan menjawab. Hermes menugaskan agen lain lewat server MCP `office-team` yang dijalankan kantor dan didaftarkan otomatis ke Hermes (cek: `docker exec hermes hermes mcp list`).
+Kantor berupa gedung tiga lantai dengan lift: lobby, ruang game, dan kantin di lantai 1, satu ruangan per agen di lantai 2, serta ruang rapat dan ruang server di lantai 3. Agen yang santai saling mengobrol (200+ topik, fakta dari Wikipedia, dan berita tren); di tab Kantor pada kotak chat Anda bisa ikut ngobrol dan satu agen akan menjawab. Hermes menugaskan agen lain lewat server MCP `office-team` yang dijalankan kantor dan didaftarkan otomatis ke Hermes (cek: `docker exec hermes hermes mcp list`).
 
 Furnitur kantor bisa dipindah, diputar, ditambah, dan dihapus lewat tombol **🛠 Layout** di header (mode edit seperti build mode The Sims; tersimpan di `config/layout.json`). Caranya ada di [PANDUAN](docs/PANDUAN.md#mengatur-layout-kantor--layout).
 

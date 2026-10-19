@@ -87,29 +87,27 @@ const bodyAt = (hour) => {
   return { sunUp, dir: new THREE.Vector3(-Math.cos(a), 0.12 + 0.88 * Math.sin(a), 0.38).normalize() };
 };
 
-// The sky is a full-screen gradient quad (the camera is orthographic and never turns).
 const SKY_VERT = `
-varying float vH;
+varying vec3 vDir;
 void main() {
-  vH = position.y * 0.5 + 0.5;
-  gl_Position = vec4(position.xy, 0.999, 1.0);
+  vDir = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 const SKY_FRAG = `
 uniform vec3 topColor;
 uniform vec3 bottomColor;
 uniform vec3 glowColor;
+uniform vec3 bodyDir;
 uniform float glow;
-varying float vH;
+varying vec3 vDir;
 void main() {
-  float h = clamp(vH, 0.0, 1.0);
-  vec3 col = mix(bottomColor, topColor, pow(h, 0.8));
-  float g = pow(1.0 - h, 3.0) * glow * 0.6;
+  float h = clamp(vDir.y, 0.0, 1.0);
+  vec3 col = mix(bottomColor, topColor, pow(h, 0.55));
+  float g = pow(max(dot(normalize(vDir), bodyDir), 0.0), 6.0) * glow * (1.0 - h * 0.6);
   gl_FragColor = vec4(col + glowColor * g, 1.0);
 }`;
 
 const CLOUDS = 9;
-const STARS = 900;
-const STAR_SPAN = { x: 70, y: 45 }; // half-size of the star sheet, enough for the widest zoom
 const RAIN_MAX = 1400;
 const RAIN_BOX = { x0: -2, x1: 38, z0: -2, z1: 38, top: 22 };
 
@@ -121,27 +119,24 @@ export class Environment {
     this.hemi = hemi;
     this.office = office;
     this.center = center;
-    this.timeId = "malam";
+    this.timeId = "auto";
     this.weatherId = "cerah";
-    this.hour = TIMES.find((t) => t.id === "malam").hour;
+    this.hour = this.clockHour();
     this.w = { ...WEATHER.cerah };
     this.look = { top: new THREE.Color(), bottom: new THREE.Color(), sun: new THREE.Color(), hSky: new THREE.Color(), hGround: new THREE.Color(), sunI: 1, hI: 1, night: 0, glow: 0 };
     this.top = new THREE.Color();
     this.bottom = new THREE.Color();
     this.tmp = new THREE.Color();
-    this.tmpV = new THREE.Vector3();
-    this.tmpR = new THREE.Vector3();
-    this.tmpU = new THREE.Vector3();
     this.flash = 0;
     this.nextFlash = 0;
     this.baseFog = { near: scene.fog?.near ?? 50, far: scene.fog?.far ?? 100 };
 
     // sky dome (follows the camera), sun/moon discs and stars
     this.dome = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
+      new THREE.SphereGeometry(150, 24, 16),
       new THREE.ShaderMaterial({
-        depthWrite: false, depthTest: false, fog: false,
-        uniforms: { topColor: { value: new THREE.Color() }, bottomColor: { value: new THREE.Color() }, glowColor: { value: new THREE.Color() }, glow: { value: 0 } },
+        side: THREE.BackSide, depthWrite: false, fog: false,
+        uniforms: { topColor: { value: new THREE.Color() }, bottomColor: { value: new THREE.Color() }, glowColor: { value: new THREE.Color() }, bodyDir: { value: new THREE.Vector3(0, 1, 0) }, glow: { value: 0 } },
         vertexShader: SKY_VERT, fragmentShader: SKY_FRAG,
       }),
     );
@@ -159,9 +154,13 @@ export class Environment {
     this.sunDisc = disc("#fff1c2", 6);
     this.moonDisc = disc("#e3ecff", 4.5);
 
-    // stars: scattered on a flat sheet facing the camera (local x/y, 120 units behind the scene)
-    const starPos = new Float32Array(STARS * 3);
-    for (let i = 0; i < STARS; i += 1) starPos.set([(Math.random() - 0.5) * 2 * STAR_SPAN.x, (Math.random() - 0.5) * 2 * STAR_SPAN.y, -120], i * 3);
+    const starPos = new Float32Array(700 * 3);
+    for (let i = 0; i < 700; i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const y = 0.08 + Math.random() * 0.92;
+      const r = Math.sqrt(1 - y * y);
+      starPos.set([Math.cos(a) * r * 130, y * 130, Math.sin(a) * r * 130], i * 3);
+    }
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
     this.stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: "#ffffff", size: 1.7, sizeAttenuation: false, transparent: true, depthWrite: false, fog: false }));
@@ -274,7 +273,9 @@ export class Environment {
     u.topColor.value.copy(this.top);
     u.bottomColor.value.copy(this.bottom);
     u.glowColor.value.copy(look.sun);
+    u.bodyDir.value.copy(body.dir);
     u.glow.value = look.glow * (1 - w.gray * 0.85);
+    this.dome.position.copy(this.camera.position);
     this.scene.background = this.bottom;
     if (this.scene.fog) {
       this.scene.fog.color.copy(this.bottom);
@@ -296,30 +297,19 @@ export class Environment {
     this.hemi.intensity = look.hI * w.hemi + this.flash * 2.2;
 
     // sun, moon and stars
-    // the discs sit on the sky behind the scene: the arc of the body maps onto the screen's upper half
-    const cam = this.camera;
-    const halfH = (cam.top - cam.bottom) / 2;
-    const halfW = (cam.right - cam.left) / 2;
-    const fwd = this.tmpV.set(0, 0, -1).transformDirection(cam.matrixWorld);
-    const right = this.tmpR.set(1, 0, 0).transformDirection(cam.matrixWorld);
-    const up = this.tmpU.set(0, 1, 0).transformDirection(cam.matrixWorld);
-    const place = (disc, show, dir, opacity, radius) => {
+    const place = (disc, show, dir, opacity) => {
       disc.visible = show && opacity > 0.02;
-      disc.position.copy(cam.position).addScaledVector(fwd, 100)
-        .addScaledVector(right, dir.x * halfW * 0.8)
-        .addScaledVector(up, halfH * (0.2 + 0.7 * dir.y));
-      disc.scale.setScalar((halfH * radius) / 6);
-      disc.quaternion.copy(cam.quaternion);
+      disc.position.copy(this.camera.position).addScaledVector(dir, 120);
+      disc.lookAt(this.camera.position);
       disc.material.opacity = opacity;
     };
     const clear = 1 - Math.min(1, w.gray * 1.1);
-    place(this.sunDisc, body.sunUp && body.dir.y > 0.14, body.dir, clear, 0.07);
-    place(this.moonDisc, !body.sunUp && body.dir.y > 0.14, body.dir, clear, 0.055);
+    place(this.sunDisc, body.sunUp && body.dir.y > 0.14, body.dir, clear);
+    place(this.moonDisc, !body.sunUp && body.dir.y > 0.14, body.dir, clear);
     this.sunDisc.material.color.copy(look.sun).lerp(this.tmp.set("#fff6d8"), 0.4);
     this.stars.material.opacity = look.night * (1 - Math.min(1, w.gray * 1.2));
     this.stars.visible = this.stars.material.opacity > 0.02;
     this.stars.position.copy(this.camera.position);
-    this.stars.quaternion.copy(this.camera.quaternion);
 
     // clouds: colour follows the light, count and darkness follow the weather
     const cloudColor = this.cloudMat.color;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agentic Digital Office</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
   <script type="importmap">
     { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
@@ -20,12 +20,14 @@
     <div class="top-actions">
       <button id="project-select" class="chip project" title="Folder proyek yang dikerjakan agen">📁 Pilih proyek…</button>
       <button id="meeting-toggle" class="chip" title="Rapat tim di Ruang Rapat">💬 Rapat</button>
+      <button id="time-toggle" class="chip" title="Waktu">🕒 Waktu</button>
       <button id="weather-toggle" class="chip" title="Cuaca">☀ Cerah</button>
+      <button id="level-toggle" class="chip" title="Tampilkan lantai: semua, atau hanya sampai lantai tertentu (lantai di atasnya disembunyikan)">🏢 Semua lantai</button>
+      <button id="follow-toggle" class="chip" title="Kamera menyorot agen yang sedang berinteraksi (rapat, ngobrol)">🎥 Sorot</button>
       <button id="layout-toggle" class="chip" title="Pindah dan atur furnitur kantor">🛠 Layout</button>
       <button id="files-toggle" class="chip" title="Lihat dan unduh file hasil kerja agen">📂 Berkas</button>
       <button id="usage-toggle" class="chip" title="Pemakaian token per agen dan model AI">📊 Pemakaian</button>
       <button id="agents-toggle" class="chip" title="Kelola agen dan SOUL.md">⚙ Agen</button>
-      <button id="follow-toggle" class="chip" title="Kamera menyorot agen yang sedang berinteraksi (rapat, ngobrol)">🎥 Sorot</button>
       <button id="pixel-toggle" class="chip" title="Gaya tampilan">▦ Pixel</button>
       <button id="voice-toggle" class="chip music" title="Suara agen saat saling mengobrol dan rapat (balasan ke pesan Anda tidak dibacakan)">🔊 Suara</button>
       <button id="music-toggle" class="chip music" title="Jukebox">♪ Musik</button>
@@ -71,6 +73,8 @@
     <div class="agents-body">
       <p class="muted lay-hint">Klik benda lalu seret untuk memindah. <kbd>R</kbd> putar · <kbd>Del</kbd> hapus · <kbd>D</kbd> gandakan · <kbd>Ctrl+Z</kbd> urungkan · <kbd>Esc</kbd> batal. Putar kamera dengan menyeret lantai kosong (klik kanan + seret untuk menggeser). Hijau = bisa ditaruh, merah = terhalang.</p>
       <div id="layout-selected" class="lay-selected"></div>
+      <h4 class="lay-h">Lantai yang diedit</h4>
+      <div id="layout-levels" class="lay-tools"></div>
       <h4 class="lay-h">Tambah benda</h4>
       <div id="layout-catalog" class="lay-cat"></div>
       <div class="lay-tools">
@@ -166,7 +170,7 @@
     </form>
   </aside>
 
-  <div class="hint">seret / panah: geser · scroll: zoom · Home: kamera awal · klik karakter: chat</div>
+  <div class="hint">seret: putar · klik kanan + seret: geser · scroll: zoom · klik karakter: chat</div>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>
