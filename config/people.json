@@ -24,11 +24,14 @@
     "hairColor": "#1e1e24",
     "skin": "#c68b5e",
     "top": "#228be6",
+    "shirt": "#ffffff",
+    "tie": "#c92a2a",
     "pants": "#343a40",
     "shoes": "#f8f9fa",
     "voice": {
       "lang": "id-ID",
       "gender": "male",
+      "prefer": [],
       "pitch": 1.05,
       "rate": 1.1
     }
