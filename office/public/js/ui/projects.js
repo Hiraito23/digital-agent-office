@@ -99,9 +99,11 @@ export const initProjectPicker = ({ onChange }) => {
       syncButton();
     } catch { /* offline: keep the current state */ }
     pop.hidden = false;
-    const r = button.getBoundingClientRect();
-    pop.style.top = `${Math.round(r.bottom + 8)}px`;
-    pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+    // inside the ⚙ Pengaturan pop-up: open the browser to the left of it; otherwise below the button
+    const host = button.closest(".settings-pop");
+    const r = (host ?? button).getBoundingClientRect();
+    pop.style.top = `${Math.round(host ? r.top : r.bottom + 8)}px`;
+    pop.style.right = `${Math.max(8, Math.round(window.innerWidth - (host ? r.left - 8 : r.right)))}px`;
     await open(active ? active.split("/").slice(0, -1).join("/") : "");
   };
 

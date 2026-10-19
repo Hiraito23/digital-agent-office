@@ -122,6 +122,7 @@ export class World {
     this.raycaster = new THREE.Raycaster();
     this.pixelMode = 1;
     this.viewLevel = 0; // the level shown by the floor tabs (null = all three levels stacked)
+    this.fadeAlpha = 0.2; // opacity of the levels that are not on show (set in ⚙ Pengaturan)
     this.viewBeforeFocus = null;
     this.editLevel = 0; // the level the layout editor works on
     this.followEnabled = true; // 🎥 Sorot: the camera looks at agents who interact
@@ -621,17 +622,22 @@ export class World {
     window.dispatchEvent(new CustomEvent("levelchange"));
   }
 
+  setFadeAlpha(alpha) {
+    this.fadeAlpha = Math.min(1, Math.max(0, alpha));
+    this.applyVisibility();
+  }
+
   applyVisibility() {
     const v = this.viewLevel;
-    // the level on show is opaque; the others stay visible at 50% opacity
-    const alphaOf = (l) => (v === null || l === v ? 1 : 0.5);
+    // the level on show is opaque; the others stay visible, faded
+    const alphaOf = (l) => (v === null || l === v ? 1 : this.fadeAlpha);
     this.office.levelGroups.forEach((g, l) => {
       const alpha = alphaOf(l);
       if ((g.userData.fadeAlpha ?? 1) !== alpha) setFade(g, alpha);
     });
     const onView = (y) => v === null || Math.abs(y - levelTop(v)) < 1.7;
     for (const a of this.agents.values()) {
-      const alpha = onView(a.y) ? 1 : 0.5;
+      const alpha = onView(a.y) ? 1 : this.fadeAlpha;
       if ((a.model.userData.fadeAlpha ?? 1) !== alpha) setFade(a.model, alpha);
     }
   }

@@ -17,6 +17,7 @@ import { initEdgeColor } from "./ui/edge-color.js";
 import { initMeeting } from "./ui/meeting.js";
 import { initUsage } from "./ui/usage.js";
 import { initFiles } from "./ui/files.js";
+import { initSettings } from "./ui/settings.js";
 import { initLayoutEditor, loadLayout } from "./ui/layout-editor.js";
 import { initEnvironmentControls } from "./ui/environment-controls.js";
 import { setNews, setFacts } from "./world/chatter.js";
@@ -108,6 +109,9 @@ followBtn.addEventListener("click", () => {
   renderFollow();
   try { localStorage.setItem("kantor-hermes-follow", follow ? "1" : "0"); } catch { /* ignore */ }
 });
+
+// ⚙ Pengaturan: one button with a pop-up for every menu and the view options
+initSettings({ world });
 
 // 🏢 Floor tabs: one storey at a time (Lantai 1 first), or all three stacked.
 const levelTabs = document.getElementById("level-tabs");

@@ -212,7 +212,7 @@ Kantor adalah **gedung tiga lantai** (tiap lantai berukuran sama, 26 x 10 tile) 
 
 **Satu agen satu ruangan:** Hermes mendapat ruangan pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **berlari ke ruangannya** (naik lift bila perlu), duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol di lobi, kantin, atau lorong. Layout bawaan punya 12 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Saat rapat, semua peserta naik lift ke Ruang Rapat di lantai 3.
 
-**Tab lantai** di bagian atas layar menampilkan satu lantai sekali waktu: mulai dari **Lantai 1** (lobby, game, kantin), lalu pilih **Lantai 2** (ruang agen) atau **Lantai 3** (rapat dan server). Lantai lain tetap terlihat dengan **opasitas 50%** (tidak disembunyikan). Tab **Semua** menampilkan ketiga lantai penuh. Kamera meluncur halus ke lantai yang dipilih. Kalau 🎥 Sorot menyorot rapat atau obrolan di lantai lain, tab berpindah sementara ke lantai itu lalu kembali setelah selesai.
+**Tab lantai** di bagian atas layar menampilkan satu lantai sekali waktu: mulai dari **Lantai 1** (lobby, game, kantin), lalu pilih **Lantai 2** (ruang agen) atau **Lantai 3** (rapat dan server). Lantai lain tetap terlihat samar (bawaan **opasitas 20%**, bisa diatur di **⚙ Pengaturan** > *Opasitas lantai lain*, 0 sampai 100%). Tab **Semua** menampilkan ketiga lantai penuh. Kamera meluncur halus ke lantai yang dipilih. Kalau 🎥 Sorot menyorot rapat atau obrolan di lantai lain, tab berpindah sementara ke lantai itu lalu kembali setelah selesai.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 
@@ -266,6 +266,18 @@ Agar kantor tidak kaku, dua agen yang sedang santai (berdiri atau berjalan di au
 **Fakta menarik dari Wikipedia.** Supaya topiknya tidak itu-itu saja, kantor mengumpulkan fakta dari Wikipedia Indonesia sebanyak-banyaknya dan menyimpannya dalam kumpulan yang terus bertambah (disimpan di volume `office-data`, jadi tidak hilang saat restart). Saat pertama menyala server mengumpulkan sekitar 220 fakta dalam beberapa menit, lalu menambah tiap 30 menit, sampai maksimal 1.500. Sumbernya puluhan kategori (candi, hewan, planet, penemuan, rekor dunia, fenomena alam, teknologi, permainan video, makanan, tarian, gunung, pulau, dan seterusnya) beserta subkategorinya; kalimat pertama artikel diambil sebagai fakta. Biografi, desa/kecamatan, daftar, definisi matematika yang kering, serta topik sedih, kekerasan, atau politik dilewati, dan fakta yang mengandung kata seperti terbesar, tertua, endemik, rekor, atau satu-satunya diprioritaskan. Sekitar 30% obrolan memakai fakta ini ("Tahu nggak, Sakura? ..."), dengan 📚 Wikipedia di bubble-nya. Setelah terkumpul banyak, obrolan hampir tidak pernah mengulang. Cek jumlahnya di `http://localhost:3000/api/facts?limit=5`.
 
 Obrolan ini tidak memanggil model AI (kalimat dan polanya ada di `office/public/js/world/chatter.js`; fakta dan berita diambil dari internet), jadi tidak memakai token dan tidak mengubah riwayat chat agen. Obrolan berhenti sendiri bila salah satu agen mendapat tugas atau ada rapat. Tambah topik baru dengan menambah baris di `GENERIC`, `BY_ROLE`, `WEATHER`, atau `PERIOD` di berkas itu. Animasi hanya berjalan saat tab browser terlihat.
+
+## Tombol Pengaturan (⚙)
+
+Header hanya berisi nama kantor, tombol **⚙ Pengaturan**, dan status koneksi. Semua menu ada di pop-up Pengaturan, dikelompokkan:
+
+| Kelompok | Isi |
+| --- | --- |
+| **Kerja** | 📁 Pilih proyek, 💬 Rapat, 📂 Berkas, 📊 Pemakaian, ⚙ Agen, 🛠 Layout |
+| **Suasana** | 🕒 Waktu, ☀ Cuaca, 🎥 Sorot, ▦ Pixel/HD, dan penggeser **Opasitas lantai lain** |
+| **Suara** | 🔊 Suara, ♪ Musik |
+
+Pop-up menutup sendiri saat Anda mengklik di luarnya, menekan Esc, atau membuka sebuah panel (Rapat, Berkas, Pemakaian, Agen, Layout). Tombol suasana dan suara membiarkannya terbuka supaya bisa diatur berurutan. Tata letak panel di layar: kiri atas **Tim**, kiri bawah **kotak chat**, kanan atas **Ringkasan**, kanan tengah **Jukebox** (saat dibuka), kanan bawah **Persetujuan**, dan **tab lantai** di tengah atas; panel samping selalu selebar sama dan menyempit di layar kecil.
 
 ## Waktu dan cuaca
 
