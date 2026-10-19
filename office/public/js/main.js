@@ -13,6 +13,7 @@ import { initAgentPanel } from "./ui/agents-panel.js";
 import { initProjectPicker } from "./ui/projects.js";
 import { initApprovals } from "./ui/approvals.js";
 import { initSummaries } from "./ui/summaries.js";
+import { initEdgeColor } from "./ui/edge-color.js";
 import { initMeeting } from "./ui/meeting.js";
 import { initUsage } from "./ui/usage.js";
 import { initFiles } from "./ui/files.js";
@@ -319,12 +320,10 @@ const clockOf = (ms) => (ms ? new Date(ms).toLocaleTimeString("id-ID", { hour: "
 
 const chatTarget = document.getElementById("chat-target");
 const kantorLog = document.getElementById("kantor-log");
-const kantorBadge = document.getElementById("kantor-badge");
 const tabButtons = [...document.querySelectorAll(".mmo-tab")];
 const logPanes = { pesan: chatLog, kantor: kantorLog, log: activityEl };
 const COLLAPSED_KEY = "kantor-hermes-chat-collapsed";
 let tab = "pesan";
-let kantorUnread = 0;
 
 const scrollEnd = (el) => { el.scrollTop = el.scrollHeight; };
 const nearEnd = (el) => el.scrollHeight - el.scrollTop - el.clientHeight < 40;
@@ -333,7 +332,6 @@ const setTab = (name) => {
   tab = name;
   tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   for (const [key, el] of Object.entries(logPanes)) el.classList.toggle("hidden", key !== name);
-  if (name === "kantor") { kantorUnread = 0; kantorBadge.hidden = true; }
   chatEl.classList.toggle("kantor-mode", name === "kantor");
   chatInput.placeholder = name === "kantor" ? "Ngobrol di kantor, salah satu agen akan menjawab…  (sebut nama untuk memilih)" : "Tulis pesan atau tugas…  (Enter = kirim)";
   scrollEnd(logPanes[name]);
@@ -377,11 +375,6 @@ const addOfficeLine = ({ kind, from, to, text, news, onClick }) => {
   kantorLog.append(el);
   while (kantorLog.children.length > 120) kantorLog.firstChild.remove();
   if (stick || kind === "me") scrollEnd(kantorLog);
-  if (tab !== "kantor" && kind !== "me") {
-    kantorUnread += 1;
-    kantorBadge.textContent = kantorUnread > 99 ? "99+" : String(kantorUnread);
-    kantorBadge.hidden = false;
-  }
 };
 
 // The Kantor tab is an office channel: what you write there is answered by ONE agent. It is the
@@ -579,6 +572,8 @@ const autosize = () => {
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 110)}px`;
 };
 chatInput.addEventListener("input", autosize);
+
+initEdgeColor({ button: document.getElementById("edge-color") });
 
 // Minimise / restore (remembered per browser)
 const applyCollapsed = (on) => {

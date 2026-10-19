@@ -143,12 +143,15 @@
     <div class="mmo-resize y" data-dir="y" title="Tarik ke atas atau bawah untuk mengatur tinggi (klik dua kali = ukuran awal)"></div>
     <div class="mmo-tabs">
       <button type="button" class="mmo-tab active" data-tab="pesan" title="Percakapan dengan agen yang dipilih">💬 Pesan</button>
-      <button type="button" class="mmo-tab" data-tab="kantor" title="Obrolan antar agen dan balasan dari agen lain">📢 Kantor<span id="kantor-badge" class="badge" hidden></span></button>
+      <button type="button" class="mmo-tab" data-tab="kantor" title="Obrolan antar agen dan balasan dari agen lain">📢 Kantor</button>
       <button type="button" class="mmo-tab" data-tab="log" title="Aktivitas dan pemberitahuan sistem">📜 Log</button>
       <span class="mmo-spacer"></span>
       <label class="mmo-to" title="Kirim ke siapa (Tab di kolom pesan untuk berganti)"><span>Ke</span><select id="chat-target"></select></label>
-      <button type="button" id="chat-clear" class="mmo-min" title="Hapus semua pesan (semua agen, ringkasan, dan log)">🗑</button>
-      <button type="button" id="chat-min" class="mmo-min" title="Kecilkan atau besarkan kotak chat">–</button>
+      <span class="mmo-tools">
+        <button type="button" id="edge-color" class="mmo-min" title="Warna garis tepi panel">🎨</button>
+        <button type="button" id="chat-clear" class="mmo-min" title="Hapus semua pesan (semua agen, ringkasan, dan log)">🗑</button>
+        <button type="button" id="chat-min" class="mmo-min" title="Kecilkan atau besarkan kotak chat">–</button>
+      </span>
     </div>
     <div class="mmo-body">
       <div id="chat-log" class="chat-log"></div>
