@@ -120,6 +120,11 @@ const createSummaries = ({ file, historyFile }) => {
       save();
       return entry;
     },
+    // Empties the whole 📋 RINGKASAN list (used by "hapus semua pesan").
+    clear() {
+      entries = [];
+      save();
+    },
     removeAgent(agentId) {
       entries = entries.filter((e) => e.agentId !== agentId);
       save();

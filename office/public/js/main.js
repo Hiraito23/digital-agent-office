@@ -593,6 +593,23 @@ document.getElementById("chat-min").onclick = () => {
   try { localStorage.setItem(COLLAPSED_KEY, on ? "1" : "0"); } catch { /* ignore */ }
 };
 
+// Delete every saved message: all agents' chats, the summaries list, the Kantor and Log tabs.
+document.getElementById("chat-clear").onclick = async () => {
+  if (!confirm("Hapus SEMUA pesan semua agen, ringkasan, dan log? Tindakan ini tidak bisa dibatalkan.")) return;
+  try {
+    const res = await gw.request("chat.clearAll", {});
+    chats.clear();
+    historyLoaded.clear();
+    kantorLog.innerHTML = "";
+    activityEl.innerHTML = "";
+    summaryPanel.load();
+    if (selected) await openChat(selected, null, { quiet: true });
+    logActivity(`Semua pesan dihapus (${res?.cleared ?? 0} pesan)`);
+  } catch (err) {
+    logActivity(`Gagal menghapus pesan: ${err?.message ?? err}`, "err");
+  }
+};
+
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = chatInput.value.trim();

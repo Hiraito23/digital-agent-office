@@ -1336,6 +1336,16 @@ async function handleMethod(method, params, id, sendEvent) {
       return resOk(id, { ok: true });
     }
 
+    // Deletes the saved chat of every agent and the summaries list. Refused while an agent is working.
+    case "chat.clearAll": {
+      if (activeRuns.size > 0) return resErr(id, "busy", "Masih ada agen yang bekerja. Tunggu selesai atau hentikan dulu.");
+      const cleared = [...conversationHistory.values()].reduce((n, h) => n + h.length, 0);
+      conversationHistory.clear();
+      saveHistoryToDisk();
+      summaries.clear();
+      return resOk(id, { ok: true, cleared });
+    }
+
     // --- Chat ---------------------------------------------------------------
 
     case "chat.send": {
@@ -1673,7 +1683,7 @@ function startAdapter() {
             type: "hello-ok", protocol: 3,
             adapterType: "hermes",
             features: { methods: ["agents.list","agents.create","agents.delete","agents.update",
-              "sessions.list","sessions.preview","sessions.patch","sessions.reset",
+              "sessions.list","sessions.preview","sessions.patch","sessions.reset","chat.clearAll",
               "chat.send","chat.abort","chat.history","agent.wait",
               "status","config.get","config.set","config.patch",
               "agents.files.get","agents.files.set",

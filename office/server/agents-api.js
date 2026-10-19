@@ -199,11 +199,15 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
   // a non-default provider is written "provider::model", which Hermes understands per request.
   let modelsCache = { at: 0, data: null };
   const modelCatalog = async () => {
-    if (modelsCache.data && Date.now() - modelsCache.at < 300_000) return modelsCache.data;
+    if (modelsCache.data && Date.now() - modelsCache.at < 10_000) return modelsCache.data;
     try {
       const raw = await dashFetch("/api/model/options");
-      const groups = (raw.providers || [])
-        .filter((p) => p.authenticated !== false && Array.isArray(p.models) && p.models.length)
+      const usable = (raw.providers || [])
+        .filter((p) => p.authenticated !== false && Array.isArray(p.models) && p.models.length);
+      // Only the provider Hermes actually runs on (e.g. the 9router custom endpoint); other
+      // providers are listed by the dashboard but are not configured for use here.
+      const inUse = usable.filter((p) => p.is_current);
+      const groups = (inUse.length ? inUse : usable)
         .map((p) => ({
           provider: p.slug, name: p.name || p.slug, current: Boolean(p.is_current),
           models: p.models.map((id) => ({ id, value: p.is_current ? id : `${p.slug}::${id}`, free: /:free$/.test(id) })),
