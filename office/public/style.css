@@ -457,3 +457,101 @@ body.chat-collapsed .party { max-height: calc(100vh - var(--panel-top) - 76px); 
 .mm-row .who small { color: var(--blue); font-size: 12px; }
 .mm-cur { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px ui-monospace, Consolas, monospace; color: var(--muted); }
 .model-form button[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ===== RPG pixel look (Digimon World 3 style): navy frames, square corners, hard shadows, pixel font ===== */
+:root {
+  --pixel: "Pixelify Sans", "Poppins", system-ui, sans-serif;
+  --ink: #0b1030;
+  --panel: linear-gradient(180deg, #1d2c80, #121a56);
+  --panel-edge: #5b7cff;
+  --text: #eaf0ff;
+  --muted: #9fb0e8;
+  --accent: #ffd23f;
+  --blue: #8fd0ff;
+  --frame: inset 0 0 0 2px #0b1030, inset 0 0 0 3px rgba(160, 185, 255, .28), 3px 3px 0 rgba(0, 0, 0, .55);
+}
+html, body { background: #070b24; }
+
+.panel, .summaries, .agents, .jukebox, .chat, .party, .hud.chat.mmo, .edge-pop, .u-card, .layout, .files, .usage {
+  border-radius: 0; border: 3px solid var(--panel-edge); box-shadow: var(--frame);
+}
+.panel, .summaries, .agents, .jukebox, .party, .chat { background: var(--panel); }
+.usage, .layout, .files { background: #0f1642; }
+.hud.chat.mmo { background: linear-gradient(180deg, rgba(29, 44, 128, .95), rgba(14, 21, 70, .96)); }
+.edge-pop { background: #121a56; }
+
+.top { background: linear-gradient(rgba(7, 11, 36, .92), rgba(7, 11, 36, 0)); }
+.title { color: var(--accent); text-shadow: 2px 2px 0 #0b1030; letter-spacing: 3px; font-size: 17px; }
+.title::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 9px; background: var(--accent); box-shadow: 0 0 0 2px #0b1030, 0 0 0 4px var(--panel-edge); }
+
+.chip, .conn {
+  border-radius: 0; font: 600 12px var(--pixel); letter-spacing: .5px; text-transform: uppercase;
+  background: linear-gradient(180deg, #2b3da3, #18236e); border: 2px solid var(--panel-edge); color: var(--text);
+  box-shadow: inset 0 0 0 1px #0b1030, 2px 2px 0 rgba(0, 0, 0, .55);
+}
+.chip:hover { filter: none; background: linear-gradient(180deg, #3a50c8, #22308f); border-color: var(--accent); }
+.chip:active { transform: translate(2px, 2px); box-shadow: inset 0 0 0 1px #0b1030; }
+.chip.project option { color: #0b1030; }
+.chip.music.playing, .chip.project.active { border-color: var(--accent); color: var(--accent); }
+.conn.on { color: #8ce99a; border-color: #8ce99a; background: #0f1642; }
+.conn.off { color: #ff9c9c; border-color: #ff6b6b; background: #0f1642; }
+
+.panel h2, .party-title, .agent-form h3, .agent-form legend, .jb-title, .lay-title, .lay-h {
+  font-family: var(--pixel); text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent);
+  border-bottom: 2px dashed rgba(160, 185, 255, .35);
+}
+.agent-form legend, .lay-h { border-bottom: 0; }
+.chat-head, .jb-head, .chat .chat-form, .mmo-tabs { border-color: rgba(160, 185, 255, .35); }
+.chat-name { font-family: var(--pixel); color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+.chat-role, .agent-list .who small, .u-sub, .meeting-people small { color: var(--blue); }
+
+/* buttons inside panels */
+.agents-tabs button, .agents-body button, .chat-head button, .jb-head button, .mmo-min, .f-act, .edge-pop button {
+  border-radius: 0; font-family: var(--pixel); border-color: var(--panel-edge); background: #18236e; color: var(--text);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .5);
+}
+.agents-tabs button.active, .agents-body button.primary, .jb-controls button, .approval button, .f-zip {
+  background: var(--accent); color: var(--ink); border: 2px solid var(--ink); border-radius: 0; font-family: var(--pixel);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .6);
+}
+.chat .chat-form button { border-radius: 0; font-family: var(--pixel); text-transform: uppercase; background: var(--accent); color: var(--ink); border: 2px solid var(--ink); box-shadow: 2px 2px 0 rgba(0, 0, 0, .6); }
+.chat .chat-form .mmo-voice { background: #18236e; border: 2px solid var(--panel-edge); color: var(--text); }
+.agents-body button.danger { border-color: #ff6b6b; color: #ffa8a8; }
+.mmo-tools .mmo-min:hover, .agents-body button:hover { border-color: var(--accent); background: #22308f; }
+.agents-body button.primary:hover { background: #ffe066; }
+
+/* chat box tabs and inputs */
+.mmo-tabs { background: rgba(7, 11, 36, .55); }
+.mmo-tab { border-radius: 0; font-family: var(--pixel); background: #18236e; border: 2px solid rgba(91, 124, 255, .5); border-bottom: 0; text-transform: uppercase; letter-spacing: .5px; }
+.mmo-tab.active { background: #2b3da3; border-color: var(--panel-edge); color: var(--accent); }
+.chat .mmo-to select, .agent-form select, .agent-form input:not([type]), .agent-form textarea,
+.agent-form input[name="id"], .agent-form input[name="name"], .agent-form input[name="role"], .agent-form input[name="prefer"] {
+  border-radius: 0; background: #0b1030; color: var(--text); border: 2px solid var(--panel-edge); font-family: var(--pixel);
+}
+.chat .mmo-to select { color: var(--accent); }
+.chat .chat-form textarea { border-radius: 0; background: #0b1030; border: 2px solid var(--panel-edge); color: var(--text); }
+.chat .chat-form textarea::placeholder { color: #6f80c0; }
+.mmo-resize.y::after { border-radius: 0; background: var(--panel-edge); }
+
+/* chat bubbles: square, with a hard border like RPG dialog boxes */
+.chat .msg .bub { border-radius: 0; border: 2px solid #0b1030; box-shadow: 2px 2px 0 rgba(0, 0, 0, .4); }
+.chat .msg .avatar { border-radius: 0; }
+.chat .msg.focused .bub { outline-color: var(--accent); }
+
+/* list rows, cards */
+.agent-list li, .summary-list li, .toolset-list li, .lay-selected, .u-summary div, .u-card, .meeting-minutes { border-radius: 0; border-color: rgba(91, 124, 255, .55); }
+.summary-list li.unread { border-color: var(--accent); background: rgba(255, 210, 63, .08); }
+.f-row { border-bottom-color: rgba(91, 124, 255, .45); }
+.u-bar { background: var(--accent); }
+.jb-progress { border-radius: 0; border-color: #0b1030; background: #0b1030; }
+
+/* name tags and speech bubbles above the characters (dialog-box style) */
+.tag { border-radius: 0; font-family: var(--pixel); background: #121a56; border: 2px solid var(--panel-edge); box-shadow: inset 0 0 0 1px #0b1030, 2px 2px 0 rgba(0, 0, 0, .55); }
+.tag.main, .tag.speaking, .tag.working { border-color: var(--accent); }
+.bubble { border-radius: 0; font-family: var(--pixel); border: 3px solid #0b1030; box-shadow: inset 0 0 0 2px #cdd6ff, 3px 3px 0 rgba(0, 0, 0, .45); background: #fffef5; }
+.bubble::after { border-radius: 0; }
+.hint { font-family: var(--pixel); color: #cdd6ff; }
+.hint::before { content: ""; }
+
+/* scrollbars */
+* { scrollbar-width: thin; scrollbar-color: #5b7cff #0b1030; }

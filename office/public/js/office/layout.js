@@ -2,28 +2,45 @@
 // Units: 1 world unit = 1 floor tile. x runs left -> right, z back -> front, y is up.
 // Change the floor plan here; the scene, routing and agents all read from it.
 //
-// The office is ONE open room on a square floor (no partition walls, no doors). The old
-// meeting room, server room, lounge, game room and lobby are now zones of that room: they
-// only differ by their floor and a name sign. The desks stand in two rows in the middle.
+// The office is a compact 16 x 16 floor: an open hall with the desks in the middle and four rooms
+// with their own walls and a door (rapat, server, pantry and lounge, game) in the corners. The lobby
+// is an open zone in front of the gate.
 
-export const N = 36;
-export const OFFICE = { x0: 8, x1: 28, z0: 8, z1: 28 };
+export const N = 32;
+export const OFFICE = { x0: 8, x1: 24, z0: 8, z1: 24 };
 
-const zone = (id, name, floor, x0, x1, z0, z1, sign) => ({ id, name, floor, x0, x1, z0, z1, walls: [], door: null, sign });
+// A room with partition walls: wall { along: "x" | "z", at, from, to, gaps }. Along "x" the wall
+// runs west-east at z = at; along "z" it runs north-south at x = at. The door is the gap, with a
+// point just inside and just outside it (both on a walking lane).
+const room = (id, name, floor, [x0, x1, z0, z1], walls, door) => ({ id, name, floor, x0, x1, z0, z1, walls, door, sign: null });
+const open = (id, name, floor, x0, x1, z0, z1, sign) => ({ id, name, floor, x0, x1, z0, z1, walls: [], door: null, sign });
+
 export const ROOMS = [
-  zone("rapat", "RUANG RAPAT", "wood", 8, 14, 8, 12.2, { x: 11, z: 11.75 }),
-  zone("server", "RUANG SERVER", "dark", 22, 28, 8, 12.2, { x: 25, z: 11.75 }),
-  zone("lounge", "PANTRY & LOUNGE", "wood", 8, 14, 22, 28, { x: 11, z: 22.6 }),
-  zone("game", "RUANG GAME", "carpet", 22, 28, 22, 28, { x: 25, z: 22.6 }),
-  zone("lobby", "LOBBY", "marble", 14, 22, 24.5, 28, { x: 15.2, z: 27.5 }),
+  room("rapat", "RUANG RAPAT", "wood", [8, 13.5, 8, 12], [
+    { along: "x", at: 12, from: 8, to: 13.5, gaps: [[10.2, 11.6]] },
+    { along: "z", at: 13.5, from: 8, to: 12 },
+  ], { inside: { x: 10.9, z: 11.4 }, outside: { x: 10.9, z: 12.8 } }),
+  room("server", "RUANG SERVER", "dark", [18.5, 24, 8, 12], [
+    { along: "x", at: 12, from: 18.5, to: 24, gaps: [[20.4, 21.8]] },
+    { along: "z", at: 18.5, from: 8, to: 12 },
+  ], { inside: { x: 21.1, z: 11.4 }, outside: { x: 21.1, z: 12.8 } }),
+  room("lounge", "PANTRY & LOUNGE", "wood", [8, 14, 19, 24], [
+    { along: "x", at: 19, from: 8, to: 14, gaps: [[10.2, 11.6]] },
+    { along: "z", at: 14, from: 19, to: 24 },
+  ], { inside: { x: 10.9, z: 19.6 }, outside: { x: 10.9, z: 18.2 } }),
+  room("game", "RUANG GAME", "carpet", [18, 24, 19, 24], [
+    { along: "x", at: 19, from: 18, to: 24, gaps: [[20.4, 21.8]] },
+    { along: "z", at: 18, from: 19, to: 24 },
+  ], { inside: { x: 21.1, z: 19.6 }, outside: { x: 21.1, z: 18.2 } }),
+  open("lobby", "LOBBY", "marble", 14, 18, 20, 24, { x: 14.9, z: 23.55 }),
 ];
 // There are no private offices any more (kept so older code that imports it keeps working).
 export const PRIVATE_OFFICES = [];
 
 // Front gate in the glass railing (opens into the lobby).
-export const GATE = { x0: 16, x1: 20 };
+export const GATE = { x0: 14, x1: 18 };
 export const roomAt = (x, z) => ROOMS.find((r) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1) ?? null;
-export const PORTAL = { x: 18, z: 26.3 };
+export const PORTAL = { x: 16, z: 22.2 };
 export const CENTER = { x: (OFFICE.x0 + OFFICE.x1) / 2, z: (OFFICE.z0 + OFFICE.z1) / 2 };
 
 // Desks are furniture (furniture.js, defaultLayout): agent i sits at desk i. These are only
@@ -36,13 +53,13 @@ export const seatOf = (slot) => slot.flip
   ? { x: slot.x - 0.65, z: slot.z - 1.15, heading: 0, room: slot.room ?? null }
   : { x: slot.x + 0.65, z: slot.z + 1.15, heading: Math.PI, room: slot.room ?? null };
 
-// Walking points for idle agents (also where two agents meet to chat): along three
-// east-west lanes (north, middle, south) and in the lobby.
+// Walking points for idle agents (also where two agents meet to chat): along the three
+// east-west lanes (north, between the desk rows, south), in the north commons and in the lobby.
 export const WANDER = [
-  [10, 11], [14, 11], [18, 11], [22, 11], [26, 11],
-  [10, 16], [14.5, 16], [18, 16], [22, 16], [26, 16],
-  [10, 21], [14, 21], [18, 21], [22, 21], [26, 21],
-  [16, 25], [20, 25.5],
+  [10, 12.8], [13, 12.8], [16, 12.8], [19, 12.8], [22, 12.8],
+  [10, 15.5], [13, 15.5], [16, 15.5], [19, 15.5], [22, 15.5],
+  [10, 18.2], [13, 18.2], [16, 18.2], [19, 18.2], [22, 18.2],
+  [15, 10.4], [17, 10.4], [15.2, 21], [17, 21.4],
 ];
 
 // Garden path ring around the office and the entrance path to the gate.
@@ -61,7 +78,7 @@ export const isPath = (i, j) => {
 // participants take the chairs of the meeting table (filled in by furniture.js).
 export const MEETING = {
   room: "rapat",
-  moderator: { x: 12.6, z: 8.75, heading: Math.PI, pose: "write", icon: "🗣" },
+  moderator: { x: 12.4, z: 8.75, heading: Math.PI, pose: "write", icon: "🗣" },
   seats: [],
 };
 

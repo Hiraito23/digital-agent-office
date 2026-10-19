@@ -201,7 +201,7 @@ Id agen tidak bisa diubah setelah dibuat. Riwayat chat, tampilan, dan suara teri
 
 ## Kantor dan kegiatan agen
 
-Kantor adalah **satu ruangan terbuka berbentuk persegi** (20 x 20 tile) tanpa dinding sekat dan tanpa pintu, dikelilingi taman kecil. Zona-zonanya hanya dibedakan oleh warna lantai dan papan nama di lantai: **Ruang Rapat** (kiri atas: meja rapat, whiteboard, rak buku), **Ruang Server** (kanan atas: rak server), **Pantry & Lounge** (kiri bawah: kopi, akuarium, sofa), **Ruang Game** (kanan bawah: arcade, ping-pong), dan **Lobby** (bawah tengah: portal Hermes dan pintu pagar masuk). Di tengah ada dua baris meja kerja dan tiga lorong jalan.
+Kantor berbentuk persegi kompak (16 x 16 tile) di sebuah pulau melayang berisi taman. Empat ruang punya tembok dan pintu sendiri: **Ruang Rapat** (kiri atas: meja rapat, whiteboard, rak buku), **Ruang Server** (kanan atas: rak server dan kristal), **Pantry & Lounge** (kiri bawah: kopi, akuarium, sofa) dan **Ruang Game** (kanan bawah: arcade, ping-pong). **Lobby** (bawah tengah: portal Hermes dan gerbang masuk) berupa zona terbuka. Di tengah ada dua baris meja kerja dan tiga lorong jalan; agen keluar-masuk ruang lewat pintunya.
 
 **Satu agen satu meja:** Hermes mendapat meja pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **langsung berlari ke mejanya**, duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol. Layout bawaan punya 10 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Agen berjalan lewat tiga lorong (utara, tengah, selatan) dan berpindah lorong lewat lorong samping.
 
@@ -290,7 +290,7 @@ Mode edit seperti *build mode* di The Sims: klik **🛠 Layout** di header untuk
 | Mengganti warna atau varian | Pilih benda lalu **🎨 Varian** (bean bag, mesin arcade, dan barang pribadi di meja kerja) |
 | Menghapus | Pilih benda lalu **Del** (atau **🗑 Hapus**) |
 | Urungkan / ulangi | **Ctrl+Z** / **Ctrl+Y** (atau tombol **↶ Urungkan** / **↷ Ulangi**) |
-| Mengatur kamera | Seret lantai kosong untuk memutar, klik kanan + seret untuk menggeser, roda mouse untuk zoom. Seret di atas benda berarti memindah benda |
+| Mengatur kamera | Kamera isometrik terkunci (tidak bisa diputar). Seret lantai kosong atau tekan tombol panah untuk menggeser, roda mouse untuk zoom, **Home** untuk kembali ke posisi awal. Seret di atas benda berarti memindah benda |
 | Kembali ke tata letak awal | **Kembalikan ke bawaan** (bisa diurungkan dengan Ctrl+Z) |
 | Selesai | **✓ Selesai**, tombol ✕, atau klik **🛠 Layout** lagi |
 

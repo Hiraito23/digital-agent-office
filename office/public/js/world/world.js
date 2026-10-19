@@ -1,10 +1,11 @@
-// The 3D world: renderer, camera + orbit controls, lights, the office scene
+// The 3D world: renderer, fixed isometric camera, lights, the office scene
 // and the agents (their seats, idle activities and movement). main.js feeds it
 // the roster and agent status from the gateway and asks it for tag positions.
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, MEETING, PORTAL, WANDER } from "../office/layout.js";
+import { ACTIVITY_SPOTS, CENTER, MEETING, N, PORTAL, WANDER } from "../office/layout.js";
+import { CameraRig } from "./camera-rig.js";
+import { Outline } from "./outline.js";
 import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
@@ -18,6 +19,8 @@ export const PIXEL_MODES = [
   { label: "Pixel", ratio: () => 0.5 },
   { label: "Retro", ratio: () => 0.33 },
 ];
+
+const FACING_STEP = Math.PI / 4;
 
 // What an agent does at an activity spot: the sofa and bean bag can mean reading or a nap, the pantry
 // a snack instead of a drink. ms is extra time spent there (a nap lasts longer).
@@ -64,24 +67,15 @@ export class World {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.outline = new Outline(this.renderer); // dark silhouette lines (world/outline.js)
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#a8dcff");
-    this.scene.fog = new THREE.Fog("#a8dcff", 50, 100);
+    this.scene.fog = new THREE.Fog("#a8dcff", 75, 150);
 
-    this.camera = new THREE.PerspectiveCamera(32, 1, 0.5, 200);
-    this.camera.position.set(CENTER.x + 17, 20, CENTER.z + 17);
-
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(CENTER.x, 0.4, CENTER.z + 0.5);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.08;
-    this.controls.minDistance = 6;
-    this.controls.maxDistance = 60;
-    this.controls.maxPolarAngle = Math.PI / 2.25;
-    this.controls.minPolarAngle = Math.PI / 8;
-    this.controls.screenSpacePanning = false;
-    this.controls.update();
+    // fixed isometric camera: pan and zoom only, no rotation (world/camera-rig.js)
+    this.rig = new CameraRig(canvas, CENTER, N);
+    this.camera = this.rig.camera;
 
     // lighting: sky/ground fill + sun with shadows
     this.hemi = new THREE.HemisphereLight("#e3f2ff", "#4e7a34", 1.1);
@@ -125,10 +119,11 @@ export class World {
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    this.renderer.setPixelRatio(PIXEL_MODES[this.pixelMode].ratio());
+    const ratio = PIXEL_MODES[this.pixelMode].ratio();
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.rig.resize(w, h, Math.round(h * ratio));
+    this.outline.resize();
   }
 
   setAppearances(map) {
@@ -370,11 +365,9 @@ export class World {
       else if (a.mode === "chat" && !moving && a.chatPartner) targetHeading = Math.atan2(a.chatPartner.x - a.x, a.chatPartner.z - a.z); // face the other agent
       else if (atSpot) targetHeading = a.spot.heading;
       else if (a.greetWith && now < a.pauseUntil) targetHeading = Math.atan2(a.greetWith.x - a.x, a.greetWith.z - a.z); // turn to the one being greeted
-      else if (!moving) targetHeading = Math.atan2(this.camera.position.x - a.x, this.camera.position.z - a.z);
-      let diff = targetHeading - a.model.rotation.y;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      a.model.rotation.y += diff * Math.min(1, dt / 120);
+      else if (!moving) targetHeading = Math.atan2(this.rig.offset.x, this.rig.offset.z); // the camera never turns: face it
+      // like a sprite: only 8 facing directions, switched instantly
+      a.model.rotation.y = Math.round(targetHeading / FACING_STEP) * FACING_STEP;
       a.model.position.set(a.x, this.office.floorTop, a.z);
       const pose = moving ? "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
       a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? (a.act?.icon ?? a.spot.icon) : "";
@@ -534,8 +527,8 @@ export class World {
   }
 
   render() {
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.rig.update();
+    this.outline.render(this.scene, this.camera);
   }
 
   // Screen positions (CSS px) above each head, for DOM name tags/bubbles.

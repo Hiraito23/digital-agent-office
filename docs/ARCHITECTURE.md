@@ -55,12 +55,13 @@ office/                 image Docker "office"
       main.js           titik masuk UI: menyambungkan semua modul + state aplikasi
       net/gateway.js    klien WebSocket ke adapter (request/response + event)
       world/
-        world.js        renderer, kamera, cahaya, agen (meja, kegiatan, gerak, obrolan antar agen)
+        camera-rig.js   kamera isometrik ortografik terkunci (hanya geser dan zoom)
+        world.js        renderer, cahaya, agen (meja, kegiatan, gerak, obrolan antar agen)
         environment.js  langit, waktu (pagi/siang/sore/malam) dan cuaca (hujan, kabut, awan, ...)
         chatter.js      kalimat obrolan antar agen yang santai (tanpa AI)
         routing.js      jalur jalan: tiga lorong timur-barat (LANES) dan lorong samping
       office/           scene kantor
-        layout.js       DENAH: satu ruangan terbuka 20x20 (OFFICE), zona lantai (ROOMS), pagar (GATE), titik jalan (WANDER); ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js
+        layout.js       DENAH: lantai 16x16 (OFFICE), ruang bertembok dan berpintu serta zona lobi (ROOMS), pagar (GATE), titik jalan (WANDER); ACTIVITY_SPOTS dan MEETING.seats diisi furniture.js
         index.js        merakit seluruh scene (buildOffice)
         rooms.js        papan nama zona di lantai
         furniture.js    furnitur yang bisa dipindah: katalog, layout bawaan, aturan penempatan, manajer
@@ -141,7 +142,7 @@ Furnitur adalah data, bukan kode: daftar `{ id, type, x, z, rot, variant? }` (`x
 - `setDesks(people)`: agen ke-*i* mendapat meja ke-*i* menurut urutan di daftar (meja pertama = Hermes). Kursi memakai `seat` milik katalog (`desk`), ruangnya dari `roomAt()`. Agen yang lebih banyak daripada meja tidak mendapat kursi (tambahkan meja lewat editor).
 - `onChange`: dipanggil setelah perubahan yang final; `World` memakainya untuk `refreshDesks()` sehingga agen yang duduk berjalan ke kursi barunya.
 
-**Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut memutar kamera (`OrbitControls`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
+**Editor (`ui/layout-editor.js`).** Penanganan pointer memakai fase *capture* pada kanvas supaya menyeret benda tidak ikut menggeser kamera (`CameraRig`). Saat dipegang, model hanya dipratinjau (`update(id, patch, { preview: true })`); data baru berubah ketika dilepas di tempat yang valid. Jejak hijau/merah/kuning digambar dengan `depthTest: false` agar terlihat di atas benda. Riwayat undo/redo berupa potret JSON seluruh layout (maks. 60). Setiap perubahan disimpan otomatis dengan jeda 500 ms (`PUT /api/layout`); **Kembalikan ke bawaan** memanggil `DELETE`.
 
 **Server (`server/layout-api.js`).** Hanya memeriksa bentuk dan rentang (maks. 300 benda, id unik, posisi -5 sampai 60, rotasi 0 sampai 3); jenis benda divalidasi browser terhadap katalognya. Berkas ditulis atomik ke `config/layout.json` (`LAYOUT_FILE` bisa menggantinya).
 

@@ -11,7 +11,7 @@ import { box, canvasTexture, cone, mat } from "./helpers.js";
 import { ACTIVITY_SPOTS, MEETING, OFFICE, PORTAL, ROOMS, roomAt } from "./layout.js";
 
 // Bump this when the floor plan changes: layouts saved for an older plan are ignored.
-export const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 3;
 import { C, makeCabinet, makeChair, makeCooler, makeDesk, makeRack } from "./props.js";
 
 // ---------------------------------------------------------------------------
@@ -294,33 +294,33 @@ export const defaultLayout = () => {
   const items = [];
   const add = (type, x, z, r = 0, variant) => items.push({ type, x, z, rot: r, ...(variant === undefined ? {} : { variant }) });
 
-  // desks: two rows in the middle of the room; agent i takes desk i (Hermes first)
-  const columns = [12.8, 15.4, 18, 20.6, 23.2];
-  columns.forEach((x, i) => add("desk", x, 13.4, 0, i));
-  columns.forEach((x, i) => add("desk", x, 17.8, 0, i + 5));
+  // desks: two rows in the middle of the hall; agent i takes desk i (Hermes first)
+  const columns = [12, 14, 16, 18, 20];
+  columns.forEach((x, i) => add("desk", x, 13.9, 0, i));
+  columns.forEach((x, i) => add("desk", x, 16.4, 0, i + 5));
   // cabinets along the west wall
-  add("cabinet", 8.35, 15.4);
-  add("cabinet", 8.35, 16.2);
-  // meeting zone (north-west) and library
-  add("meeting-table", 11, 10.1);
+  add("cabinet", 8.35, 14.2);
+  add("cabinet", 8.35, 15.0);
+  // meeting room (north-west) and library
+  add("meeting-table", 10.8, 9.9);
   add("bookshelf", 8.25, 9.4);
-  // server zone (north-east)
-  for (const x of [23.5, 24.5, 25.5]) add("rack", x, 8.45);
-  // lounge (south-west)
-  add("rug", 11, 26);
-  add("sofa", 11, 27.25, 1);
-  add("coffee-table", 11, 26);
-  add("beanbag", 9.75, 25.05, 0, 0);
-  add("beanbag", 12.25, 25.05, 0, 1);
-  add("counter", 8.35, 23.6);
-  add("aquarium", 8.3, 25.7);
-  add("cooler", 13.55, 22.75);
-  // game zone (south-east)
-  add("arcade", 27.45, 23.6, 0, 0);
-  add("arcade", 27.45, 24.6, 0, 1);
-  add("pingpong", 24.6, 26.4);
-  // big plants
-  for (const [x, z] of [[21.2, 8.6], [27.5, 12.5], [13.7, 12.5], [8.6, 20.4], [27.4, 19.6]]) add("plant", x, z);
+  // server room (north-east)
+  for (const x of [20, 21, 22]) add("rack", x, 8.45);
+  // pantry and lounge (south-west)
+  add("rug", 11, 22);
+  add("sofa", 11, 23.25, 1);
+  add("coffee-table", 11, 22);
+  add("beanbag", 9.75, 21.05, 0, 0);
+  add("beanbag", 12.25, 21.05, 0, 1);
+  add("counter", 8.35, 20.4);
+  add("aquarium", 8.3, 22.4);
+  add("cooler", 13.45, 19.8);
+  // game room (south-east)
+  add("arcade", 23.45, 19.8, 0, 0);
+  add("arcade", 23.45, 20.8, 0, 1);
+  add("pingpong", 20.6, 22.6);
+  // plants
+  for (const [x, z] of [[14.4, 8.7], [16.6, 8.7], [8.6, 17.4], [23.4, 13.2], [23.4, 17.4]]) add("plant", x, z);
   return withIds(items);
 };
 

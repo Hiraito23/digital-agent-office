@@ -6,10 +6,10 @@ import { ROOMS } from "../office/layout.js";
 
 // Three east-west lanes: north of the desks, between the two desk rows, and south of them.
 // Agents walk along a lane and switch lanes through the side aisles at both ends.
-export const LANES = [11, 16, 21];
+export const LANES = [12.8, 15.5, 18.2];
 export const corridorFor = (z) => LANES.reduce((best, lane) => (Math.abs(lane - z) < Math.abs(best - z) ? lane : best), LANES[0]);
-export const AISLE_LEFT = 9.4;
-export const AISLE_RIGHT = 26.6;
+export const AISLE_LEFT = 9.7;
+export const AISLE_RIGHT = 22.3;
 
 // Work-area route: detour around the desk rows using two corridors and the side aisles.
 export const corridorRoute = (from, to) => {

@@ -1,7 +1,7 @@
 // 🎨 Outline colour: the border colour of every panel (--panel-edge), chosen with a colour
 // picker or typed as a hex code. Remembered per browser.
 const KEY = "kantor-hermes-edge-color";
-const DEFAULT = "#c9a24d";
+const DEFAULT = "#5b7cff";
 
 // "#abc", "abc", "#AABBCC" → "#aabbcc", or null when it is not a hex colour
 const normalize = (value) => {
@@ -24,7 +24,7 @@ export const initEdgeColor = ({ button }) => {
   pop.hidden = true;
   pop.innerHTML = `
     <span>Warna garis tepi panel</span>
-    <div class="row"><input type="color" aria-label="Pilih warna"><input type="text" maxlength="7" spellcheck="false" placeholder="#C9A24D" aria-label="Kode hex"></div>
+    <div class="row"><input type="color" aria-label="Pilih warna"><input type="text" maxlength="7" spellcheck="false" placeholder="#5B7CFF" aria-label="Kode hex"></div>
     <button type="button" data-reset>Kembalikan ke bawaan</button>`;
   document.body.append(pop);
   const picker = pop.querySelector('input[type="color"]');
