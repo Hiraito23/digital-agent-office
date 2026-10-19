@@ -9,6 +9,7 @@
 //                     /api/files    files-api.js    (📂 browse and download the agents' files)
 //                     /api/news     news.js         (trending headlines for the agents' small talk)
 //                     /api/usage    usage.js        (📊 token usage per agent and model)
+//                     /api/config   office name from .env (OFFICE_NAME)
 //                     /api/*        agents-api.js   (agent panel, SOUL.md)
 //                     /people.json  config/people.json (looks + voices)
 //                     everything else  static-files.js (UI, three.js, MP3)
@@ -33,6 +34,8 @@ const { serveStatic } = require("./static-files.js");
 const { attachWsProxy } = require("./ws-proxy.js");
 
 const PORT = Number(process.env.PORT || 3000);
+// Name shown in the header, the browser tab and the neon sign (OFFICE_NAME in .env).
+const OFFICE_NAME = (process.env.OFFICE_NAME || "").trim().slice(0, 40) || "Agentic Digital Office";
 const ADAPTER_PORT = Number(process.env.HERMES_ADAPTER_PORT || 18789);
 
 const handleAgentsApi = createAgentsApi(adapter);
@@ -68,6 +71,10 @@ const server = http.createServer((req, res) => {
   if (urlPath.startsWith("/api/projects")) return handleProjectsApi(req, res, urlPath);
   if (urlPath === "/api/layout") return handleLayoutApi(req, res);
   if (urlPath === "/api/files" || urlPath.startsWith("/api/files/")) return handleFilesApi(req, res, urlPath);
+  if (urlPath === "/api/config" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    return res.end(JSON.stringify({ name: OFFICE_NAME }));
+  }
   if (urlPath === "/api/news") return handleNewsApi(req, res);
   if (urlPath === "/api/facts") return handleFactsApi(req, res);
   if (urlPath === "/api/office-chat") return handleOfficeChatApi(req, res);

@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { box, canvasTexture, mat } from "./helpers.js";
 import { OFFICE } from "./layout.js";
 
-export const addDecor = (scene, top, animated) => {
+export const addDecor = (scene, top, animated, officeName = "Agentic Digital Office") => {
   // --- whiteboard with sticky notes (back wall) ---
   const boardTex = canvasTexture(64, 32, (ctx) => {
     ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0, 0, 64, 32);
@@ -23,9 +23,18 @@ export const addDecor = (scene, top, animated) => {
   // --- neon sign (back wall) ---
   const neonTex = canvasTexture(128, 20, (ctx) => {
     ctx.fillStyle = "#1a2138"; ctx.fillRect(0, 0, 128, 20);
-    ctx.font = "bold 11px Poppins, sans-serif"; ctx.textBaseline = "middle";
-    ctx.fillStyle = "#ff8cc6"; ctx.fillText("AGENTIC DIGITAL", 4, 10);
-    ctx.fillStyle = "#74c0fc"; ctx.fillText("OFFICE", 92, 10);
+    // the last word in blue, the rest in pink; the font shrinks until the name fits
+    const words = officeName.toUpperCase().split(/\s+/);
+    const last = words.length > 1 ? words.pop() : "";
+    const first = words.join(" ");
+    ctx.textBaseline = "middle";
+    let size = 11;
+    const widthOf = () => ctx.measureText(`${first} ${last}`).width;
+    for (; size > 5; size -= 1) { ctx.font = `bold ${size}px Poppins, sans-serif`; if (widthOf() <= 120) break; }
+    ctx.font = `bold ${size}px Poppins, sans-serif`;
+    const start = Math.max(2, (128 - widthOf()) / 2);
+    ctx.fillStyle = "#ff8cc6"; ctx.fillText(first, start, 10);
+    ctx.fillStyle = "#74c0fc"; ctx.fillText(last, start + ctx.measureText(`${first} `).width, 10);
   });
   const neon = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.5), new THREE.MeshBasicMaterial({ map: neonTex }));
   neon.position.set(16, top + 1.45, OFFICE.z0 + 0.012);

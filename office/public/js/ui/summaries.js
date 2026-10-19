@@ -2,7 +2,8 @@
 // first. The list lives on the server (summaries.list / "summary" events), so it
 // survives page refreshes. Each entry has a checkbox the user ticks once they
 // have read it (summaries.mark, saved on the server); unread entries stand out
-// and can be shown on their own. Clicking an entry opens that agent's chat.
+// and can be shown on their own. Clicking an entry opens that agent's chat and ticks it as
+// read automatically; the tick can still be toggled by hand.
 
 const KEY = "kantor-hermes-summaries-collapsed";
 const FILTER_KEY = "kantor-hermes-summaries-unread-only";
@@ -55,35 +56,43 @@ export const initSummaries = ({ gw, nameOf, onOpen }) => {
     list.innerHTML = shown.length
       ? shown.map((e) => `
         <li data-id="${esc(e.id)}" data-agent="${esc(e.agentId)}" class="${e.kind === "meeting" ? "meeting" : ""} ${e.read ? "read" : "unread"}" title="Buka chat ${esc(nameOf(e.agentId))}">
-          <div class="sm-head">
-            <label class="sm-check" title="${e.read ? "Tandai belum dibaca" : "Tandai sudah dibaca"}"><input type="checkbox"${e.read ? " checked" : ""} /><span>${e.read ? "Dibaca" : "Baru"}</span></label>
-            <b>${e.kind === "meeting" ? "💬 " : ""}${esc(nameOf(e.agentId))}</b><span>${when(e.at)}</span>
+          <span class="sm-avatar">${e.kind === "meeting" ? "💬" : esc(String(nameOf(e.agentId)).charAt(0).toUpperCase())}</span>
+          <div class="sm-main">
+            <div class="sm-head"><b>${esc(nameOf(e.agentId))}</b><span class="sm-time">${when(e.at)}</span></div>
+            ${e.task ? `<div class="sm-task">${e.kind === "meeting" ? "Rapat" : "Tugas"}: ${esc(e.task)}</div>` : ""}
+            <div class="sm-text">${esc(e.summary)}</div>
           </div>
-          ${e.task ? `<div class="sm-task">${e.kind === "meeting" ? "Rapat" : "Tugas"}: ${esc(e.task)}</div>` : ""}
-          <div class="sm-text">${esc(e.summary)}</div>
+          <label class="sm-check" title="${e.read ? "Sudah dibaca (klik untuk tandai belum)" : "Tandai sudah dibaca"}"><input type="checkbox"${e.read ? " checked" : ""} /><i aria-hidden="true"></i></label>
         </li>`).join("")
       : `<li class="muted">${unreadOnly && entries.length ? "Semua ringkasan sudah Anda baca." : "Belum ada jawaban. Ringkasan muncul di sini setiap kali agen selesai menjawab."}</li>`;
+  };
+
+  // Marks an entry read/unread: shown at once, saved on the server (undone when that fails).
+  const setRead = async (entry, read) => {
+    entry.read = read;
+    render();
+    try {
+      await gw.request("summaries.mark", { id: entry.id, read });
+    } catch {
+      entry.read = !read;
+      render();
+    }
   };
 
   list.addEventListener("click", async (e) => {
     const li = e.target.closest("li[data-agent]");
     if (!li) return;
     const box = e.target.closest(".sm-check");
-    if (!box) return onOpen(entries.find((x) => x.id === li.dataset.id) ?? { agentId: li.dataset.agent });
+    if (!box) {
+      const opened = entries.find((x) => x.id === li.dataset.id);
+      if (opened && !opened.read) setRead(opened, true); // reading it ticks it
+      return onOpen(opened ?? { agentId: li.dataset.agent });
+    }
     // the checkbox only marks read/unread; it never opens the chat
     e.stopPropagation();
     if (e.target.tagName !== "INPUT") return; // the label forwards the click to its input
     const entry = entries.find((x) => x.id === li.dataset.id);
-    if (!entry) return;
-    const read = e.target.checked;
-    entry.read = read;
-    render();
-    try {
-      await gw.request("summaries.mark", { id: entry.id, read });
-    } catch {
-      entry.read = !read; // not saved: undo
-      render();
-    }
+    if (entry) setRead(entry, e.target.checked);
   });
 
   const reload = async () => {

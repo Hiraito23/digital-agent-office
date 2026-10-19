@@ -40,7 +40,12 @@ const syncTopHeight = () => document.documentElement.style.setProperty("--top-h"
 new ResizeObserver(syncTopHeight).observe(topBar);
 syncTopHeight();
 
-const world = new World(view, { layout: await loadLayout() });
+// Office name from OFFICE_NAME in .env (header, browser tab and the neon sign on the wall).
+const officeName = await fetch("/api/config", { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).then((c) => c.name).catch(() => null) || "Agentic Digital Office";
+document.title = officeName;
+document.querySelector(".top .title").textContent = officeName.toUpperCase();
+
+const world = new World(view, { layout: await loadLayout(), name: officeName });
 // 🛠 Layout: move, rotate, add and delete furniture (build mode).
 const layoutEditor = initLayoutEditor({ world, canvas: view });
 // 🌦 Sky: time of day and weather buttons.
@@ -87,6 +92,22 @@ initAgentPanel({
   },
 });
 window.addEventListener("resize", () => world.resize());
+
+// 🎥 Sorot: the camera looks at agents who are talking to each other (smooth ease in and out).
+const followBtn = document.getElementById("follow-toggle");
+let follow = true;
+try { follow = localStorage.getItem("kantor-hermes-follow") !== "0"; } catch { /* ignore */ }
+const renderFollow = () => {
+  world.followEnabled = follow;
+  followBtn.textContent = follow ? "🎥 Sorot" : "🎥 Manual";
+  followBtn.classList.toggle("playing", follow);
+};
+renderFollow();
+followBtn.addEventListener("click", () => {
+  follow = !follow;
+  renderFollow();
+  try { localStorage.setItem("kantor-hermes-follow", follow ? "1" : "0"); } catch { /* ignore */ }
+});
 
 // Pixel look toggle (HD / Pixel / Retro), remembered per browser.
 let pixelMode = 1;

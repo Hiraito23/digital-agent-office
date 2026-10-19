@@ -50,6 +50,7 @@ services:
       - HERMES_ADAPTER_PORT=18789
       - HERMES_MODEL=hermes-agent
       - HERMES_AGENT_NAME=Hermes
+      - OFFICE_NAME=${OFFICE_NAME:-Agentic Digital Office}   # nama kantor di header, tab browser, dan papan neon
       - TEAM_FILE=/data/config/team.json
       - OFFICE_FILE=/data/config/office.json                  # proyek aktif
       - WORKSPACE_DIR=/workspace

@@ -11,7 +11,7 @@ import { floorTexture, groundTexture, screenTexture, windowTexture } from "./tex
 
 const PONDS = { x: 2.4, z: 20, rx: 1.7, rz: 2.4 };
 
-export const buildOffice = (scene, layout) => {
+export const buildOffice = (scene, layout, { name } = {}) => {
   const animated = [];
 
   // the garden is a floating island: a grass-topped block of earth on a tapering rock
@@ -39,7 +39,7 @@ export const buildOffice = (scene, layout) => {
   const fw = OFFICE.x1 - OFFICE.x0;
   const fd = OFFICE.z1 - OFFICE.z0;
   const floor = new THREE.Mesh(new THREE.BoxGeometry(fw, 0.08, fd), [
-    mat("#c3ccd5"), mat("#c3ccd5"), new THREE.MeshLambertMaterial({ map: floorTexture() }), mat("#c3ccd5"), mat("#aab4bf"), mat("#aab4bf"),
+    mat("#c3ccd5"), mat("#c3ccd5"), new THREE.MeshLambertMaterial({ map: floorTexture(), color: "#a9b0c4" }) // a little darker than the raw tiles, mat("#c3ccd5"), mat("#aab4bf"), mat("#aab4bf"),
   ]);
   floor.position.set(OFFICE.x0 + fw / 2, 0.0, OFFICE.z0 + fd / 2);
   floor.receiveShadow = true;
@@ -145,7 +145,7 @@ export const buildOffice = (scene, layout) => {
 
   // Movable furniture: desks, cabinets, lounge, server racks, game room, ... (furniture.js).
   const furniture = createFurniture({ scene, top, animated, screenTex, rooms, makeAutoDesk: addAutoDesk, items: layout });
-  addDecor(scene, top, animated);
+  addDecor(scene, top, animated, name);
 
   // server corner + floating crystal
   const crystal = new THREE.Mesh(

@@ -9,6 +9,18 @@ const DISTANCE = 45;
 const SIZE = { min: 10, max: 40, start: 20 }; // visible height in world units
 const KEY_PAN = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright"]);
 
+// Critically damped spring (like Unity's SmoothDamp): starts slowly, speeds up, settles softly.
+const damp = (current, target, vel, key, smoothTime, dt) => {
+  const omega = 2 / Math.max(0.0001, smoothTime);
+  const x = omega * dt;
+  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = current - target;
+  const temp = (vel[key] + omega * change) * dt;
+  vel[key] = (vel[key] - omega * temp) * exp;
+  const out = target + (change + temp) * exp;
+  return Number.isFinite(out) ? out : target;
+};
+
 export class CameraRig {
   constructor(canvas, center, extent) {
     this.canvas = canvas;
@@ -30,6 +42,11 @@ export class CameraRig {
     this.texel = 0; // world units per rendered pixel (0 = no snapping)
     this.keys = new Set();
     this.drag = null;
+    this.vel = { x: 0, z: 0, size: 0 }; // for the smooth damping
+    this.smooth = 0.09; // seconds to settle after the user pans or zooms
+    this.focus = null; // { key, x, z, size }: where the camera looks while agents interact
+    this.saved = null; // the user's own view, restored when the interaction is over
+    this.ignoreKey = null; // a focus the user moved away from (not followed again)
     this.last = performance.now();
     this.bind();
     this.apply();
@@ -50,6 +67,7 @@ export class CameraRig {
       this.drag.y = e.clientY;
       if (!dx && !dy) return;
       canvas.style.cursor = "grabbing";
+      this.userMoved();
       const perPx = this.goalSize / window.innerHeight; // the map follows the pointer
       this.panBy(-dx * perPx, dy * perPx / Math.sin(ELEVATION));
     });
@@ -63,6 +81,7 @@ export class CameraRig {
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
+      this.userMoved();
       this.goalSize = Math.min(SIZE.max, Math.max(SIZE.min, this.goalSize * Math.exp(e.deltaY * 0.0012)));
     }, { passive: false });
 
@@ -73,6 +92,7 @@ export class CameraRig {
       if (key === "home") { this.reset(); return; }
       if (!KEY_PAN.has(key)) return;
       e.preventDefault();
+      this.userMoved();
       this.keys.add(key);
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
@@ -87,8 +107,41 @@ export class CameraRig {
   }
 
   reset() {
+    this.userMoved();
     this.goal.copy(this.home);
     this.goalSize = SIZE.start;
+  }
+
+  // The user took over: stop following the interaction (until a different one starts).
+  userMoved() {
+    if (!this.focus) return;
+    this.ignoreKey = this.focus.key;
+    this.focus = null;
+    this.saved = null;
+    this.smooth = 0.09;
+  }
+
+  // Look at (x, z) from `size` world units high, easing there slowly; null = back to the user's view.
+  // Called every frame with the same key while the interaction lasts; the point may move.
+  setFocus(f) {
+    if (!f) {
+      this.ignoreKey = null;
+      if (!this.focus) return;
+      this.focus = null;
+      if (this.saved) { this.goal.copy(this.saved.goal); this.goalSize = this.saved.size; this.saved = null; }
+      this.smooth = 0.9;
+      return;
+    }
+    if (f.key === this.ignoreKey) return;
+    if (!this.focus) {
+      this.saved = { goal: this.goal.clone(), size: this.goalSize };
+      this.smooth = 0.9; // gentle start: ease in, ease out
+    } else if (f.key !== this.focus.key) {
+      this.smooth = 0.9;
+    }
+    this.focus = f;
+    this.goal.set(Math.min(this.max, Math.max(this.min, f.x)), this.goal.y, Math.min(this.max, Math.max(this.min, f.z)));
+    this.goalSize = f.size;
   }
 
   // Called on window resize; bufferHeight is the canvas height in rendered pixels.
@@ -106,9 +159,11 @@ export class CameraRig {
       const dir = (a, b) => (this.keys.has(a) ? 1 : 0) - (this.keys.has(b) ? 1 : 0);
       this.panBy(dir("arrowright", "arrowleft") * speed, dir("arrowup", "arrowdown") * speed / Math.sin(ELEVATION));
     }
-    const k = 1 - Math.exp(-dt / 1000 * 12);
-    this.target.lerp(this.goal, k);
-    this.size += (this.goalSize - this.size) * k;
+    const sec = dt / 1000;
+    this.target.x = damp(this.target.x, this.goal.x, this.vel, "x", this.smooth, sec);
+    this.target.z = damp(this.target.z, this.goal.z, this.vel, "z", this.smooth, sec);
+    this.size = damp(this.size, this.goalSize, this.vel, "size", this.smooth, sec);
+    this.target.y = this.goal.y;
     this.apply();
   }
 

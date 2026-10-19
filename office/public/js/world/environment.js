@@ -121,9 +121,9 @@ export class Environment {
     this.hemi = hemi;
     this.office = office;
     this.center = center;
-    this.timeId = "auto";
+    this.timeId = "malam";
     this.weatherId = "cerah";
-    this.hour = this.clockHour();
+    this.hour = TIMES.find((t) => t.id === "malam").hour;
     this.w = { ...WEATHER.cerah };
     this.look = { top: new THREE.Color(), bottom: new THREE.Color(), sun: new THREE.Color(), hSky: new THREE.Color(), hGround: new THREE.Color(), sunI: 1, hI: 1, night: 0, glow: 0 };
     this.top = new THREE.Color();

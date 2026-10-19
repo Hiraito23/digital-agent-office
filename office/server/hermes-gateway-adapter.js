@@ -1782,7 +1782,7 @@ function broadcastRoster() {
 // Active project (set from the office's 📁 Proyek picker). Every agent's system
 // prompt gets the project folder and the git branch rules appended, including
 // sub-agents that Hermes delegates to.
-let activeProject = null; // { name, path }
+let activeProject = null; // { name, path, git }
 
 // Where finished files must end up. Hermes' own folders (/opt/data, cache/scratch, /tmp) live
 // inside the container and are invisible to the user, so every result goes to /workspace
@@ -1797,17 +1797,20 @@ const projectContext = () => {
 
 Tidak ada proyek aktif. Folder hasil kerja bersama: ${FALLBACK_DIR} (folder milik pengguna; buat kalau belum ada, mis. \`mkdir -p ${FALLBACK_DIR}\`).${filesRule(FALLBACK_DIR)}`;
   }
-  const { name, path: dir } = activeProject;
+  const { name, path: dir, git } = activeProject;
+  const gitRules = git ? `
+- Aturan git (wajib): sebelum mengubah file, jalankan \`git status\` dan \`git branch --show-current\`.
+  Kalau branch aktif belum diawali "agent/", buat satu branch kerja bersama untuk tugas ini:
+  \`git checkout -b agent/<nama-tugas-singkat>\`. Seluruh tim memakai branch itu; jangan pindah ke branch lain.
+- Jangan pernah commit atau push ke main, master, atau develop; jangan force push; jangan menghapus branch atau riwayat.
+  Commit kecil dengan pesan yang jelas. Push hanya kalau pengguna memintanya.` : `
+- Folder ini bukan repositori git: tidak perlu perintah git. Jangan menghapus atau menimpa file yang sudah ada tanpa diminta.`;
   return `
 
 Proyek aktif: "${name}" di folder ${dir} (folder milik pengguna yang di-mount ke container).
 - Kerjakan semua file dan perintah terminal di folder ini: pakai path absolut atau jalankan \`cd ${dir}\` lebih dulu.${filesRule(dir)}
 - Baca struktur folder dan README proyek sebelum mengubah apa pun, lalu ikuti konvensi yang sudah ada.
-- Aturan git (wajib): sebelum mengubah file, jalankan \`git status\` dan \`git branch --show-current\`.
-  Kalau branch aktif belum diawali "agent/", buat satu branch kerja bersama untuk tugas ini:
-  \`git checkout -b agent/<nama-tugas-singkat>\`. Seluruh tim memakai branch itu; jangan pindah ke branch lain.
-- Jangan pernah commit atau push ke main, master, atau develop; jangan force push; jangan menghapus branch atau riwayat.
-  Commit kecil dengan pesan yang jelas. Push hanya kalau pengguna memintanya.
+${gitRules}
 - Jangan membaca, menampilkan, atau mengubah file rahasia (.env, kunci, kredensial).`;
 };
 
@@ -1824,7 +1827,7 @@ const withProjectContext = (systemPrompt) => `${systemPrompt}${REPLY_STYLE}${pro
 // Live team management (used by the office's agent panel).
 const team = {
   setProject(project) {
-    activeProject = project && project.name ? { name: project.name, path: project.path } : null;
+    activeProject = project && project.name ? { name: project.name, path: project.path, git: project.git !== false } : null;
     console.log(`[hermes-adapter] Active project: ${activeProject ? activeProject.path : "(none)"}`);
   },
   ORCHESTRATOR_ID: AGENT_ID,

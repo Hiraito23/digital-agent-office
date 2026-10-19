@@ -3,6 +3,9 @@
 // adapter runs the turns, server/meetings.js), then Hermes writes the minutes.
 // The world shows who is in the room, bubbles show who is talking.
 
+const MAX_DOC_BYTES = 200 * 1024;
+const MAX_DOC_CHARS = 20000; // what the agents get to read (the server cuts at the same length)
+
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, logActivity, getProject }) => {
@@ -12,7 +15,7 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
   let meeting = null; // last meeting state from the server
   let live = null; // { agentId, text } of the turn being spoken
   let limits = { maxParticipants: 5, maxRounds: 3 };
-  let draft = { topic: "", participants: [], rounds: 1 };
+  let draft = { topic: "", participants: [], rounds: 1, document: null }; // document: { name, text } read from an uploaded .md/.txt
 
   const flash = (msg, kind = "err") => {
     status.textContent = msg;
@@ -37,7 +40,15 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
       <form class="agent-form meeting-form">
         <p class="muted">Peserta berjalan ke <b>Ruang Rapat</b> dan bergiliran bicara. Hermes membuka rapat dan menutupnya dengan notulen (ringkasan, keputusan, action item). Selama rapat agen hanya berdiskusi, tidak mengubah file.</p>
         <p class="muted">Proyek aktif: <b>${project ? esc(project) : "tidak ada"}</b>${project ? " (ikut jadi konteks rapat)" : ""}.</p>
-        <label>Topik rapat
+        <fieldset class="meeting-doc"><legend>Dokumen untuk dibahas (opsional)</legend>
+          ${draft.document ? `
+            <div class="doc-chip"><b>📄 ${esc(draft.document.name)}</b> <small>${draft.document.text.length.toLocaleString("id-ID")} karakter${draft.document.truncated ? ", dipotong" : ""}</small>
+              <button type="button" data-act="remove-doc" title="Lepas dokumen">✕</button></div>
+            <pre class="doc-preview">${esc(draft.document.text.slice(0, 500))}${draft.document.text.length > 500 ? "\n…" : ""}</pre>` : ""}
+          <label class="doc-pick"><input type="file" name="doc" accept=".md,.markdown,.txt,text/markdown,text/plain" />
+            <small>Unggah file .md atau .txt. Hermes dan peserta membacanya lalu mendiskusikannya. Tanpa peserta, Hermes membahasnya sendiri.</small></label>
+        </fieldset>
+        <label>Topik rapat${draft.document ? " (boleh dikosongkan)" : ""}
           <textarea name="topic" rows="3" maxlength="2000" placeholder="Misalnya: rencana fitur login dan pembagian tugasnya">${esc(draft.topic)}</textarea>
         </label>
         <fieldset><legend>Peserta (maks. ${limits.maxParticipants})</legend>
@@ -50,6 +61,7 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
           <select name="rounds">${[1, 2, 3].slice(0, limits.maxRounds).map((n) => `<option value="${n}"${n === draft.rounds ? " selected" : ""}>${n} putaran</option>`).join("")}</select>
           <small>Setiap peserta bicara sekali per putaran. Lebih banyak putaran = diskusi lebih dalam, tapi lebih lama.</small>
         </label>
+        <p class="muted">Hasil rapat disimpan otomatis sebagai file .md di folder <b>rapat/</b> (lihat di 📂 Berkas).</p>
         <div class="form-actions"><button type="submit" class="primary">💬 Mulai rapat</button></div>
       </form>`;
     const form = body.querySelector("form");
@@ -58,17 +70,35 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
         topic: form.elements.topic.value,
         participants: [...form.querySelectorAll("input[name=p]:checked")].map((i) => i.value),
         rounds: Number(form.elements.rounds.value),
+        document: draft.document,
       };
     };
+    // read the chosen file in the browser; only its text goes to the server with the meeting
+    form.elements.doc.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > MAX_DOC_BYTES) { e.target.value = ""; return flash(`File terlalu besar (maks. ${MAX_DOC_BYTES / 1024} KB)`); }
+      try {
+        const text = (await file.text()).trim();
+        if (!text) { e.target.value = ""; return flash("File kosong"); }
+        draft.document = { name: file.name, text: text.slice(0, MAX_DOC_CHARS), truncated: text.length > MAX_DOC_CHARS };
+        status.textContent = "";
+        showForm();
+      } catch {
+        flash("Gagal membaca file");
+      }
+    };
+    form.querySelector("[data-act=remove-doc]")?.addEventListener("click", () => { form.onchange(); draft.document = null; showForm(); });
     form.onsubmit = async (e) => {
       e.preventDefault();
       form.onchange();
-      if (!draft.topic.trim()) return flash("Isi topik rapat dulu");
-      if (!draft.participants.length) return flash("Pilih minimal satu peserta");
+      if (!draft.topic.trim() && !draft.document) return flash("Isi topik rapat atau lampirkan dokumen");
+      if (!draft.participants.length && !draft.document) return flash("Pilih minimal satu peserta");
       if (draft.participants.length > limits.maxParticipants) return flash(`Maksimal ${limits.maxParticipants} peserta`);
       status.textContent = "";
       try {
-        await gw.request("meeting.start", draft);
+        await gw.request("meeting.start", { ...draft, document: draft.document ? { name: draft.document.name, text: draft.document.text } : undefined });
+        draft = { topic: "", participants: [], rounds: draft.rounds, document: null };
       } catch (err) {
         flash(err.message);
       }
@@ -94,7 +124,9 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
       <div class="meeting-view">
         <h3>${esc(m.topic)}</h3>
         <p class="muted">${stateLine} · peserta: ${["hermes", ...m.participants].map((id) => esc(nameOf(id))).join(", ")} · ${m.rounds} putaran</p>
+        ${m.document ? `<p class="muted">📄 Dokumen: <b>${esc(m.document.name)}</b></p>` : ""}
         ${m.minutes ? `<div class="meeting-minutes"><b>📝 Notulen</b>${esc(m.minutes)}</div>` : ""}
+        ${m.savedTo ? `<p class="muted">💾 Disimpan di <a href="/viewer.html?path=${encodeURIComponent(m.savedTo)}" target="_blank" rel="noopener">${esc(m.savedTo)}</a></p>` : ""}
         <div class="meeting-log chat-log">${turns}${speaking}${!turns && !speaking ? `<p class="muted">Peserta sedang berjalan ke Ruang Rapat…</p>` : ""}</div>
         <div class="form-actions">
           ${running ? `<button data-act="stop">■ Akhiri rapat</button>` : `<button data-act="new" class="primary">💬 Rapat baru</button>`}
@@ -154,8 +186,9 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
     if (p.state === "ended") {
       meeting.state = "ended";
       meeting.minutes = p.minutes;
+      meeting.savedTo = p.savedTo ?? null;
       world.endMeeting();
-      logActivity(`Rapat selesai: notulen ada di 📋 RINGKASAN`, "ok");
+      logActivity(p.savedTo ? `Rapat selesai: notulen disimpan di ${p.savedTo}` : "Rapat selesai: notulen ada di 📋 RINGKASAN", "ok");
     }
     if (p.state === "stopped" || p.state === "error") {
       meeting.state = p.state;

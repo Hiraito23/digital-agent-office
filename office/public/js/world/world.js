@@ -3,7 +3,7 @@
 // the roster and agent status from the gateway and asks it for tag positions.
 import * as THREE from "three";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, MEETING, N, PORTAL, WANDER } from "../office/layout.js";
+import { ACTIVITY_SPOTS, CENTER, MEETING, N, PORTAL, ROOMS, WANDER } from "../office/layout.js";
 import { CameraRig } from "./camera-rig.js";
 import { Outline } from "./outline.js";
 import { animatePerson } from "../characters/animation.js";
@@ -61,7 +61,7 @@ function pickGreeting(a, b, period) {
 }
 
 export class World {
-  constructor(canvas, { layout } = {}) {
+  constructor(canvas, { layout, name } = {}) {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.shadowMap.enabled = true;
@@ -94,7 +94,7 @@ export class World {
     sun.shadow.normalBias = 0.02;
     this.scene.add(sun, sun.target);
 
-    this.office = buildOffice(this.scene, layout);
+    this.office = buildOffice(this.scene, layout, { name });
     this.office.furniture.onChange = () => this.refreshDesks(); // a moved desk moves its seat
     // sky: time of day and weather drive the lights, background, fog, lamps and windows
     this.environment = new Environment({ scene: this.scene, camera: this.camera, sun, hemi: this.hemi, office: this.office, center: CENTER });
@@ -102,6 +102,7 @@ export class World {
     this.appearances = {};
     this.raycaster = new THREE.Raycaster();
     this.pixelMode = 1;
+    this.followEnabled = true; // 🎥 Sorot: the camera looks at agents who interact
     // small talk between idle agents (world/chatter.js); main.js fills in the callbacks
     this.chatter = { active: null, nextAt: performance.now() + 9000, recent: [] };
     this.onSay = null; // (agentId, text, ms) -> speech bubble
@@ -376,6 +377,22 @@ export class World {
     }
     this.updateGreetings(now);
     this.updateChatter(now);
+    this.rig.setFocus(this.followEnabled ? this.interactionFocus() : null);
+  }
+
+  // Where the camera should look while agents interact: the meeting room during a meeting, the
+  // pair that is chatting, or the two giving each other a high five. null = nothing going on.
+  interactionFocus() {
+    const agents = [...this.agents.values()];
+    if (this.meetingOn && agents.some((a) => a.mode === "meeting")) {
+      const room = ROOMS.find((r) => r.id === MEETING.room);
+      if (room) return { key: "meeting", x: (room.x0 + room.x1) / 2, z: (room.z0 + room.z1) / 2, size: 13 };
+    }
+    const ch = this.chatter.active;
+    if (ch && ch.state === "talk") return { key: `chat:${ch.a.id}:${ch.b.id}`, x: (ch.a.x + ch.b.x) / 2, z: (ch.a.z + ch.b.z) / 2, size: 11 };
+    const hi5 = agents.find((a) => a.gesture === "hi5" && a.greetWith);
+    if (hi5) return { key: `hi5:${hi5.id}`, x: (hi5.x + hi5.greetWith.x) / 2, z: (hi5.z + hi5.greetWith.z) / 2, size: 10 };
+    return null;
   }
 
   // Picks a free activity spot. Ping-pong needs two players: another idle agent is invited to the
