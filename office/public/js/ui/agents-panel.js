@@ -275,11 +275,79 @@ export const initAgentPanel = ({ voice, onChanged, loadToolsets }) => {
       </ul>`;
   };
 
+  // ---- model for many agents at once: tick agents, pick a model, submit ---------
+
+  const showModels = async () => {
+    body.innerHTML = `<p class="muted">Memuat…</p>`;
+    let catalog;
+    try {
+      roster = (await api("GET", "/api/agents")).agents;
+      catalog = await api("GET", "/api/models");
+    } catch (err) {
+      body.innerHTML = `<p class="agents-status err">${esc(err.message)}</p>`;
+      return;
+    }
+    const members = roster.filter((a) => !a.builtin);
+    const modelOpt = (m) => `<option value="${esc(m.value)}">${esc(m.id)}</option>`;
+    const groups = catalog.groups.map((g) => `<optgroup label="${esc(g.name)}">${g.models.map(modelOpt).join("")}</optgroup>`).join("");
+    body.innerHTML = `
+      <form class="model-form">
+        <p class="muted">1. Centang agen · 2. pilih model · 3. kirim. Orkestrator Hermes selalu memakai model utama Hermes${catalog.default ? ` (${esc(catalog.default)})` : ""}.</p>
+        <label class="mm-all"><input type="checkbox" data-all> Pilih semua (${members.length})</label>
+        <ul class="agent-list mm-list">
+          ${members.map((a) => `
+            <li>
+              <label class="mm-row">
+                <input type="checkbox" name="ids" value="${esc(a.id)}">
+                <span class="who"><b>${esc(a.name)}</b><small>${esc(a.role || "")}</small></span>
+                <code class="mm-cur">${esc(a.model || "ikut default")}</code>
+              </label>
+            </li>`).join("")}
+        </ul>
+        <label>Model AI
+          <select name="model">
+            <option value="">Ikut model default Hermes${catalog.default ? ` (${esc(catalog.default)})` : ""}</option>
+            ${groups}
+          </select>
+        </label>
+        ${catalog.error ? `<small class="agents-status err">Daftar model tidak bisa dimuat (${esc(catalog.error)})</small>` : ""}
+        <button type="submit" class="primary wide" disabled>Terapkan ke 0 agen</button>
+      </form>`;
+    const form = body.querySelector("form");
+    const boxes = [...form.querySelectorAll('input[name="ids"]')];
+    const all = form.querySelector("[data-all]");
+    const submit = form.querySelector('button[type="submit"]');
+    const refresh = () => {
+      const n = boxes.filter((b) => b.checked).length;
+      all.checked = n === boxes.length && n > 0;
+      all.indeterminate = n > 0 && n < boxes.length;
+      submit.disabled = n === 0;
+      submit.textContent = `Terapkan ke ${n} agen`;
+    };
+    all.onchange = () => { boxes.forEach((b) => { b.checked = all.checked; }); refresh(); };
+    boxes.forEach((b) => { b.onchange = refresh; });
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const ids = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (!ids.length) return;
+      submit.disabled = true;
+      try {
+        const res = await api("POST", "/api/agents/models", { ids, model: form.model.value });
+        flash(`Model ${res.model || "default Hermes"} diterapkan ke ${res.updated} agen`);
+        onChanged?.();
+        await showModels();
+      } catch (err) {
+        flash(err.message, "err");
+        submit.disabled = false;
+      }
+    };
+  };
+
   const show = (next) => {
     tab = next;
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
     status.textContent = "";
-    ({ soul: showSoul, tools: showTools }[tab] ?? showTeam)();
+    ({ soul: showSoul, tools: showTools, models: showModels }[tab] ?? showTeam)();
   };
   tabs.forEach((t) => { t.onclick = () => show(t.dataset.tab); });
 

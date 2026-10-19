@@ -266,6 +266,27 @@ const createAgentsApi = ({ team, TEAM_FILE }) => {
         return send(res, 405, { error: "method tidak didukung" });
       }
 
+      // Set one model for several agents at once: { ids: [...], model: "" } ("" = follow Hermes' default).
+      if (urlPath === "/api/agents/models") {
+        if (req.method !== "POST") return send(res, 405, { error: "method tidak didukung" });
+        const body = await readBody(req);
+        const ids = Array.isArray(body.ids) ? [...new Set(body.ids.map(String))] : [];
+        if (!ids.length) throw new BadRequest("pilih minimal satu agen");
+        const model = text(body.model, 120, "model");
+        const members = readJson(TEAM_FILE, []);
+        const unknown = ids.filter((id) => !members.some((x) => x && x.id === id));
+        if (unknown.length) throw new BadRequest(`agen tidak ditemukan: ${unknown.join(", ")}`);
+        for (const id of ids) {
+          const index = members.findIndex((x) => x && x.id === id);
+          const member = { ...members[index] };
+          if (model) member.model = model; else delete member.model;
+          members[index] = member;
+        }
+        writeJson(TEAM_FILE, members);
+        for (const id of ids) team.upsert(members.find((x) => x && x.id === id));
+        return send(res, 200, { ok: true, updated: ids.length, model });
+      }
+
       const m = /^\/api\/agents\/([a-z0-9-]+)$/.exec(urlPath);
       if (m) {
         const id = m[1];
