@@ -212,7 +212,7 @@ Kantor adalah **gedung tiga lantai** (tiap lantai berukuran sama, 26 x 10 tile) 
 
 **Satu agen satu ruangan:** Hermes mendapat ruangan pertama, lalu anggota tim diurutkan menurut id. Begitu mendapat tugas (dari Anda atau dari Hermes), agen **berlari ke ruangannya** (naik lift bila perlu), duduk, dan mengetik; setelah selesai ia tetap duduk minimal 3 detik (agar terlihat bekerja walau tugasnya singkat), lalu berdiri dan kembali bersantai atau mengobrol di lobi, kantin, atau lorong. Layout bawaan punya 12 meja. Kalau agen lebih banyak dari meja, tambah meja lewat **🛠 Layout**. Saat rapat, semua peserta naik lift ke Ruang Rapat di lantai 3.
 
-**Tab lantai** di bagian atas layar menampilkan satu lantai sekali waktu: mulai dari **Lantai 1** (lobby, game, kantin), lalu pilih **Lantai 2** (ruang agen) atau **Lantai 3** (rapat dan server). Lantai lain tetap terlihat samar (bawaan **opasitas 20%**, bisa diatur di **⚙ Pengaturan** > *Opasitas lantai lain*, 0 sampai 100%). Tab **Semua** menampilkan ketiga lantai penuh. Kamera meluncur halus ke lantai yang dipilih. Kalau 🎥 Sorot menyorot rapat atau obrolan di lantai lain, tab berpindah sementara ke lantai itu lalu kembali setelah selesai.
+**Tab lantai** di bagian atas layar menampilkan satu lantai sekali waktu: mulai dari **Lantai 1** (lobby, game, kantin), lalu pilih **Lantai 2** (ruang agen) atau **Lantai 3** (rapat dan server). Lantai lain tetap terlihat samar (bawaan **opasitas 20%**, bisa diatur di **⚙ Pengaturan** > *Opasitas lantai lain*, 0 sampai 100%). Tab **Semua** menampilkan ketiga lantai penuh. Kamera meluncur halus ke lantai yang dipilih. Agen di lantai lain yang sedang mengerjakan tugas atau berbicara tetap punya name tag lengkap dengan **bar progres**, bertanda *Lantai N* dan berbingkai putus-putus. Kalau 🎥 Sorot menyorot rapat atau obrolan di lantai lain, tab berpindah sementara ke lantai itu lalu kembali setelah selesai.
 
 Saat santai, agen memakai properti kantor dan ikon kegiatannya tampil di label nama:
 
@@ -356,7 +356,15 @@ Untuk membahas sebuah project bersama beberapa agen sekaligus:
 4. Hermes membuka rapat, lalu tiap peserta bicara bergiliran 2 sampai 4 kalimat dari sudut pandang perannya; gelembung kata dan transkrip di panel menunjukkan siapa yang sedang bicara.
 5. Hermes menutup rapat dengan **notulen**: Ringkasan, Keputusan, dan Action item per orang. Notulen muncul di panel rapat dan di **📋 RINGKASAN**, **disimpan otomatis sebagai file `.md` di folder `rapat/`** (di `PROJECTS_DIR`, bisa dibuka di 📂 Berkas; berisi notulen, transkrip, dan dokumen yang dibahas), dan tersimpan di riwayat chat setiap peserta, jadi Anda bisa melanjutkan, misalnya ke Naruto: "kerjakan action item-mu dari rapat tadi".
 
-Tombol **Salin notulen** dan **Unduh .md** menyimpan notulen + transkrip. **■ Akhiri rapat** menghentikan rapat kapan saja. Selama rapat agen hanya berdiskusi, tidak mengubah file. Peserta yang modelnya tidak merespons selama 90 detik dilewati supaya rapat tetap berjalan. Lama rapat kira-kira (1 + peserta × putaran + 1) giliran × 5 sampai 15 detik.
+Panel rapat punya dua tab: **💬 Obrolan** (isi diskusi per pembicara, langsung terisi selama rapat) dan **📝 Notulen** (ringkasan, keputusan, action item), jadi keduanya tidak berebut tempat. Rapat terakhir tetap bisa dibaca setelah halaman dimuat ulang. Tombol **Salin notulen** dan **Unduh .md** menyimpan notulen + transkrip. **■ Akhiri rapat** menghentikan rapat kapan saja. Selama rapat agen hanya berdiskusi, tidak mengubah file. Peserta yang modelnya tidak merespons selama 90 detik dilewati supaya rapat tetap berjalan. Lama rapat kira-kira (1 + peserta × putaran + 1) giliran × 5 sampai 15 detik.
+
+### Melanjutkan hasil rapat dan melampirkan berkas ke chat
+
+Hasil rapat tersimpan di folder `rapat/`. Ada tiga cara memakainya sebagai bahan kerja berikutnya:
+
+1. **Tombol "➡ Lanjutkan ke Hermes (lembar kerja)"** di tab 📝 Notulen setelah rapat selesai: notulen terlampir ke chat Hermes dan kolom pesan terisi usulan tugas (ubah keputusan dan action item menjadi lembar kerja per agen, simpan di `rapat/`, lalu delegasikan). Edit dulu kalau perlu, lalu kirim.
+2. **Tombol 📎 di kotak chat**: pilih berkas dari workspace (bagian *Hasil rapat terbaru* di atas, atau jelajahi folder). Isi berkas dikirim ke agen sebagai konteks; gelembung chat hanya menampilkan nama berkasnya. Batas: 5 berkas teks (.md, .txt, .json, .csv, kode, ...), maksimal 200 KB per berkas dan 40.000 karakter total. Lampiran berlaku untuk pesan ke satu agen (tab Pesan), bukan tab Kantor.
+3. **Rapat lanjutan**: di formulir Rapat pilih *Lanjutkan dari rapat sebelumnya*; berkas hasil rapat itu menjadi dokumen yang dibahas di rapat baru.
 
 ## Tools Hermes (🧰 Tools dan PERSETUJUAN)
 

@@ -114,14 +114,16 @@ export class NameTags {
   render(tags) {
     const seen = new Set();
     const now = performance.now();
-    for (const { agent, x, y } of tags) {
+    for (const { agent, x, y, floor, offLevel } of tags) {
       seen.add(agent.id);
       const node = this.nodeFor(agent);
       const tool = this.tools.get(agent.id);
       const icon = tool ? `${tool} ` : agent.activityIcon ? `${agent.activityIcon} ` : "";
-      const label = `<span class="name">${icon}${agent.name}</span><span class="role">${agent.role || ""}</span>`;
+      const where = offLevel ? ` · Lantai ${floor}` : ""; // a busy agent on another floor says where it is
+      const label = `<span class="name">${icon}${agent.name}</span><span class="role">${(agent.role || "") + where}</span>`;
       if (node.label.innerHTML !== label) node.label.innerHTML = label;
       node.tag.classList.toggle("speaking", Boolean(agent.speaking));
+      node.tag.classList.toggle("offlevel", Boolean(offLevel));
       node.tag.classList.toggle("tooling", Boolean(tool));
       const hasProgress = this.renderProgress(node, agent.id, now);
       const top = y - 4;

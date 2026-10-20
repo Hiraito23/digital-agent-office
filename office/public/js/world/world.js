@@ -710,20 +710,39 @@ export class World {
   }
 
   // Screen positions (CSS px) above each head, for DOM name tags/bubbles.
-  tagPositions() {
+  // always(agent): agents that keep their tag on any level, e.g. while they work on a task (progress bar)
+  // or speak, so a task on another floor stays visible; those tags say which floor the agent is on.
+  tagPositions(always = () => false) {
     const out = [];
     const v = new THREE.Vector3();
     const w = window.innerWidth;
     const h = window.innerHeight;
     const hidden = this.hiddenByFloors();
+    let stacked = 0;
     for (const a of this.agents.values()) {
       const sitting = a.mode === "sitting" && !a.route.length;
-      if (hidden.has(a.id)) continue;
-      if (this.viewLevel !== null && Math.abs(a.y - levelTop(this.viewLevel)) >= 1.7) continue; // agents on the faded levels have no tag
+      const floor = LEVELS.reduce((best, _, l) => (levelTop(l) <= a.y + 0.2 ? l : best), 0);
+      const offLevel = this.viewLevel !== null && Math.abs(a.y - levelTop(this.viewLevel)) >= 1.7;
+      const keep = always(a);
+      if (hidden.has(a.id) && !keep) continue;
+      if (offLevel && !keep) continue; // agents on the faded levels have no tag unless they are busy
       v.set(a.x, a.y + (sitting ? 1.45 : 1.38), a.z);
       v.project(this.camera);
       if (v.z > 1) continue;
-      out.push({ agent: a, x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h });
+      let px = (v.x * 0.5 + 0.5) * w;
+      let py = (-v.y * 0.5 + 0.5) * h;
+      if (offLevel) {
+        // keep the tag (and its progress bar) on screen between the side panels and below the floor tabs, even
+        // when the agent itself is off the edge; tags that end up in the same spot are stacked
+        const topH = document.querySelector(".top")?.offsetHeight ?? 56;
+        const maxX = Math.max(180, w - 380);
+        const minY = topH + 112;
+        const clamped = px < 180 || px > maxX || py < minY || py > h - 20;
+        px = Math.min(maxX, Math.max(180, px));
+        py = Math.min(h - 20, Math.max(minY, py));
+        if (clamped) { py += stacked * 78; stacked += 1; }
+      }
+      out.push({ agent: a, x: px, y: py, floor: floor + 1, offLevel });
     }
     return out;
   }

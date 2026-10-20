@@ -8,12 +8,13 @@ const MAX_DOC_CHARS = 20000; // what the agents get to read (the server cuts at 
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, logActivity, getProject }) => {
+export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, logActivity, getProject, onContinue }) => {
   const panel = document.getElementById("meeting");
   const body = document.getElementById("meeting-body");
   const status = document.getElementById("meeting-status");
   let meeting = null; // last meeting state from the server
   let live = null; // { agentId, text } of the turn being spoken
+  let tab = "chat"; // meeting view tab: "chat" (the discussion) or "minutes" (the notulen)
   let limits = { maxParticipants: 5, maxRounds: 3 };
   let draft = { topic: "", participants: [], rounds: 1, document: null }; // document: { name, text } read from an uploaded .md/.txt
 
@@ -33,7 +34,25 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
 
   // ---- form ----------------------------------------------------------------
 
+  // earlier meetings saved in rapat/ (newest first), listed in the form; null = not loaded yet
+  let previous = null;
+  let loadingPrevious = false;
+  const loadPrevious = async () => {
+    if (loadingPrevious) return;
+    loadingPrevious = true;
+    try {
+      const res = await fetch("/api/files?path=rapat", { cache: "no-store" });
+      const data = res.ok ? await res.json() : { entries: [] };
+      previous = data.entries.filter((e) => !e.dir && /\.md$/i.test(e.name)).sort((a, b) => b.mtime - a.mtime).slice(0, 30).map((e) => ({ path: `rapat/${e.name}`, name: e.name }));
+    } catch {
+      previous = [];
+    }
+    loadingPrevious = false;
+    if (!meeting && !panel.classList.contains("hidden")) showForm();
+  };
+
   const showForm = () => {
+    if (previous === null) loadPrevious();
     const team = agents().filter((a) => a.id !== "hermes");
     const project = getProject();
     body.innerHTML = `
@@ -41,6 +60,9 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
         <p class="muted">Peserta berjalan ke <b>Ruang Rapat</b> dan bergiliran bicara. Hermes membuka rapat dan menutupnya dengan notulen (ringkasan, keputusan, action item). Selama rapat agen hanya berdiskusi, tidak mengubah file.</p>
         <p class="muted">Proyek aktif: <b>${project ? esc(project) : "tidak ada"}</b>${project ? " (ikut jadi konteks rapat)" : ""}.</p>
         <fieldset class="meeting-doc"><legend>Dokumen untuk dibahas (opsional)</legend>
+          <label class="doc-prev">Lanjutkan dari rapat sebelumnya
+            <select name="prev"><option value="">${previous === null ? "Memuat…" : previous.length ? "Pilih hasil rapat…" : "Belum ada hasil rapat"}</option>${(previous ?? []).map((p) => `<option value="${esc(p.path)}">${esc(p.name.replace(/\.md$/, ""))}</option>`).join("")}</select>
+          </label>
           ${draft.document ? `
             <div class="doc-chip"><b>📄 ${esc(draft.document.name)}</b> <small>${draft.document.text.length.toLocaleString("id-ID")} karakter${draft.document.truncated ? ", dipotong" : ""}</small>
               <button type="button" data-act="remove-doc" title="Lepas dokumen">✕</button></div>
@@ -88,6 +110,22 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
         flash("Gagal membaca file");
       }
     };
+    // continue an earlier meeting: its saved file (notulen + transcript) becomes the document to discuss
+    form.elements.prev.onchange = async (e) => {
+      const path = e.target.value;
+      if (!path) return;
+      try {
+        const res = await fetch(`/api/files/raw?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("gagal membaca");
+        const text = (await res.text()).trim();
+        draft.document = { name: path.split("/").pop(), text: text.slice(0, MAX_DOC_CHARS), truncated: text.length > MAX_DOC_CHARS };
+        if (!form.elements.topic.value.trim()) draft.topic = "Lanjutan: tindak lanjut hasil rapat sebelumnya";
+        status.textContent = "";
+        showForm();
+      } catch {
+        flash("Gagal membaca hasil rapat itu");
+      }
+    };
     form.querySelector("[data-act=remove-doc]")?.addEventListener("click", () => { form.onchange(); draft.document = null; showForm(); });
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -107,39 +145,69 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
 
   // ---- meeting view --------------------------------------------------------
 
+  // a colour per speaker, stable across renders
+  const colorOf = (id) => {
+    let h = 0;
+    for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) % 360;
+    return id === "hermes" ? "#ffd86b" : `hsl(${h} 70% 72%)`;
+  };
+
+  // The meeting view has two tabs: the discussion (the chat of who said what, live while it runs) and the
+  // minutes (notulen), so neither squeezes the other. Buttons and the saved file stay pinned below.
   const showMeeting = () => {
     const m = meeting;
     const running = m.state === "running";
-    const turns = m.transcript.map((t) => `
-      <div class="msg assistant meeting-turn"><b>${esc(nameOf(t.agentId))}</b>${esc(t.text)}</div>`).join("");
-    const speaking = live ? `
-      <div class="msg assistant meeting-turn live"><b>${esc(nameOf(live.agentId))} sedang bicara…</b>${esc(live.text || "…")}</div>` : "";
+    const previous = body.querySelector(".meeting-log");
+    const atBottom = !previous || previous.scrollHeight - previous.scrollTop - previous.clientHeight < 40;
+    const keepTop = previous?.scrollTop ?? 0;
+    const bubble = (id, text, live = false) => `
+      <div class="mt-row${live ? " live" : ""}">
+        <span class="mt-avatar" style="background:${colorOf(id)}">${esc(String(nameOf(id)).charAt(0).toUpperCase())}</span>
+        <div class="mt-bubble"><b style="color:${colorOf(id)}">${esc(nameOf(id))}${live ? " sedang bicara…" : ""}</b><div class="mt-text">${esc(text)}</div></div>
+      </div>`;
+    const turns = m.transcript.map((t) => bubble(t.agentId, t.text)).join("");
+    const speaking = live ? bubble(live.agentId, live.text || "…", true) : "";
     const stateLine = {
       running: "Rapat sedang berlangsung",
       ended: "Rapat selesai",
       stopped: "Rapat dihentikan",
       error: `Rapat gagal: ${esc(m.error || "")}`,
     }[m.state] || "";
+    const chatPane = `<div class="meeting-log">${turns}${speaking}${!turns && !speaking ? `<p class="muted">Peserta sedang berjalan ke Ruang Rapat…</p>` : ""}</div>`;
+    const minutesPane = `<div class="meeting-log meeting-minutes">${m.minutes ? esc(m.minutes) : `<p class="muted">${running ? "Notulen ditulis Hermes setelah semua peserta bicara." : "Belum ada notulen."}</p>`}</div>`;
     body.innerHTML = `
       <div class="meeting-view">
-        <h3>${esc(m.topic)}</h3>
-        <p class="muted">${stateLine} · peserta: ${["hermes", ...m.participants].map((id) => esc(nameOf(id))).join(", ")} · ${m.rounds} putaran</p>
-        ${m.document ? `<p class="muted">📄 Dokumen: <b>${esc(m.document.name)}</b></p>` : ""}
-        ${m.minutes ? `<div class="meeting-minutes"><b>📝 Notulen</b>${esc(m.minutes)}</div>` : ""}
-        ${m.savedTo ? `<p class="muted">💾 Disimpan di <a href="/viewer.html?path=${encodeURIComponent(m.savedTo)}" target="_blank" rel="noopener">${esc(m.savedTo)}</a></p>` : ""}
-        <div class="meeting-log chat-log">${turns}${speaking}${!turns && !speaking ? `<p class="muted">Peserta sedang berjalan ke Ruang Rapat…</p>` : ""}</div>
-        <div class="form-actions">
-          ${running ? `<button data-act="stop">■ Akhiri rapat</button>` : `<button data-act="new" class="primary">💬 Rapat baru</button>`}
-          ${m.minutes ? `<button data-act="copy">Salin notulen</button><button data-act="download">Unduh .md</button>` : ""}
+        <div class="meeting-head">
+          <h3>${esc(m.topic)}</h3>
+          <p class="muted">${stateLine} · ${m.rounds} putaran</p>
+          <p class="muted">Peserta: ${["hermes", ...m.participants].map((id) => esc(nameOf(id))).join(", ")}</p>
+          ${m.document ? `<p class="muted">📄 <b>${esc(m.document.name)}</b></p>` : ""}
+        </div>
+        <div class="meeting-tabs" role="tablist">
+          <button type="button" role="tab" data-tab="chat" class="${tab === "chat" ? "active" : ""}">💬 Obrolan <small>${m.transcript.length}</small></button>
+          <button type="button" role="tab" data-tab="minutes" class="${tab === "minutes" ? "active" : ""}">📝 Notulen${m.minutes ? " ✓" : ""}</button>
+        </div>
+        <div class="meeting-pane">${tab === "chat" ? chatPane : minutesPane}</div>
+        <div class="meeting-foot">
+          ${m.savedTo ? `<p class="muted">💾 Disimpan di <a href="/viewer.html?path=${encodeURIComponent(m.savedTo)}" target="_blank" rel="noopener">${esc(m.savedTo)}</a></p>` : ""}
+          <div class="form-actions">
+            ${running ? `<button data-act="stop">■ Akhiri rapat</button>` : `<button data-act="new" class="primary">💬 Rapat baru</button>`}
+            ${m.minutes ? `<button data-act="copy">Salin notulen</button><button data-act="download">Unduh .md</button>` : ""}
+          </div>
+          ${m.minutes && m.savedTo ? `<div class="form-actions"><button data-act="continue" class="primary" title="Lampirkan notulen ini ke chat Hermes dan minta lembar kerja tahap berikutnya">➡ Lanjutkan ke Hermes (lembar kerja)</button></div>` : ""}
         </div>
       </div>`;
     const log = body.querySelector(".meeting-log");
-    log.scrollTop = log.scrollHeight;
+    if (log) log.scrollTop = atBottom && tab === "chat" ? log.scrollHeight : keepTop;
+    body.querySelectorAll("button[data-tab]").forEach((b) => {
+      b.onclick = () => { tab = b.dataset.tab; showMeeting(); };
+    });
     body.querySelectorAll("button[data-act]").forEach((b) => {
       b.onclick = async () => {
         const act = b.dataset.act;
         if (act === "stop") await gw.request("meeting.stop", { id: m.id }).catch((err) => flash(err.message));
-        if (act === "new") { meeting = null; live = null; render(); }
+        if (act === "new") { meeting = null; live = null; tab = "chat"; previous = null; render(); }
+        if (act === "continue") onContinue?.(m);
         if (act === "copy") {
           try { await navigator.clipboard.writeText(minutesMarkdown(m)); flash("Notulen disalin", "ok"); } catch { flash("Gagal menyalin"); }
         }
@@ -166,6 +234,7 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
     const p = e.detail;
     if (p.state === "started") {
       meeting = p.meeting;
+      tab = "chat";
       live = null;
       enterRoom(meeting);
       logActivity(`Rapat dimulai: ${meeting.topic.slice(0, 60)}`, "ok");
@@ -187,6 +256,7 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
       meeting.state = "ended";
       meeting.minutes = p.minutes;
       meeting.savedTo = p.savedTo ?? null;
+      previous = null; // the new file shows up in the list of earlier meetings
       world.endMeeting();
       logActivity(p.savedTo ? `Rapat selesai: notulen disimpan di ${p.savedTo}` : "Rapat selesai: notulen ada di 📋 RINGKASAN", "ok");
     }
@@ -206,10 +276,11 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
     try {
       const res = await gw.request("meeting.current");
       limits = { maxParticipants: res.maxParticipants || 5, maxRounds: res.maxRounds || 3 };
-      if (res.meeting?.state === "running") {
+      if (res.meeting) {
+        // the last meeting stays readable after a refresh (its discussion and minutes); only a running one sends everyone to the room
         meeting = res.meeting;
         live = res.meeting.speaking ? { agentId: res.meeting.speaking, text: "" } : null;
-        setTimeout(() => enterRoom(meeting), 500); // after the roster is in the world
+        if (res.meeting.state === "running") setTimeout(() => enterRoom(meeting), 500); // after the roster is in the world
       }
       render();
     } catch { /* older adapter */ }
@@ -217,6 +288,7 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
 
   document.getElementById("meeting-toggle").addEventListener("click", () => {
     panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) loadPrevious();
     status.textContent = "";
     render();
   });

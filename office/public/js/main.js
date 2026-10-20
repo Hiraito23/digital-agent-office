@@ -18,6 +18,7 @@ import { initMeeting } from "./ui/meeting.js";
 import { initUsage } from "./ui/usage.js";
 import { initFiles } from "./ui/files.js";
 import { initSettings } from "./ui/settings.js";
+import { initAttach, splitAttachments, withAttachments } from "./ui/attach.js";
 import { initLayoutEditor, loadLayout } from "./ui/layout-editor.js";
 import { initEnvironmentControls } from "./ui/environment-controls.js";
 import { setNews, setFacts } from "./world/chatter.js";
@@ -34,6 +35,7 @@ const chatLog = document.getElementById("chat-log");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const pixelBtn = document.getElementById("pixel-toggle");
+const attach = initAttach({}); // 📎 files from the workspace as context for the next message
 
 // Panels below the header follow its real height (it wraps into more rows on narrow screens).
 const topBar = document.querySelector(".top");
@@ -151,6 +153,7 @@ view.addEventListener("pointerup", (e) => {
 
 window.__world = world; // handy for inspecting the office from the browser console
 const nameTags = new NameTags(tagsEl);
+window.__nameTags = nameTags; // handy for inspecting the name tags from the browser console
 const say = (agentId, text, ms) => nameTags.say(agentId, text, ms);
 // idle small talk between agents: bubbles above their heads and lines in the Kantor tab
 world.onSay = say;
@@ -169,7 +172,7 @@ const frame = (now) => {
   last = now;
   world.update(dt, now);
   world.render();
-  nameTags.render(world.tagPositions());
+  nameTags.render(world.tagPositions((a) => nameTags.isWorking(a.id) || a.speaking));
   requestAnimationFrame(frame);
 };
 requestAnimationFrame(frame);
@@ -179,6 +182,7 @@ requestAnimationFrame(frame);
 // ---------------------------------------------------------------------------
 
 const gw = new Gateway(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+window.__gw = gw; // handy for inspecting the connection from the browser console
 const agentsById = new Map();
 const status = new Map();
 const chats = new Map(); // agentId -> [{role, content}]
@@ -320,6 +324,16 @@ const summaryPanel = initSummaries({ gw, nameOf, onOpen: (entry) => openChat(ent
 // 💬 Rapat: team meetings in the meeting room, closed with minutes by Hermes.
 initMeeting({
   gw, world, nameOf, say, voice, logActivity,
+  // "Lanjutkan ke Hermes": the saved minutes become an attachment and the chat gets a suggested task
+  onContinue: async (m) => {
+    await openChat("hermes");
+    setTab("pesan");
+    const err = m.savedTo ? await attach.add(m.savedTo) : "Notulen belum tersimpan sebagai berkas";
+    if (err) logActivity(`Lampiran gagal: ${err}`, "err");
+    chatInput.value = `Lanjutkan hasil rapat "${String(m.topic).slice(0, 80)}" ke tahap berikutnya. Ubah keputusan dan action item di notulen menjadi lembar kerja: tabel tugas per agen (siapa, tugas, output yang diharapkan, tenggat, ketergantungan). Simpan lembar kerja sebagai berkas .md di folder rapat/, lalu delegasikan tugasnya ke agen yang sesuai.`;
+    autosize();
+    chatInput.focus();
+  },
   roleOf: (id) => agentsById.get(id)?.role ?? "",
   agents: () => [...agentsById.values()],
   getProject: () => document.getElementById("project-select").value || null,
@@ -372,7 +386,7 @@ const setTab = (name) => {
   tab = name;
   tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   for (const [key, el] of Object.entries(logPanes)) el.classList.toggle("hidden", key !== name);
-  chatEl.classList.toggle("kantor-mode", name === "kantor");
+  chatEl.classList.toggle("kantor-mode", name === "kantor"); // attachments are for messages to one agent
   chatInput.placeholder = name === "kantor" ? "Ngobrol di kantor, salah satu agen akan menjawab…  (sebut nama untuk memilih)" : "Tulis pesan atau tugas…  (Enter = kirim)";
   scrollEnd(logPanes[name]);
 };
@@ -513,7 +527,11 @@ const findMessage = (list, focus) => {
 const chatLine = (m) => {
   const t = `<span class="t">${clockOf(m.at)}</span>`;
   const name = escapeHtml(nameOf(selected));
-  if (m.role === "user") return `<div class="msg user"><div class="bub"><div class="meta"><b>Anda</b> <span class="to">➜ ${name}</span></div><div class="txt">${escapeHtml(m.content)}</div>${t}</div></div>`;
+  if (m.role === "user") {
+    const { text, files } = splitAttachments(m.content); // attached files show as names, not their whole text
+    const chips = files.length ? `<div class="att-line">${files.map((f) => `<span class="att-chip">📎 ${escapeHtml(f.split("/").pop())}</span>`).join("")}</div>` : "";
+    return `<div class="msg user"><div class="bub"><div class="meta"><b>Anda</b> <span class="to">➜ ${name}</span></div><div class="txt">${escapeHtml(text)}</div>${chips}${t}</div></div>`;
+  }
   if (m.role === "error") return `<div class="msg error">${avatar(selected)}<div class="bub"><div class="meta"><b>⚠ ${name}</b></div><div class="txt">${escapeHtml(m.content)}</div>${t}</div></div>`;
   return `<div class="msg assistant">${avatar(selected)}<div class="bub"><div class="meta"><b style="color:${colorOf(selected)}">${name}</b></div><div class="txt">${escapeHtml(m.content || "…")}</div>${t}</div></div>`;
 };
@@ -648,7 +666,8 @@ document.getElementById("chat-clear").onclick = async () => {
 chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = chatInput.value.trim();
-  if (!text) return;
+  const attached = tab === "kantor" ? [] : attach.files(); // attachments go with messages to one agent
+  if (!text && !attached.length) return;
   if (tab === "kantor") { // the office channel: one agent answers
     chatInput.value = "";
     autosize();
@@ -659,10 +678,12 @@ chatForm.addEventListener("submit", async (e) => {
   chatInput.value = "";
   autosize();
   if (tab !== "pesan") setTab("pesan");
-  pushChat(selected, { role: "user", content: text });
-  logActivity(`Anda memberi tugas ke ${nameOf(selected)}`);
+  const message = withAttachments(text || "Pelajari berkas terlampir, lalu beri tanggapan dan langkah berikutnya.", attached);
+  attach.clear();
+  pushChat(selected, { role: "user", content: message });
+  logActivity(`Anda memberi tugas ke ${nameOf(selected)}${attached.length ? ` (dengan ${attached.length} berkas)` : ""}`);
   try {
-    await gw.request("chat.send", { sessionKey: sessionKeyFor(selected), message: text, idempotencyKey: `po-${Date.now()}` });
+    await gw.request("chat.send", { sessionKey: sessionKeyFor(selected), message, idempotencyKey: `po-${Date.now()}` });
   } catch (err) {
     pushChat(selected, { role: "error", content: String(err.message || err) });
   }
