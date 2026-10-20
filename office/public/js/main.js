@@ -206,16 +206,49 @@ const logActivity = (text, kind = "") => {
 
 const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+// One row per agent: the name (click to talk) and a power button that switches the agent on or off.
+// A switched-off agent sleeps in the bedroom and is not called, greeted or mentioned.
 const renderRoster = () => {
   rosterEl.innerHTML = "";
   for (const a of agentsById.values()) {
+    const row = document.createElement("div");
+    row.className = `party-row${a.active ? "" : " asleep"}`;
     const chip = document.createElement("button");
     chip.className = "chip";
-    chip.innerHTML = `<span class="dot ${status.get(a.id) || ""}"></span>${escapeHtml(a.name)}`;
+    chip.innerHTML = `<span class="dot ${a.active ? status.get(a.id) || "" : "sleep"}"></span>${escapeHtml(a.name)}${a.active ? "" : " 💤"}`;
+    chip.title = a.active ? `Bicara dengan ${a.name}` : `${a.name} sedang tidak aktif (tidur)`;
     chip.onclick = () => openChat(a.id);
-    rosterEl.append(chip);
+    row.append(chip);
+    if (a.id !== "hermes") { // the orchestrator is always on
+      const pwr = document.createElement("button");
+      pwr.className = "pwr";
+      pwr.textContent = a.active ? "⏻" : "☾";
+      pwr.title = a.active ? `Nonaktifkan ${a.name}: tidur di Ruang Tidur dan tidak dipanggil` : `Aktifkan ${a.name}: bangun dan siap bekerja`;
+      pwr.setAttribute("aria-pressed", String(!a.active));
+      pwr.onclick = async () => {
+        try {
+          await gw.request("agents.setActive", { agentId: a.id, active: !a.active });
+        } catch (err) {
+          logActivity(`Gagal mengubah status ${a.name}: ${err?.message ?? err}`, "err");
+        }
+      };
+      row.append(pwr);
+    }
+    rosterEl.append(row);
   }
 };
+
+// Applies an active/inactive change from the server (the same event reaches every open tab).
+const applyActive = (id, active) => {
+  const a = agentsById.get(id);
+  if (!a || a.active === active) return;
+  a.active = active;
+  world.setActive(id, active);
+  renderRoster();
+  renderTargets();
+  logActivity(active ? `${a.name} diaktifkan, bangun dan siap bekerja` : `${a.name} dinonaktifkan, tidur di Ruang Tidur`, active ? "ok" : "");
+};
+gw.addEventListener("agent.active", (e) => applyActive(e.detail.agentId, Boolean(e.detail.active)));
 
 const setAgentStatus = (id, value) => {
   status.set(id, value);
@@ -226,7 +259,7 @@ const setAgentStatus = (id, value) => {
 const refreshAgents = async () => {
   const res = await gw.request("agents.list");
   agentsById.clear();
-  for (const a of res.agents || []) agentsById.set(a.id, { id: a.id, name: a.name, role: a.role || "" });
+  for (const a of res.agents || []) agentsById.set(a.id, { id: a.id, name: a.name, role: a.role || "", active: a.active !== false });
   world.syncAgents([...agentsById.values()]);
   renderRoster();
   renderTargets();
@@ -434,10 +467,11 @@ const addOfficeLine = ({ kind, from, to, text, news, onClick }) => {
 // The Kantor tab is an office channel: what you write there is answered by ONE agent. It is the
 // one you name (Kenji, @Kenji), else the last one who spoke there, else any agent who is not busy.
 const regexEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const mentions = (a, text) => new RegExp(`(^|[^\\p{L}])@?${regexEscape(a.name)}(?=$|[^\\p{L}])`, "iu").test(text);
 const pickResponder = (text) => {
-  const agents = [...agentsById.values()];
+  const agents = [...agentsById.values()].filter((a) => a.active); // sleeping agents are not part of the conversation
   if (!agents.length) return null;
-  const named = agents.find((a) => new RegExp(`(^|[^\\p{L}])@?${regexEscape(a.name)}(?=$|[^\\p{L}])`, "iu").test(text));
+  const named = agents.find((a) => mentions(a, text));
   if (named) return named.id;
   const free = agents.filter((a) => !nameTags.isWorking(a.id));
   const pool = free.length ? free : agents;
@@ -457,6 +491,8 @@ const showTyping = (id) => {
 const sendOfficeMessage = async (text) => {
   const context = officeContext.slice();
   addOfficeLine({ kind: "me", text });
+  const asleep = [...agentsById.values()].find((a) => !a.active && mentions(a, text));
+  if (asleep) { addOfficeLine({ kind: "error", from: asleep.id, text: `${asleep.name} sedang tidak aktif (tidur). Aktifkan dulu dengan tombol ☾ di daftar Tim.` }); return; }
   const id = pickResponder(text);
   if (!id) { addOfficeLine({ kind: "error", from: "hermes", text: "Belum ada agen yang bisa menjawab." }); return; }
   const typing = showTyping(id);
@@ -475,7 +511,7 @@ const sendOfficeMessage = async (text) => {
 
 const renderTargets = () => {
   chatTarget.innerHTML = [...agentsById.values()]
-    .map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}${a.role ? ` · ${escapeHtml(a.role)}` : ""}</option>`).join("");
+    .map((a) => `<option value="${escapeHtml(a.id)}">${a.active ? "" : "💤 "}${escapeHtml(a.name)}${a.role ? ` · ${escapeHtml(a.role)}` : ""}</option>`).join("");
   if (selected && agentsById.has(selected)) chatTarget.value = selected;
 };
 
@@ -675,6 +711,11 @@ chatForm.addEventListener("submit", async (e) => {
     return;
   }
   if (!selected || !gw.connected) return;
+  if (agentsById.get(selected)?.active === false) { // nobody calls a sleeping agent
+    if (tab !== "pesan") setTab("pesan");
+    pushChat(selected, { role: "error", content: `${nameOf(selected)} sedang tidak aktif (tidur), jadi tidak dipanggil. Aktifkan dulu dengan tombol ☾ di daftar Tim.` });
+    return;
+  }
   chatInput.value = "";
   autosize();
   if (tab !== "pesan") setTab("pesan");

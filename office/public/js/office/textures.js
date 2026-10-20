@@ -55,6 +55,7 @@ export const FLOOR_STYLES = {
   wood: { base: "#c08552", grout: "#8d5a2b", light: "#d9a066", fleck: "#a86b3c" },
   carpet: { base: "#5f3dc4", grout: "#5f3dc4", light: "#7048e8", fleck: "#9775fa" },
   marble: { base: "#f1f3f5", grout: "#dee2e6", light: "#ffffff", fleck: "#e9c46a" },
+  rest: { base: "#4b5d8a", grout: "#4b5d8a", light: "#5d70a1", fleck: "#7f92c6" }, // soft carpet of the bedroom
 };
 
 // Floor tiles are drawn at FPX pixels per tile (a multiple of 10) so that room borders
@@ -77,7 +78,7 @@ export const drawFloorTile = (ctx, ox, oz, style, size = TPX) => {
     ctx.fillRect(ox + s(1), oz + s(1), s(4), 1); ctx.fillRect(ox + s(7), oz + s(9), s(4), 1);
     return;
   }
-  if (style === "carpet") {
+  if (style === "carpet" || style === "rest") {
     ctx.fillStyle = c.fleck;
     for (let k = 0; k < 6; k += 1) ctx.fillRect(ox + ((k * s(7)) % size), oz + ((k * s(5) + s(3)) % size), 1, 1);
     ctx.fillStyle = c.light;

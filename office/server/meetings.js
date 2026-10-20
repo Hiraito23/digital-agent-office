@@ -21,7 +21,7 @@ const MAX_PARTICIPANTS = 5;
 const MAX_ROUNDS = 3;
 const TURN_IDLE_MS = 90_000; // a speaker whose model goes silent this long is skipped
 
-const createMeetings = ({ agentRegistry, orchestratorId, model, streamOneTurn, recordUsage, systemPromptFor, broadcast, onMinutes, forwarder, sanitize }) => {
+const createMeetings = ({ agentRegistry, orchestratorId, model, streamOneTurn, recordUsage, systemPromptFor, broadcast, onMinutes, forwarder, sanitize, isActive = () => true }) => {
   let current = null; // { id, topic, participants, rounds, transcript, state, stopped, minutes }
 
   const nameOf = (id) => agentRegistry.get(id)?.name ?? id;
@@ -151,7 +151,7 @@ Jangan menjalankan tools, perintah terminal, atau mengubah file selama rapat; in
       const cleanTopic = String(topic || "").trim().slice(0, 2000) || (doc ? `Membahas dokumen ${doc.name}` : "");
       if (!cleanTopic) throw new Error("topik rapat wajib diisi");
       const ids = [...new Set((Array.isArray(participants) ? participants : []).map(String))]
-        .filter((id) => id !== orchestratorId && agentRegistry.has(id));
+        .filter((id) => id !== orchestratorId && agentRegistry.has(id) && isActive(id)); // switched-off agents are not called to a meeting
       if (!ids.length && !doc) throw new Error("pilih minimal satu peserta, atau lampirkan dokumen untuk dibahas dengan Hermes");
       if (ids.length > MAX_PARTICIPANTS) throw new Error(`maksimal ${MAX_PARTICIPANTS} peserta (kursi di Ruang Rapat terbatas)`);
       const m = {

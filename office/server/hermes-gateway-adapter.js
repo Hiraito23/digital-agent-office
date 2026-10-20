@@ -79,7 +79,7 @@ const MAX_TOOL_ROUNDS = 8;
 // Orchestrator system prompt
 // ---------------------------------------------------------------------------
 
-const ORCHESTRATOR_SYSTEM_PROMPT = `Kamu adalah ${HERMES_AGENT_NAME}, orkestrator tim di kantor virtual 3D. Anggota tim adalah agen kantor sungguhan (Haruto sales digital, Kenji analis saham, Sakura konten, Yui brainstorming, Takumi QA, Akane keamanan, Daichi riset pasar, dan lainnya) yang tampil sebagai karakter di kantor. Kamu menyuruh mereka dengan tool tim kantor (server MCP "office-team"):
+const ORCHESTRATOR_SYSTEM_PROMPT = `Kamu adalah ${HERMES_AGENT_NAME}, orkestrator tim di kantor virtual 3D. Anggota tim adalah agen kantor sungguhan yang tampil sebagai karakter di kantor; daftar anggota yang aktif diberikan di bagian "Tim kantor saat ini" (anggota yang tidak ada di daftar itu sedang istirahat: jangan disebut atau dipanggil). Kamu menyuruh mereka dengan tool tim kantor (server MCP "office-team"):
 
 - team_list: daftar anggota tim beserta agent_id-nya.
 - team_delegate(agent_id, task, wait_seconds): beri tugas ke seorang anggota; hasilnya dikembalikan ke kamu.
@@ -232,6 +232,26 @@ const agentRegistry = new Map([
   }],
 ]);
 
+// Agents that are switched off (they sleep in the office): nobody calls or mentions them. Saved in the
+// office file next to the active project, so it survives restarts.
+const OFFICE_FILE = process.env.OFFICE_FILE || path.join(HOME, ".hermes", "clawd3d-office.json");
+const inactiveAgents = new Set();
+const isActive = (id) => !inactiveAgents.has(id);
+const activeMembers = () => [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID && isActive(a.id));
+const readOfficeFile = () => { try { return JSON.parse(fs.readFileSync(OFFICE_FILE, "utf8")); } catch { return {}; } };
+try { for (const id of readOfficeFile().inactiveAgents ?? []) inactiveAgents.add(String(id)); } catch { /* none saved */ }
+function saveInactive() {
+  try {
+    fs.mkdirSync(path.dirname(OFFICE_FILE), { recursive: true });
+    const tmp = `${OFFICE_FILE}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify({ ...readOfficeFile(), inactiveAgents: [...inactiveAgents] }, null, 2)}\n`);
+    fs.renameSync(tmp, OFFICE_FILE);
+  } catch (err) {
+    console.warn("[hermes-adapter] could not save the active/inactive state:", sanitizeErrorMessage(err));
+  }
+}
+const inactiveMessage = (agent) => `${agent?.name ?? "Agen itu"} sedang tidak aktif (tidur). Aktifkan dulu di daftar Tim kalau mau memberinya tugas.`;
+
 // Set of all active sendEvent functions (one per connected WS client)
 /** @type {Set<(frame: object) => void>} */
 const activeSendEventFns = new Set();
@@ -271,7 +291,7 @@ function recordSummary(input) {
 
 // 💬 Rapat: team meetings in the meeting room (server/meetings.js).
 const meetings = createMeetings({
-  agentRegistry, orchestratorId: AGENT_ID, model: HERMES_MODEL, streamOneTurn, recordUsage,
+  agentRegistry, orchestratorId: AGENT_ID, model: HERMES_MODEL, streamOneTurn, recordUsage, isActive,
   systemPromptFor: (agent) => withProjectContext(agent?.id === AGENT_ID ? `${agent.systemPrompt}${teamContext()}` : agent?.systemPrompt || ""),
   broadcast: broadcastEvent, forwarder: hermesEventForwarder, sanitize: sanitizeErrorMessage,
   onMinutes: (m, minutes) => {
@@ -757,6 +777,7 @@ async function execDelegateTask(args) {
 
   const agent = agentRegistry.get(targetId);
   if (!agent) return JSON.stringify({ ok: false, error: `Agent ${targetId} not found` });
+  if (!isActive(targetId)) return JSON.stringify({ ok: false, error: inactiveMessage(agent) });
 
   const sessionKey = `agent:${targetId}:${MAIN_KEY}`;
   const history = getHistory(sessionKey);
@@ -941,7 +962,7 @@ async function ensureFilesSaved({ agentId, baseMessages, plan, replyText, model,
 // calling team_delegate, which it sometimes skips while claiming it did. Returns null for
 // everything else, which goes to Hermes as usual.
 function detectDelegation(text) {
-  const members = [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID);
+  const members = activeMembers();
   if (!members.length) return null;
   const order = /^\s*(?:tolong\s+)?(?:suruh(?:lah)?|minta(?:lah)?|perintahkan|tugaskan|beri(?:kan)?\s+tugas\s+(?:ke|kepada)|kasih\s+tugas\s+(?:ke|kepada)|panggil)\s+([\s\S]+)$/i.exec(text);
   if (!order) return null;
@@ -980,7 +1001,7 @@ const GOAL_ROLES = [
 function detectGoalPlan(text) {
   const goal = String(text).trim();
   if (goal.length < 12 || goal.length > 600 || /\?\s*$/.test(goal) || !GOAL_START.test(goal)) return null;
-  const members = new Map([...agentRegistry.values()].filter((a) => a.id !== AGENT_ID).map((a) => [a.id, a]));
+  const members = new Map(activeMembers().map((a) => [a.id, a]));
   const chosen = GOAL_ROLES.filter((r) => members.has(r.id) && r.re.test(goal));
   // a single unrelated hit is not a team job (e.g. "cari tahu cuaca"): let Hermes handle it
   if (chosen.length < 2 && !/(peluncuran|luncurkan|launch|kampanye|strategi|rencana|bisnis|produk|riset|saham|keamanan|konten|penjualan)/i.test(goal)) return null;
@@ -1186,9 +1207,9 @@ async function runAgenticLoop({ sessionKey, agentId, userMessage, model, tools, 
 
 // The orchestrator's view of the team (so it delegates instead of spawning new agents).
 function teamContext() {
-  const members = [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID);
+  const members = activeMembers();
   if (!members.length) return "";
-  return `\n\nTim kantor saat ini. Semua agen ini SUDAH aktif dan siap menerima tugas lewat tool team_delegate dengan agent_id di bawah; jangan bilang tim belum ada dan jangan membuat agen baru untuk peran yang sudah ada:\n${
+  return `\n\nTim kantor saat ini. Semua agen ini SUDAH aktif dan siap menerima tugas lewat tool team_delegate dengan agent_id di bawah; jangan bilang tim belum ada dan jangan membuat agen baru untuk peran yang sudah ada. Hanya anggota di daftar ini yang boleh kamu panggil, tugaskan, atau sebut; anggota lain sedang tidak aktif (beristirahat), jangan disinggung:\n${
     members.map((a) => `- ${a.id}: ${a.name}${a.role ? ` (${a.role})` : ""}`).join("\n")}`;
 }
 
@@ -1219,6 +1240,7 @@ async function handleMethod(method, params, id, sendEvent) {
         id: agent.id, name: agent.name, workspace: agent.workspace,
         identity: { name: agent.name, emoji: "🤖" },
         role: agent.role,
+        active: isActive(agent.id),
       }));
       return resOk(id, { defaultId: AGENT_ID, mainKey: MAIN_KEY, agents: allAgents });
     }
@@ -1241,6 +1263,7 @@ async function handleMethod(method, params, id, sendEvent) {
       const delId = typeof p.agentId === "string" ? p.agentId : "";
       if (delId && delId !== AGENT_ID) {
         agentRegistry.delete(delId);
+        if (inactiveAgents.delete(delId)) saveInactive();
         clearHistory(`agent:${delId}:${MAIN_KEY}`);
       }
       return resOk(id, { ok: true, removedBindings: 0 });
@@ -1255,6 +1278,17 @@ async function handleMethod(method, params, id, sendEvent) {
         if (typeof p.role === "string") existing.role = p.role.trim();
       }
       return resOk(id, { ok: true, removedBindings: 0 });
+    }
+
+    // Switch an agent on or off (off = it sleeps and is not called or mentioned). Hermes cannot be switched off.
+    case "agents.setActive": {
+      const targetId = typeof p.agentId === "string" ? p.agentId : "";
+      if (!agentRegistry.has(targetId)) return resErr(id, "not_found", "agen tidak ditemukan");
+      if (targetId === AGENT_ID) return resErr(id, "not_allowed", `${HERMES_AGENT_NAME} selalu aktif`);
+      if (p.active === false) inactiveAgents.add(targetId); else inactiveAgents.delete(targetId);
+      saveInactive();
+      broadcastEvent({ type: "event", event: "agent.active", payload: { agentId: targetId, active: isActive(targetId) } });
+      return resOk(id, { ok: true, agentId: targetId, active: isActive(targetId) });
     }
 
     case "agents.files.get": {
@@ -1359,6 +1393,7 @@ async function handleMethod(method, params, id, sendEvent) {
       const sessionAgentId = sessionKey.startsWith("agent:") ? sessionKey.split(":")[1] : AGENT_ID;
       const agent = agentRegistry.get(sessionAgentId);
       const isOrchestrator = sessionAgentId === AGENT_ID;
+      if (agent && !isActive(sessionAgentId)) return resErr(id, "agent_inactive", inactiveMessage(agent));
 
       let aborted = false;
       activeRuns.set(runId, {
@@ -1682,7 +1717,7 @@ function startAdapter() {
           payload: {
             type: "hello-ok", protocol: 3,
             adapterType: "hermes",
-            features: { methods: ["agents.list","agents.create","agents.delete","agents.update",
+            features: { methods: ["agents.list","agents.create","agents.delete","agents.update","agents.setActive",
               "sessions.list","sessions.preview","sessions.patch","sessions.reset","chat.clearAll",
               "chat.send","chat.abort","chat.history","agent.wait",
               "status","config.get","config.set","config.patch",
@@ -1692,7 +1727,7 @@ function startAdapter() {
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron","tool","approval","summary","summary.read","meeting"] },
+              events: ["chat","presence","heartbeat","cron","tool","approval","summary","summary.read","meeting","agent.active"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },
@@ -1865,6 +1900,7 @@ startAdapter();
 async function officeChat({ agent_id, message, context }) {
   const agent = agentRegistry.get(typeof agent_id === "string" ? agent_id.trim() : "");
   if (!agent) return { ok: false, error: "agen tidak ditemukan" };
+  if (!isActive(agent.id)) return { ok: false, error: inactiveMessage(agent) };
   const text = String(message ?? "").trim().slice(0, 600);
   if (!text) return { ok: false, error: "pesan kosong" };
   const lines = (Array.isArray(context) ? context : []).slice(-10)
@@ -1892,7 +1928,7 @@ async function officeChat({ agent_id, message, context }) {
 
 // Handed to the MCP server (team-mcp.js): Hermes' tools for working with the real office agents.
 const teamApi = {
-  list: () => [...agentRegistry.values()].filter((a) => a.id !== AGENT_ID).map((a) => ({ id: a.id, name: a.name, role: a.role || "" })),
+  list: () => activeMembers().map((a) => ({ id: a.id, name: a.name, role: a.role || "" })),
   delegate: execDelegateTask,
   context: execReadAgentContext,
 };

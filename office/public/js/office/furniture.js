@@ -8,10 +8,10 @@
 // and move with it, so agents keep using whatever the layout looks like now.
 import * as THREE from "three";
 import { box, canvasTexture, cone, mat, prepareFade, setFade } from "./helpers.js";
-import { ACTIVITY_SPOTS, GATE, LEVELS, LIFT, MEETING, PORTAL, ROOMS, levelTop, roomAt } from "./layout.js";
+import { ACTIVITY_SPOTS, BEDS, GATE, LEVELS, LIFT, MEETING, PORTAL, ROOMS, levelTop, roomAt } from "./layout.js";
 
 // Bump this when the floor plan changes: layouts saved for an older plan are ignored.
-export const LAYOUT_VERSION = 3;
+export const LAYOUT_VERSION = 4;
 import { C, makeCabinet, makeChair, makeCooler, makeDesk, makeRack } from "./props.js";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,7 @@ const rugTexture = (() => {
 })();
 
 const BEANBAG_COLORS = ["#f59f00", "#7048e8", "#e64980", "#12b886"];
+const BLANKET_COLORS = ["#4dabf7", "#f06595", "#51cf66", "#ffa94d"];
 const ARCADE_COLORS = ["#e03131", "#1971c2", "#2b8a3e", "#f59f00"];
 const ARCADE_SCREEN = ["#2b8a3e", "#5f3dc4", "#c92a2a", "#1971c2", "#e67700"];
 
@@ -282,6 +283,23 @@ export const CATALOG = {
       return g;
     },
   },
+  bed: {
+    label: "Tempat tidur", icon: "🛏", variants: 4,
+    bed: true, // agents that are switched off sleep here (the next free bed, in layout order)
+    rects: [{ x: 0, z: 0, w: 0.9, d: 2.0 }],
+    build: (ctx, item) => {
+      const v = item.variant ?? 0;
+      const g = new THREE.Group();
+      const wood = mat("#8d5a2b");
+      g.add(box(0.9, 0.2, 2.0, wood, 0, 0.12, 0)); // frame
+      g.add(box(0.84, 0.14, 1.92, mat("#f1f3f5"), 0, 0.29, 0)); // mattress
+      g.add(box(0.5, 0.1, 0.3, mat("#ffffff"), 0, 0.41, -0.75)); // pillow
+      g.add(box(0.86, 0.07, 1.1, mat(BLANKET_COLORS[v % BLANKET_COLORS.length]), 0, 0.39, 0.35)); // blanket
+      g.add(box(0.9, 0.55, 0.06, mat("#5a3418"), 0, 0.45, -1.0)); // headboard
+      for (const [x, z] of [[-0.4, 0.95], [0.4, 0.95]]) g.add(box(0.06, 0.12, 0.06, mat("#5a3418"), x, 0.04, z)); // foot legs
+      return g;
+    },
+  },
   "meeting-table": {
     label: "Meja rapat", icon: "🪑", max: 1,
     rects: [{ x: 0, z: 0, w: 2.2, d: 1.0 }, { x: -0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: -0.95, w: 0.45, d: 0.45 }, { x: -0.6, z: 0.95, w: 0.45, d: 0.45 }, { x: 0.6, z: 0.95, w: 0.45, d: 0.45 }],
@@ -310,7 +328,7 @@ export const CATALOG = {
   },
 };
 
-export const CATALOG_ORDER = ["desk", "sofa", "coffee-table", "dining-table", "beanbag", "rug", "counter", "aquarium", "bookshelf", "arcade", "pingpong", "plant", "rack", "cabinet", "cooler", "meeting-table"];
+export const CATALOG_ORDER = ["desk", "sofa", "coffee-table", "dining-table", "bed", "beanbag", "rug", "counter", "aquarium", "bookshelf", "arcade", "pingpong", "plant", "rack", "cabinet", "cooler", "meeting-table"];
 
 // ---------------------------------------------------------------------------
 // Default layout: lobby, game room and canteen (level 0), one room per agent (level 1),
@@ -330,22 +348,24 @@ export const defaultLayout = () => {
   add(0, "beanbag", 21.6, 21.2, 0, 1);
   add(0, "cooler", 31.3, 20.6);
   for (const [x, z] of [[7.1, 23.5], [15, 23.5], [24.5, 23.5], [31.2, 23.5], [7.1, 15]]) add(0, "plant", x, z);
-  // kantin: pantry counters on the north wall, a cooler, dining tables, aquarium
+  // kantin: pantry counters on the north wall, a cooler, a dining table, aquarium
   add(0, "counter", 9.4, 14.6, 3);
   add(0, "counter", 10.9, 14.6, 3);
   add(0, "counter", 12.4, 14.6, 3);
-  add(0, "cooler", 14.3, 14.5);
-  add(0, "aquarium", 17.6, 16.6);
-  add(0, "dining-table", 10.5, 17.1);
-  add(0, "dining-table", 15.4, 17.1);
+  add(0, "cooler", 13.5, 14.5);
+  add(0, "aquarium", 13.6, 16.6);
+  add(0, "dining-table", 9.7, 17.1);
   add(0, "plant", 8.5, 18.4);
-  add(0, "plant", 17.5, 14.5);
+  add(0, "plant", 13.5, 18.4);
+  // ruang tidur: twelve beds (agents that are switched off sleep here); two rows, the second row leaves the door free
+  for (let k = 0; k < 7; k += 1) add(0, "bed", 14.6 + k * 1.05, 15.2, 0, k);
+  for (const x of [14.6, 15.65, 16.7, 19.85, 20.9]) add(0, "bed", x, 17.25, 0, Math.round(x));
   // game room: arcade row on the east wall, two ping-pong tables, bean bags
   [14.7, 15.7, 16.7, 17.7].forEach((z, i) => add(0, "arcade", 31.4, z, 0, i));
-  add(0, "pingpong", 22.5, 16.5);
-  add(0, "pingpong", 27, 16.5);
-  [19.5, 20.5, 21.5].forEach((x, i) => add(0, "beanbag", x, 14.6, 0, i));
-  add(0, "plant", 18.6, 18.4);
+  add(0, "pingpong", 24.6, 16.3);
+  add(0, "pingpong", 28.8, 16.3);
+  [14.7, 15.7, 16.7].forEach((z, i) => add(0, "beanbag", 22.7, z, 0, i));
+  add(0, "plant", 22.6, 18.4);
   add(0, "plant", 30.8, 18.4);
 
   // ---- level 1: one room per agent; agent i sits at desk i (Hermes first) ----
@@ -509,6 +529,14 @@ export const createFurniture = ({ groups, animated, screenTex, rooms, makeAutoDe
       }
     }
     for (const id of [...spots.keys()]) if (!seen.has(id)) spots.delete(id);
+    // beds, in layout order: the body lies from the foot of the bed (+0.55 along the bed) towards its head
+    BEDS.length = 0;
+    for (const item of items) {
+      if (!CATALOG[item.type].bed) continue;
+      const r = norm(item.rot);
+      const [ox, oz] = rot(r, 0, 0.55);
+      BEDS.push({ id: item.id, x: item.x + ox, z: item.z + oz, level: levelOf(item), heading: (r * Math.PI) / 2 });
+    }
     ACTIVITY_SPOTS.length = 0;
     ACTIVITY_SPOTS.push(...spots.values());
     MEETING.seats.length = 0;

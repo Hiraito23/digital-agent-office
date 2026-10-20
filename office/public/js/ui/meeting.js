@@ -75,8 +75,8 @@ export const initMeeting = ({ gw, world, nameOf, roleOf, agents, say, voice, log
         </label>
         <fieldset><legend>Peserta (maks. ${limits.maxParticipants})</legend>
           <div class="meeting-people">${team.map((a) => `
-            <label class="color"><input type="checkbox" name="p" value="${esc(a.id)}"${draft.participants.includes(a.id) ? " checked" : ""} />
-              <span>${esc(a.name)} <small>${esc(a.role || "")}</small></span></label>`).join("")}
+            <label class="color${a.active === false ? " asleep" : ""}" title="${a.active === false ? "Sedang tidak aktif (tidur): tidak bisa diundang" : ""}"><input type="checkbox" name="p" value="${esc(a.id)}"${draft.participants.includes(a.id) && a.active !== false ? " checked" : ""}${a.active === false ? " disabled" : ""} />
+              <span>${a.active === false ? "💤 " : ""}${esc(a.name)} <small>${esc(a.role || "")}</small></span></label>`).join("")}
           </div>
         </fieldset>
         <label>Putaran bicara

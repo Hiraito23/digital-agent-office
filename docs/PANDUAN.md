@@ -206,7 +206,7 @@ Kantor adalah **gedung tiga lantai** (tiap lantai berukuran sama, 26 x 10 tile) 
 
 | Lantai | Isi |
 | --- | --- |
-| **Lantai 1** | **Lobby** di sisi depan (portal Hermes, area tunggu, gerbang masuk), lalu di belakangnya **Kantin** (konter kopi, dispenser, meja makan, akuarium) dan **Ruang Game** (arcade, dua meja ping-pong, bean bag), masing-masing dengan pintu ke lobby |
+| **Lantai 1** | **Lobby** di sisi depan (portal Hermes, area tunggu, gerbang masuk), lalu di belakangnya **Kantin** (konter kopi, dispenser, meja makan, akuarium), **Ruang Tidur** (12 ranjang) dan **Ruang Game** (arcade, dua meja ping-pong, bean bag), masing-masing dengan pintu ke lobby |
 | **Lantai 2** | Lorong dengan **12 ruang pribadi**: tiap agen punya ruangan sendiri berisi meja kerja, lemari, dan tanaman. Nama agen tampil di papan atas pintunya |
 | **Lantai 3** | **Ruang Rapat** (meja rapat, whiteboard, rak buku), **Ruang Server** (rak server dan kristal), dan teras terbuka |
 
@@ -266,6 +266,17 @@ Agar kantor tidak kaku, dua agen yang sedang santai (berdiri atau berjalan di au
 **Fakta menarik dari Wikipedia.** Supaya topiknya tidak itu-itu saja, kantor mengumpulkan fakta dari Wikipedia Indonesia sebanyak-banyaknya dan menyimpannya dalam kumpulan yang terus bertambah (disimpan di volume `office-data`, jadi tidak hilang saat restart). Saat pertama menyala server mengumpulkan sekitar 220 fakta dalam beberapa menit, lalu menambah tiap 30 menit, sampai maksimal 1.500. Sumbernya puluhan kategori (candi, hewan, planet, penemuan, rekor dunia, fenomena alam, teknologi, permainan video, makanan, tarian, gunung, pulau, dan seterusnya) beserta subkategorinya; kalimat pertama artikel diambil sebagai fakta. Biografi, desa/kecamatan, daftar, definisi matematika yang kering, serta topik sedih, kekerasan, atau politik dilewati, dan fakta yang mengandung kata seperti terbesar, tertua, endemik, rekor, atau satu-satunya diprioritaskan. Sekitar 30% obrolan memakai fakta ini ("Tahu nggak, Sakura? ..."), dengan 📚 Wikipedia di bubble-nya. Setelah terkumpul banyak, obrolan hampir tidak pernah mengulang. Cek jumlahnya di `http://localhost:3000/api/facts?limit=5`.
 
 Obrolan ini tidak memanggil model AI (kalimat dan polanya ada di `office/public/js/world/chatter.js`; fakta dan berita diambil dari internet), jadi tidak memakai token dan tidak mengubah riwayat chat agen. Obrolan berhenti sendiri bila salah satu agen mendapat tugas atau ada rapat. Tambah topik baru dengan menambah baris di `GENERIC`, `BY_ROLE`, `WEATHER`, atau `PERIOD` di berkas itu. Animasi hanya berjalan saat tab browser terlihat.
+
+## Status agen: aktif dan tidak aktif
+
+Di daftar **Tim** (kiri atas) tiap agen punya tombol daya di sebelah namanya: **⏻** = aktif, **☾** = tidak aktif. Hermes selalu aktif.
+
+Agen yang **tidak aktif**:
+- berjalan ke **Ruang Tidur** di Lantai 1 (naik atau turun lift bila perlu) dan **tidur di ranjang** (berbaring, ikon 💤 di name tag); ranjang dibagi berurutan sesuai urutan agen;
+- **tidak dipanggil**: Hermes tidak mendelegasikan tugas ke dia (`team_delegate` ditolak dan daftar tim Hermes hanya memuat agen aktif), tidak ikut rapat (kotak peserta nonaktif dengan 💤), tidak menjawab di tab Kantor, dan pesan langsung ke dia ditolak dengan penjelasan;
+- **tidak disinggung**: Hermes tidak menyebut namanya, dan agen lain tidak menyapa, mengobrol, atau mengajaknya main ping-pong.
+
+Mengaktifkan lagi dengan **☾**: agen bangun, meregang, lalu kembali bersantai atau bekerja. Status tersimpan di `config/office.json` (bersama proyek aktif) dan tetap ada setelah restart; perubahan langsung muncul di semua tab yang terbuka.
 
 ## Tombol Pengaturan (⚙)
 

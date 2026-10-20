@@ -2,8 +2,9 @@
 // Units: 1 world unit = 1 floor tile. x runs west -> east, z north -> south, y is up.
 // Change the floor plan here; the scene, routing and agents all read from it.
 //
-//   Level 0 (Lantai 1): lobby (open, along the south side, with the gate), the canteen (kantin)
-//                        and the game room, both north of the lobby with a door onto it.
+//   Level 0 (Lantai 1): lobby (open, along the south side, with the gate); north of it, each with a
+//                        door onto the lobby: the canteen (kantin), the bedroom (ruang tidur, where agents
+//                        that are switched off sleep) and the game room.
 //   Level 1 (Lantai 2): a corridor with 12 private rooms, one per agent (desk i is in room i).
 //   Level 2 (Lantai 3): the meeting room and the server room, plus an open terrace.
 //
@@ -48,14 +49,19 @@ const rooms = [
   // the game room are north of it, each with a door in its south wall ----
   open("lobby", "LOBBY", "marble", 0, 6, 32, 19, 24, { x: 19, z: 23.45 }),
   open("lobby-lift", "", "marble", 0, 6, 8, 14, 19, null),
-  room("kantin", "KANTIN", "wood", 0, [8, 18, 14, 19], [
-    { along: "x", at: 19, from: 8, to: 18, gaps: gapAt(13) },
+  room("kantin", "KANTIN", "wood", 0, [8, 14, 14, 19], [
+    { along: "x", at: 19, from: 8, to: 14, gaps: gapAt(11.5) },
     { along: "z", at: 8, from: 14, to: 19 },
-    { along: "z", at: 18, from: 14, to: 19 },
-  ], { inside: { x: 13, z: 18.3 }, outside: { x: 13, z: 20.2 } }),
-  room("game", "RUANG GAME", "carpet", 0, [18, 32, 14, 19], [
-    { along: "x", at: 19, from: 18, to: 32, gaps: gapAt(25) },
-  ], { inside: { x: 25, z: 18.3 }, outside: { x: 25, z: 20.2 } }),
+    { along: "z", at: 14, from: 14, to: 19 },
+  ], { inside: { x: 11.5, z: 18.3 }, outside: { x: 11.5, z: 20.2 } }),
+  // the bedroom takes the east end of the canteen and the west end of the game room
+  room("tidur", "RUANG TIDUR", "rest", 0, [14, 22, 14, 19], [
+    { along: "x", at: 19, from: 14, to: 22, gaps: gapAt(18) },
+    { along: "z", at: 22, from: 14, to: 19 },
+  ], { inside: { x: 18, z: 18.3 }, outside: { x: 18, z: 20.2 } }),
+  room("game", "RUANG GAME", "carpet", 0, [22, 32, 14, 19], [
+    { along: "x", at: 19, from: 22, to: 32, gaps: gapAt(26) },
+  ], { inside: { x: 26, z: 18.3 }, outside: { x: 26, z: 20.2 } }),
 ];
 
 // ---- level 1: twelve private rooms along the corridor (six north, six south of it) ----
@@ -141,3 +147,7 @@ export const MEETING = {
 // filled in place by the furniture manager (office/furniture.js), so they follow the
 // layout; each one: { id, room, level, x, z, heading, pose, icon }.
 export const ACTIVITY_SPOTS = [];
+
+// Beds (filled in by furniture.js, in layout order): where agents that are switched off sleep.
+// Each: { x, z, level, heading } with (x, z) where the body lies, head towards the head of the bed.
+export const BEDS = [];

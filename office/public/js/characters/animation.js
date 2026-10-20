@@ -9,7 +9,8 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false, gestu
   legs.forEach((l) => l.rotation.set(0, 0, 0));
   arms.forEach((a) => a.rotation.set(0, 0, 0));
   head.rotation.set(0, 0, 0);
-  body.position.y = 0;
+  body.position.set(0, 0, 0);
+  body.rotation.set(0, 0, 0);
   blob.visible = true;
   if (mode === "walk") {
     const s = Math.sin(k * 11);
@@ -77,6 +78,14 @@ export const animatePerson = (person, mode, t, phase = 0, talking = false, gestu
     arms[1].rotation.set(-0.95, 0, -0.55);
     head.rotation.x = 0.6 + Math.sin(k * 1.1) * 0.03;
     head.rotation.z = 0.18;
+    blob.visible = false;
+  } else if (mode === "lie") {
+    // asleep in bed: lying on the back (head towards -z of the model), arms at the sides, slow breathing
+    body.rotation.x = -Math.PI / 2;
+    body.position.y = 0.5 + Math.sin(k * 1.2) * 0.006;
+    arms[0].rotation.z = -0.08;
+    arms[1].rotation.z = 0.08;
+    head.rotation.x = 0.05;
     blob.visible = false;
   } else if (mode === "eat") {
     // plate in one hand, bites with the other, chewing

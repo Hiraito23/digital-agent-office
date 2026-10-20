@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildOffice } from "../office/index.js";
-import { ACTIVITY_SPOTS, CENTER, LEVELS, LIFT, MEETING, PORTAL, ROOMS, WANDER, levelTop, roomAt, wanderOn } from "../office/layout.js";
+import { ACTIVITY_SPOTS, BEDS, CENTER, LEVELS, LIFT, MEETING, PORTAL, ROOMS, WANDER, levelTop, roomAt, wanderOn } from "../office/layout.js";
 import { animatePerson } from "../characters/animation.js";
 import { createPerson } from "../characters/person.js";
 import { PRESETS } from "../characters/presets.js";
@@ -196,7 +196,7 @@ export class World {
       const lobby = wanderOn(0);
       const spawn = isMain ? { x: PORTAL.x - 0.6, z: PORTAL.z + 0.4 } : lobby[(order * 3) % lobby.length];
       const a = {
-        id: info.id, name: info.name, role: info.role, isMain, preset, seat: null,
+        id: info.id, name: info.name, role: info.role, isMain, preset, seat: null, active: info.active !== false, bed: null,
         x: spawn.x, z: spawn.z, level: 0, y: levelTop(0), heading: Math.PI / 4, route: [], mode: "idle", status: "idle", spot: null,
         nextWander: performance.now() + 1500 + Math.random() * 3000, lastActive: 0, phase: Math.random() * 10,
         gesture: "", gestureUntil: 0, pauseUntil: 0, greetWith: null, act: null,
@@ -205,6 +205,17 @@ export class World {
       this.agents.set(info.id, a);
     });
     this.assignDesks(["hermes", ...others].filter((id) => this.agents.has(id)));
+    // existing agents whose active flag changed (the roster is sent again), and new ones that start switched off
+    for (const info of list) {
+      const a = this.agents.get(info.id);
+      if (!a) continue;
+      if (!a.spawned) {
+        a.spawned = true;
+        if (a.active === false) this.sendToBed(a, { instant: true }); // switched off when the office opens: already in bed
+      } else if (a.active !== (info.active !== false)) {
+        this.setActive(info.id, info.active !== false);
+      }
+    }
   }
 
   // One desk + chair per agent: Hermes first, then the team in a stable order.
@@ -226,6 +237,8 @@ export class World {
   // Seats changed (a desk was moved in the layout editor): agents walk to their new seat.
   refreshDesks() {
     if (this.deskOrder) this.assignDesks(this.deskOrder);
+    for (const a of this.agents.values()) if (a.active === false && a.mode === "sleeping") { a.bed = null; }
+    this.reassignBeds();
   }
 
   // Route to the agent's own desk (private offices are entered through their door).
@@ -240,6 +253,72 @@ export class World {
     return ACTIVITY_SPOTS.filter((s) => !taken.has(s.id) && !(this.meetingOn && s.room === MEETING.room));
   }
 
+  // ---- active / inactive (agents that are switched off sleep in the bedroom) ----
+
+  // The bed of an agent: switched-off agents take the beds in layout order (by their place in the roster).
+  bedFor(a) {
+    const order = (this.deskOrder ?? [...this.agents.keys()]).filter((id) => this.agents.get(id)?.active === false);
+    const i = order.indexOf(a.id);
+    return BEDS.length && i >= 0 ? BEDS[i % BEDS.length] : null;
+  }
+
+  sendToBed(a, { instant = false } = {}) {
+    const bed = this.bedFor(a);
+    a.bed = bed;
+    a.spot = null;
+    a.meeting = null;
+    a.act = null;
+    if (!bed) { a.route = []; a.mode = "sleeping"; return; } // no bed in the layout: sleep where it stands
+    if (instant) {
+      Object.assign(a, { x: bed.x, z: bed.z, level: bed.level, y: levelTop(bed.level), route: [], mode: "sleeping", room: "tidur", heading: bed.heading });
+      return;
+    }
+    const from = a.mode === "activity" ? a.room : a.mode === "sitting" && a.seat?.room ? a.seat.room : this.insideRoom(a);
+    a.route = planRoute(a, { x: bed.x, z: bed.z, level: bed.level }, from, "tidur");
+    a.room = null;
+    a.mode = "toBed";
+  }
+
+  // Switch an agent on or off. Off: it walks to its bed and sleeps; nobody calls or greets it. On: it gets up.
+  setActive(id, active, { instant = false } = {}) {
+    const a = this.agents.get(id);
+    if (!a) return;
+    a.active = Boolean(active);
+    if (!a.active) {
+      const ch = this.chatter.active;
+      if (ch && (ch.a === a || ch.b === a)) this.endChat(performance.now());
+      a.chatPartner = null;
+      a.hi5With = null;
+      a.gesture = "";
+      this.sendToBed(a, { instant });
+      // the beds follow the order of the sleepers: the others may have to move to another bed
+      this.reassignBeds(a);
+    } else if (a.mode === "sleeping" || a.mode === "toBed") {
+      const room = a.mode === "sleeping" ? "tidur" : this.insideRoom(a);
+      const w = wanderOn(0)[Math.floor(Math.random() * wanderOn(0).length)];
+      a.bed = null;
+      a.route = planRoute(a, w, room, null);
+      a.room = null;
+      a.mode = "wander";
+      a.gesture = "stretch";
+      a.gestureUntil = performance.now() + 1800;
+      a.pauseUntil = performance.now() + 1500;
+      a.nextWander = performance.now() + 4000;
+      this.reassignBeds(a);
+    }
+  }
+
+  // After a change, sleepers whose bed changed lie down in their new bed (without walking again).
+  reassignBeds(except = null) {
+    for (const x of this.agents.values()) {
+      if (x === except || x.active !== false || x.mode !== "sleeping") continue;
+      const bed = this.bedFor(x);
+      if (!bed || (x.bed && x.bed.id === bed.id)) continue;
+      x.bed = bed;
+      Object.assign(x, { x: bed.x, z: bed.z, level: bed.level, y: levelTop(bed.level), heading: bed.heading });
+    }
+  }
+
   // 💬 Rapat: send the moderator to the whiteboard and participants to the chairs.
   startMeeting(moderatorId, participantIds) {
     this.endMeeting();
@@ -249,7 +328,7 @@ export class World {
       if (a.spot?.room === MEETING.room && a.mode === "activity") a.activityEnd = 0;
       if (a.spot?.room === MEETING.room && a.mode === "toSpot") { a.spot = null; a.mode = "idle"; a.route = []; }
     }
-    const places = [[moderatorId, MEETING.moderator], ...participantIds.map((id, i) => [id, MEETING.seats[i]])];
+    const places = [[moderatorId, MEETING.moderator], ...participantIds.filter((id) => this.agents.get(id)?.active !== false).map((id, i) => [id, MEETING.seats[i]])];
     for (const [id, place] of places) {
       const a = this.agents.get(id);
       if (!a || !place) continue;
@@ -304,6 +383,7 @@ export class World {
     a.status = status;
     a.lastActive = performance.now();
     if (a.meeting) return; // stays in the meeting room until the meeting ends
+    if (a.active === false) return; // asleep: nobody gives it work
     if (status === "working" && a.seat && a.mode !== "sitting") {
       this.leaveSpot(a); // drop the sofa/arcade/coffee and go to work
       a.route = this.seatRoute(a, a.leavingRoom);
@@ -356,6 +436,7 @@ export class World {
           a.z = target.z;
           a.route.shift();
           if (!a.route.length && a.mode === "toSeat") { a.mode = "sitting"; a.seatedAt = now; }
+          if (!a.route.length && a.mode === "toBed") { a.mode = "sleeping"; a.room = "tidur"; }
           if (!a.route.length && a.mode === "toMeeting") { a.mode = "meeting"; a.room = MEETING.room; }
           if (!a.route.length && a.mode === "wander") a.mode = "idle";
           if (!a.route.length && a.mode === "toChat") a.mode = "chat";
@@ -415,7 +496,8 @@ export class World {
       const inMeeting = a.mode === "meeting" && !moving && a.meeting;
       // face the desk when seated, the prop at an activity, the camera side when idle
       let targetHeading = a.heading;
-      if (sitting) targetHeading = a.seat?.heading ?? Math.PI; // facing the desk
+      if (a.mode === "sleeping" && !moving && !riding) targetHeading = a.bed?.heading ?? 0; // head towards the head of the bed
+      else if (sitting) targetHeading = a.seat?.heading ?? Math.PI; // facing the desk
       else if (inMeeting) targetHeading = a.meeting.heading;
       else if (a.mode === "chat" && !moving && a.chatPartner) targetHeading = Math.atan2(a.chatPartner.x - a.x, a.chatPartner.z - a.z); // face the other agent
       else if (atSpot) targetHeading = a.spot.heading;
@@ -426,8 +508,9 @@ export class World {
       while (diff < -Math.PI) diff += Math.PI * 2;
       a.model.rotation.y += diff * Math.min(1, dt / 120);
       a.model.position.set(a.x, a.y, a.z);
-      const pose = moving || riding ?  "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
-      a.activityIcon = inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? (a.act?.icon ?? a.spot.icon) : "";
+      const asleep = a.mode === "sleeping" && !moving && !riding;
+      const pose = asleep ? (a.bed ? "lie" : "sleep") : moving || riding ?  "walk" : sitting ? "sit" : inMeeting ? a.meeting.pose : atSpot ? (a.act?.pose ?? a.spot.pose) : "idle";
+      a.activityIcon = a.active === false ? "💤" : inMeeting || a.mode === "toMeeting" ? a.meeting.icon : atSpot ? (a.act?.icon ?? a.spot.icon) : "";
       if (a.gesture && now > a.gestureUntil) a.gesture = "";
       animatePerson(a.model, pose, now, a.phase, Boolean(a.speaking || a.chatSpeaking), a.gesture);
     }
@@ -457,7 +540,7 @@ export class World {
     const prefix = spot.id.split("/")[0];
     const other = spots.find((s) => s !== spot && s.id.split("/")[0] === prefix);
     const mate = [...this.agents.values()]
-      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture)
+      .filter((x) => x !== a && x.active !== false && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture)
       .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z))[0];
     if (!other || !mate) {
       const rest = spots.filter((s) => s.pose !== "pingpong");
@@ -474,7 +557,7 @@ export class World {
   // A task is done: a free colleague walks over for a high five.
   callHighFive(a, now) {
     const mate = [...this.agents.values()]
-      .filter((x) => x !== a && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture && x.level === a.level && Math.hypot(x.x - a.x, x.z - a.z) < 14)
+      .filter((x) => x !== a && x.active !== false && !x.isMain && (x.mode === "idle" || x.mode === "wander") && !x.room && !x.speaking && x.status !== "working" && !x.meeting && !x.gesture && x.level === a.level && Math.hypot(x.x - a.x, x.z - a.z) < 14)
       .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z))[0];
     if (!mate) return false;
     const side = a.seat.heading === 0 ? -1 : 1; // the free side of the desk
@@ -510,7 +593,7 @@ export class World {
     if (now < (this.nextGreetCheck ?? 0) || document.hidden) return;
     this.nextGreetCheck = now + 500;
     if (now < (this.nextGreetAt ?? 0)) return;
-    const ok = (a) => (a.mode === "idle" || a.mode === "wander" || a.mode === "toSpot") && a.status !== "working" && !a.meeting && !a.speaking && !a.gesture;
+    const ok = (a) => a.active !== false && (a.mode === "idle" || a.mode === "wander" || a.mode === "toSpot") && a.status !== "working" && !a.meeting && !a.speaking && !a.gesture;
     const list = [...this.agents.values()].filter(ok);
     this.greetCool ??= new Map();
     for (let i = 0; i < list.length; i += 1) {
@@ -541,7 +624,7 @@ export class World {
     const c = this.chatter;
     if (c.active) { this.stepChat(c.active, now); return; }
     if (now < c.nextAt || this.meetingOn || document.hidden) return;
-    const free = [...this.agents.values()].filter((a) => (a.mode === "idle" || a.mode === "wander") && !a.room && !a.riding && !a.speaking && a.status !== "working" && !a.meeting);
+    const free = [...this.agents.values()].filter((a) => a.active !== false && (a.mode === "idle" || a.mode === "wander") && !a.room && !a.riding && !a.speaking && a.status !== "working" && !a.meeting);
     if (free.length < 2) { c.nextAt = now + 5000; return; }
     const a = free[Math.floor(Math.random() * free.length)];
     const near = free.filter((x) => x !== a && x.level === a.level).sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 3);
