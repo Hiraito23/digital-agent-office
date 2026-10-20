@@ -1,7 +1,7 @@
 ---
 name: riset-saham-fundamental-dan-teknikal
 description: "Playbook riset saham: sumber, fundamental, kualitas laba, valuasi, teknikal, skenario, risiko, dan template laporan."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -94,3 +94,38 @@ Catatan: riset informasi, bukan saran investasi; keputusan dan risikonya ada pad
 - Semua angka punya sumber dan tanggal; rasio dihitung dengan rumus yang konsisten.
 - Ada rentang valuasi, tiga skenario, risiko, dan level pembatalan.
 - Disclaimer ada di akhir laporan dan tidak ada instruksi beli/jual.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila data keuangan atau harga tidak tersedia)
+
+Jangan berhenti dengan "datanya belum cukup". Bila tidak bisa mengakses data resmi, kerjakan metodenya dengan **emiten fiktif** dan tandai semuanya DUMMY. Ini mendemonstrasikan analisis, bukan menilai saham nyata.
+- **Emiten ilustrasi:** `PT Contoh Sejahtera Tbk (kode DUMY)`, sektor dipilih sesuai konteks. Jangan memakai kode saham atau nama perusahaan nyata dengan angka karangan.
+- **Laporan keuangan 5 tahun** (`data-dummy/saham/dumy-keuangan-DUMMY.csv`): pendapatan, HPP, laba kotor, beban usaha, EBITDA, laba bersih, kas operasi, capex, kas, utang berbunga, ekuitas, saham beredar. Pertahankan hubungan akuntansi (laba kotor = pendapatan - HPP; ekuitas tahun berikutnya = ekuitas + laba - dividen; arus kas masuk akal terhadap laba) dan sisipkan satu kejanggalan (mis. kas operasi jauh di bawah laba) supaya analisis kualitas laba punya bahan.
+- **Harga harian dummy 250 hari** (random walk dengan seed tetap + volume) untuk latihan tren, support/resistance, MA, RSI, MACD.
+- **Emiten nyata diminta tetapi data tidak bisa diakses:** buat **kerangka laporan yang siap diisi** (tabel metrik dengan sel input kosong, rumus tertulis, daftar data yang harus diambil beserta sumbernya: laporan keuangan emiten, IDX, OJK), plus satu contoh terisi dengan emiten fiktif. Jangan mengisi angka nyata dari ingatan.
+- Semua keluaran memuat banner: `⚠ Data DUMMY, bukan analisis saham nyata. Riset informasi, bukan saran investasi.`
+
+## Pendalaman
+
+**DuPont (membongkar ROE):** ROE = margin bersih x perputaran aset x leverage (aset / ekuitas). ROE naik karena margin dan perputaran lebih sehat daripada karena utang.
+
+**Kualitas laba:** akrual = (laba bersih - kas operasi) / rata-rata aset; akrual tinggi berulang = waspada. Free cash flow = kas operasi - capex; FCF yield = FCF / kapitalisasi pasar. Cash conversion cycle = hari piutang + hari persediaan - hari utang usaha.
+
+**Skor kesehatan ringkas (bukan ramalan):** hitung 9 tanda Piotroski (laba positif, ROA naik, kas operasi positif, kas operasi > laba, utang turun, current ratio naik, tanpa penerbitan saham baru, margin kotor naik, perputaran aset naik). 7-9 kuat, 0-3 lemah; sebut keterbatasannya (lebih cocok untuk saham murah/kecil).
+
+**Contoh DCF mini dengan sensitivitas**
+
+```
+FCF tahun 1 = 100 (dummy), pertumbuhan 10% selama 5 tahun, lalu 3% abadi, WACC 11%
+Nilai ekuitas = jumlah FCF terdiskon + nilai akhir terdiskon - utang bersih
+Tabel sensitivitas: WACC 10% / 11% / 12% x pertumbuhan akhir 2% / 3% / 4%
+```
+Tampilkan rentang nilai wajar dari tabel itu, bukan satu angka.
+
+**Teknikal sebagai skenario:** tulis tiga hal: level masuk skenario, level pembatalan, dan target wajar berdasar jarak support-resistance; hitung rasio risiko-imbalan (target - masuk) / (masuk - pembatalan) dan abaikan setup < 1,5. Konfirmasi dengan volume; satu indikator tidak cukup.
+
+**Bobot skenario:** beri peluang subjektif bull/base/bear (mis. 25/50/25) dan hitung nilai ekspektasi, lalu tulis bahwa peluang adalah penilaian, bukan data.
+
+**Daftar bendera merah tambahan:** margin kotor naik sementara beban naik tersembunyi, perubahan kebijakan akuntansi, piutang pihak berelasi, dana IPO tidak sesuai tujuan, penundaan laporan, kenaikan pesat saham free float kecil tanpa berita (gorengan).
+
+**Mutu hasil:** setiap angka punya sumber dan tanggal (atau label DUMMY), rumus tertulis, skenario ada pemicu dan pembatal, dan penutup riset informasi tidak dihilangkan. Tidak ada kata pasti, tidak ada perintah beli/jual.

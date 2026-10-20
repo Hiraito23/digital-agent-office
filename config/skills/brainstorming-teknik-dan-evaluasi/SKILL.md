@@ -1,7 +1,7 @@
 ---
 name: brainstorming-teknik-dan-evaluasi
 description: "Playbook brainstorming: perumusan masalah, teknik ide, penilaian, uji asumsi, dan rencana tindak."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -92,3 +92,33 @@ Lampiran: semua ide per tema, tabel penilaian, asumsi
 ## Verification
 
 - Ada rumusan masalah, minimal 15 ide dengan tema, tabel penilaian berbobot, tiga pilihan teratas dengan risiko, eksperimen berbatas waktu, dan satu rekomendasi tegas.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila konteks atau data belum ada)
+
+Jangan menunggu data lengkap sebelum bertukar pikiran. Bila masalah, pasar, atau angka belum diberikan:
+- **Skenario ilustrasi:** tulis satu skenario pendek yang masuk akal (siapa, masalah, batasan, anggaran, waktu) dan tandai `SKENARIO DUMMY`. Bila pengguna sudah memberi sebagian konteks, lengkapi sisanya dengan asumsi bertanda, jangan mengganti yang sudah diberikan.
+- **Data penilaian dummy:** isi tabel penilaian ide dengan skor 1-5 beserta alasan satu kalimat per skor, lalu tandai bahwa skor adalah penilaian awal yang harus diuji. Beri angka dampak/usaha perkiraan dengan rentang (mis. dampak 100-300 pelanggan baru) dan tulis dasar asumsinya.
+- **Data uji asumsi dummy:** rancang eksperimen lengkap (hipotesis, metrik, sampel, ambang lolos) dan sertakan contoh hasil DUMMY untuk menunjukkan cara membacanya, jelas berlabel.
+- Hasil tetap utuh: rumusan masalah, 25 ide, pengelompokan, penilaian, tiga teratas yang ditantang, eksperimen, rencana tindak. Tutup dengan daftar "fakta yang perlu dikonfirmasi sebelum memutuskan".
+
+## Pendalaman
+
+**Teknik pemicu ide (pakai minimal tiga yang berbeda):**
+- SCAMPER: Substitute, Combine, Adapt, Modify, Put to other use, Eliminate, Reverse; tanyakan tiap huruf pada produk, proses, atau pesan.
+- Brainstorming terbalik: "bagaimana membuat masalah ini lebih buruk?", lalu balik tiap jawaban jadi ide.
+- Analogi: bagaimana industri lain (logistik, game, kesehatan) menyelesaikan masalah serupa?
+- Batasan ekstrem: "bila anggaran nol", "bila harus selesai besok", "bila pelanggan 100x lebih banyak".
+- Enam topi berpikir untuk penilaian akhir: fakta, perasaan, kehati-hatian, manfaat, kreativitas, proses.
+
+**Pra-mortem:** bayangkan proyek gagal total enam bulan lagi; tulis 8 penyebab paling mungkin, beri peluang dan dampak, lalu tambahkan pencegahan ke rencana tindak.
+
+**Skor RICE** untuk memprioritaskan: Reach (berapa orang per periode) x Impact (0,25 / 0,5 / 1 / 2 / 3) x Confidence (%) / Effort (orang-minggu). Tulis tiap angka dengan dasar. Bandingkan hasil RICE dengan firasat; selisih besar = ada asumsi yang belum diungkap.
+
+**Peta asumsi:** daftar asumsi, nilai dua sumbu (seberapa penting, seberapa belum terbukti). Uji dulu yang penting dan paling belum terbukti, dengan eksperimen termurah (wawancara 5 orang, halaman pendaftaran palsu, prototipe kertas, pre-order).
+
+**Pohon peluang-solusi:** tujuan bisnis -> peluang (kebutuhan pelanggan) -> solusi -> eksperimen. Pastikan tiap solusi terhubung ke peluang yang nyata.
+
+**Memo keputusan satu halaman:** keputusan yang diminta, opsi (2-4), kriteria dan skor, rekomendasi dengan alasan, risiko terbesar dan cara memantaunya, **kriteria berhenti** (angka atau kejadian yang membuat kita membatalkan), pemilik keputusan, tanggal tinjau.
+
+**Mutu hasil:** ide tidak dinilai saat diverge; penilaian memakai kriteria tertulis; ada tiga teratas dengan tantangan terhadapnya; eksperimen punya ambang lolos; rencana tindak punya pemilik dan tanggal; semua data dummy berlabel.

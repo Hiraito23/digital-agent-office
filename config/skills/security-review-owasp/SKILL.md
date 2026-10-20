@@ -1,7 +1,7 @@
 ---
 name: security-review-owasp
 description: "Playbook keamanan: ruang lingkup, threat model, OWASP Top 10 dan ASVS, keamanan akun dan operasional, severity, laporan, dan respons insiden."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -96,3 +96,43 @@ Referensi: OWASP/CWE/ASVS
 - Ruang lingkup tertulis; setiap temuan punya bukti, severity beralasan, dan rekomendasi konkret.
 - Fakta terbukti dipisahkan dari dugaan; data sensitif tidak tersalin.
 - Perbaikan diuji ulang sebelum temuan ditutup.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila belum ada sistem atau ruang lingkup tertulis)
+
+**Tanpa ruang lingkup tertulis, jangan menguji sistem nyata apa pun.** Itu aturan keselamatan, bukan alasan menunggu. Kerjakan semua yang bisa dikerjakan secara aman:
+- **Sistem contoh (dummy)**: deskripsikan arsitektur ilustrasi (web + API + basis data + penyimpanan berkas) berlabel `SISTEM DUMMY` sebagai bahan threat model STRIDE lengkap dengan aliran data dan batas kepercayaan.
+- **Laporan contoh dengan temuan fiktif** berlabel `CONTOH, bukan temuan nyata` untuk memperlihatkan format (ringkasan eksekutif, tabel temuan, bukti, perbaikan). Jangan menulis temuan pada sistem nyata yang belum diuji.
+- **Data uji aman:** akun uji fiktif per peran; daftar masukan uji non-destruktif untuk sistem milik sendiri atau yang diizinkan (mis. `<script>alert(1)</script>` untuk XSS refleksi, `' OR '1'='1` untuk pengujian injeksi pada lingkungan uji, `../../etc/passwd` untuk path traversal pada sandbox, ID objek orang lain untuk IDOR). Hanya dijalankan pada target yang masuk ruang lingkup.
+- **Daftar periksa siap pakai** dan **rencana uji** (apa, urutan, alat, bukti yang dikumpulkan) yang tinggal dijalankan setelah ruang lingkup disetujui.
+- Jangan pernah memindai, menyerang, atau mencoba masuk ke sistem pihak lain, dan jangan membuat eksploit yang bisa dipakai di luar pengujian terotorisasi.
+
+## Pendalaman
+
+**Matriks STRIDE per komponen:** tiap komponen dan aliran data dinilai untuk Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege; tulis ancaman, kontrol yang ada, celah, dan pencegahan.
+
+**Pohon serangan satu tujuan:** mis. "mengambil data pelanggan" -> lewat API tanpa otorisasi objek (IDOR) / lewat akun admin yang dibobol (kata sandi lemah, tanpa MFA) / lewat cadangan terbuka. Beri biaya dan kemungkinan tiap cabang; perbaiki cabang termurah bagi penyerang dulu.
+
+**Menguji IDOR dan otorisasi (metode):** buat dua akun peran sama dan satu admin; kumpulkan semua endpoint dan ID objek; ulangi permintaan akun A memakai ID milik akun B; ulangi tanpa token; ulangi dengan peran lebih rendah. Hasil yang seharusnya: 403/404 konsisten dan tanpa kebocoran informasi di pesan galat.
+
+**Pemindaian rahasia pada kode (sistem milik sendiri):**
+
+```
+grep -rInE "(api[_-]?key|secret|token|passw(or)?d)\s*[:=]\s*['\"][^'\"]{8,}" --exclude-dir=node_modules --exclude-dir=.git .
+git log -p | grep -nE "BEGIN (RSA|OPENSSH|EC) PRIVATE KEY"
+```
+Temuan rahasia: anggap bocor, cabut dan buat baru, bersihkan riwayat bila perlu.
+
+**Audit dependensi:** `npm audit --omit=dev`, `pip-audit`, `go list -m -u all`; nilai keterjangkauan (apakah kode yang rentan benar-benar dipakai) sebelum menentukan severity; sematkan versi dan aktifkan pembaruan otomatis.
+
+**Header dan transport (daftar periksa):** HTTPS dan HSTS, CSP yang membatasi sumber skrip, X-Content-Type-Options, X-Frame-Options/frame-ancestors, cookie Secure + HttpOnly + SameSite, CORS tidak memakai `*` dengan kredensial, pesan galat tanpa jejak tumpukan.
+
+**Jebakan JWT/sesi:** algoritma "none", kunci lemah, tanpa kedaluwarsa, klaim peran bisa diubah klien, token tidak dicabut saat ganti kata sandi, penyimpanan di localStorage yang terjangkau XSS.
+
+**Register risiko:** kemungkinan (1-5) x dampak (1-5) = skor; 15+ segera, 8-14 terjadwal, <8 dipantau. Tiap risiko punya pemilik, kontrol, dan tanggal tinjau.
+
+**Deteksi dan pemantauan:** tentukan 5 kejadian yang harus memicu alarm (banyak gagal login, login dari negara baru, ekspor data besar, perubahan peran, akses berkas rahasia) dan siapa yang menerimanya.
+
+**Runbook insiden satu halaman:** identifikasi, batasi (cabut akses, isolasi), bersihkan, pulihkan, pelajari (post-mortem tanpa menyalahkan), beri tahu pihak terdampak sesuai aturan (UU PDP: pemberitahuan bila kebocoran data pribadi). Simpan kontak darurat dan urutan hubungi.
+
+**Mutu hasil:** setiap temuan punya bukti yang bisa diulang, dampak yang dijelaskan dalam bahasa bisnis, severity beralasan, dan perbaikan konkret; tidak ada data nyata yang disalin ke laporan; semua dummy dan contoh berlabel.

@@ -1,7 +1,7 @@
 ---
 name: qa-test-plan-dan-laporan-bug
 description: "Playbook QA: strategi uji berbasis risiko, test plan, desain test case, laporan bug, severity, regresi, dan verdict."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -108,3 +108,41 @@ Aturan verdict: ada Critical/High terbuka = GAGAL; hanya Medium/Low yang disepak
 - Setiap kriteria punya minimal satu test case; hasil nyata dilampirkan.
 - Setiap bug punya langkah reproduksi, environment, bukti, dan severity beralasan.
 - Laporan memisahkan Diuji, Belum diuji, dan Diduga; verdict tegas dan konsisten dengan aturan.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila belum ada objek uji atau data uji)
+
+Jangan menunggu aplikasi atau data siap. Kerjakan perencanaan dan persiapan uji sekarang dengan data uji dummy, lalu tinggal dijalankan begitu objek tersedia.
+- **Data uji dummy** (`data-dummy/qa/`): akun uji per peran (admin, pengguna biasa, tamu) dengan email `@example.com`; berkas CSV nilai masukan per kolom **valid, batas (min, maks, min-1, maks+1), kosong, terlalu panjang, karakter khusus/emoji/Unicode, spasi di tepi, format salah**; contoh lampiran (gambar kecil, PDF, berkas besar, ekstensi ganda).
+- **Test case parametrik:** tulis satu kasus dengan tabel data masukan sehingga ratusan kombinasi tidak perlu ditulis satu-satu.
+- **Objek uji mini:** bila diminta menguji tetapi tidak ada apa pun, buat prototipe kecil (satu halaman HTML dengan form dan validasi sengaja bermasalah) hanya untuk mendemonstrasikan siklus uji; label `OBJEK UJI DUMMY` dan jangan menyebut bug di dalamnya sebagai bug produk nyata.
+- **Contoh laporan bug dummy** boleh dibuat untuk memperlihatkan format, jelas berlabel CONTOH. Jangan menyatakan ada bug pada sistem nyata yang belum kamu jalankan.
+- Verdict pada fase ini selalu "BELUM DIUJI: rencana siap, data uji siap", bukan lulus/gagal.
+
+## Pendalaman
+
+**Tabel kelas ekuivalen dan batas:** untuk tiap masukan tulis kelas valid, kelas tidak valid, dan nilai batas. Contoh umur 17-60: uji 16, 17, 18, 59, 60, 61, kosong, "abc", 17.5, -1.
+
+**Pairwise (kombinasi berpasangan):** untuk 4-5 parameter yang masing-masing punya beberapa nilai (peramban, peran, bahasa, perangkat), pilih himpunan kasus sehingga setiap pasangan nilai muncul minimal sekali; hasilnya jauh lebih sedikit daripada semua kombinasi.
+
+**Uji eksploratori berbasis sesi:** piagam (charter) satu kalimat ("Jelajahi pembayaran dengan data tidak biasa untuk menemukan kegagalan validasi"), 45-90 menit, catatan: apa dicoba, apa ditemukan, pertanyaan, risiko baru. Akhiri dengan debrief singkat.
+
+**Severity vs prioritas:** severity = dampak teknis ke pengguna (kritis: data hilang/keamanan/tidak bisa dipakai; mayor: fitur inti rusak ada jalan memutar; minor; kosmetik). Prioritas = urutan memperbaiki berdasar bisnis dan tenggat. Tulis keduanya terpisah.
+
+**Contoh API cepat (curl):**
+
+```
+curl -i -X POST "$BASE/api/orders" -H "Content-Type: application/json" -d '{"qty": -1}'
+# harapkan 400/422 dengan pesan jelas, bukan 500 dan bukan jejak tumpukan
+```
+Cek juga: tanpa token (401), token orang lain (403/404), ukuran badan sangat besar, tipe data salah, idempotensi (kirim dua kali).
+
+**Uji performa ringan (asap):** ukur waktu respons halaman utama dan satu endpoint dengan 20 permintaan berurutan; catat median dan p95; bandingkan dengan target tertulis. Bukan uji beban penuh.
+
+**Aksesibilitas cepat:** Tab melalui seluruh halaman (urutan logis, fokus terlihat), perbesar 200%, matikan CSS (urutan baca), kontras teks >= 4,5:1, label pada semua input, pesan galat terkait ke input.
+
+**Daftar periksa rilis:** semua kasus prioritas tinggi lulus, tidak ada bug kritis/mayor terbuka (atau ada persetujuan tertulis), regresi inti lulus, migrasi data diuji pada salinan, rencana mundur (rollback) ada, pemantauan dan alarm siap, catatan rilis ditulis.
+
+**Menangani uji tidak stabil (flaky):** jalankan ulang 10 kali, catat tingkat gagal, cari penyebab (waktu, urutan, data bersama, jaringan), perbaiki atau karantina dengan tiket; jangan menghapus diam-diam.
+
+**Mutu hasil:** setiap kasus punya langkah, hasil diharapkan, dan data; setiap bug dapat direproduksi dari laporannya sendiri; bukti (log, tangkapan layar, respons) dilampirkan; data dummy berlabel.

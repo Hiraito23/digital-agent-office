@@ -1,7 +1,7 @@
 ---
 name: konten-copywriting-dan-kalender
 description: "Playbook konten: brief, suara brand, formula copy, hook, adaptasi per kanal, kalender, dan checklist kualitas."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -95,3 +95,29 @@ Rencana minggu: 3-4 konten utama + turunannya (satu artikel jadi 3 caption + 1 v
 
 - Ada 3 opsi hook dan rekomendasi, versi per kanal, CTA jelas, dan checklist akhir terpenuhi.
 - Kalender memuat tanggal, tujuan, dan aset yang dibutuhkan.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila brief atau data brand belum ada)
+
+Jangan menunggu brief lengkap. Buat **brand dan konteks ilustrasi**, tandai DUMMY, dan hasilkan paket konten yang tinggal diganti.
+- **Brand dummy** bila tidak disebut: nama, produk, harga kisaran, 3 kata sifat suara brand, 5 kata favorit dan terlarang (`data-dummy/konten/brand-DUMMY.md`).
+- **Persona audiens dummy (2-3)** dengan masalah, kata yang mereka pakai, dan kanal. **Pertanyaan audiens dummy** (15-20 baris, seperti komentar atau pertanyaan pelanggan) sebagai bahan riset topik.
+- **Metrik kinerja dummy** (tayang, simpan, klik, konversi per konten selama 4 minggu) agar contoh laporan mingguan dan keputusan "ulangi / ubah / hentikan" bisa didemonstrasikan.
+- **Dilarang dibuat-buat:** testimoni, ulasan nyata, angka penjualan, klaim kesehatan/penghasilan. Pakai `[TESTIMONI ASLI DIBUTUHKAN]` dan `[ANGKA ASLI: ...]`.
+- Keluaran lengkap: kalender 4 minggu, 10 konten siap pakai (hook, isi, CTA), versi per kanal, dan daftar aset/data asli yang perlu diganti.
+
+## Pendalaman
+
+**Bank hook (isi sesuai topik, pilih tipe berbeda):** angka spesifik ("3 kesalahan..."), pertanyaan menyentuh, kontras ("X mahal belum tentu Y"), cerita satu kalimat, mitos vs fakta, sebelum/sesudah, "yang tidak dikatakan orang soal...", tantangan 7 hari, daftar periksa.
+
+**Audit konten (bila ada konten lama):** untuk 20 konten terakhir catat topik, format, hook, metrik, lalu kelompokkan: pemenang (ulangi dan kembangkan), rata-rata (ubah hook atau format), gagal (hentikan). Tulis tiga pola pemenang sebagai aturan produksi.
+
+**Matriks daur ulang:** satu ide inti -> artikel -> 3 caption -> 1 video pendek -> 1 email -> 1 thread. Catat tanggal posting agar tidak bertabrakan.
+
+**Rencana uji copy:** satu variabel (hook ATAU CTA ATAU gambar), dua varian, jam tayang sama, metrik utama satu (simpan atau klik), kriteria menang (selisih >= 20% dan sampel memadai), lalu catat pelajaran. Jangan menyimpulkan dari satu posting.
+
+**SEO dasar untuk artikel:** satu kata kunci utama dan 3-5 turunan, judul <= 60 karakter berisi kata kunci di depan, meta deskripsi 140-155 karakter dengan manfaat dan ajakan, satu H1, subjudul memuat variasi kata kunci, tautan ke 2 halaman internal, teks alt gambar, tautan penjelasan sumber. Tulis untuk manusia dulu.
+
+**Panduan balasan komentar dan krisis:** balas <= 24 jam, akui, jawab spesifik, pindahkan urusan pribadi ke pesan langsung; keluhan publik: minta maaf singkat tanpa defensif, jelaskan langkah, beri kabar lanjutan bertanggal. Jangan menghapus kritik yang sah.
+
+**Mutu editorial:** baca keras-keras (kalimat yang tersandung dipecah), buang kata pengisi (sangat, sekali, banget, yang mana), pastikan satu ide per paragraf, periksa konsistensi nama, harga, dan tanggal di semua versi, dan tandai semua `[PERLU: ...]` dalam satu daftar di akhir.

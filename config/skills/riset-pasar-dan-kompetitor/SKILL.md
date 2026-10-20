@@ -1,7 +1,7 @@
 ---
 name: riset-pasar-dan-kompetitor
 description: "Playbook riset pasar: pertanyaan riset, sumber, kompetitor, pelanggan, ukuran pasar, harga, sintesis, dan rekomendasi."
-version: 2.0.0
+version: 3.0.0
 author: Agentic Digital Office
 license: MIT
 metadata:
@@ -81,3 +81,37 @@ Kumpulkan rentang harga pasar, tentukan posisi (murah, sepadan, premium), dasar 
 
 - Setiap klaim penting punya sumber dan tanggal, atau ditandai perkiraan beserta asumsinya.
 - Ada tabel pembanding seragam, tema ulasan, rentang ukuran pasar, dan rekomendasi berprioritas dengan tingkat keyakinan.
+
+<!-- skill-v3: dummy, pendalaman -->
+## Mode Data Dummy (bila data pasar tidak bisa diakses)
+
+Jangan berhenti karena belum ada data. Bila sumber tidak bisa diakses atau pengguna belum memberi data, kerjakan riset sebagai **kerangka berisi data ilustrasi**, bukan laporan fakta.
+- **Kompetitor ilustrasi** (`data-dummy/riset/kompetitor-DUMMY.csv`): 5 pesaing fiktif (Pesaing A-E) dengan kolom positioning, kisaran harga, segmen, kekuatan, kelemahan, kanal, tanggal cek. Jangan memberi data karangan pada merek nyata.
+- **Ulasan pelanggan dummy** 40-60 baris (`bintang, tema, kutipan singkat fiktif`) dengan distribusi realistis (mis. 55% bintang 4-5, 25% bintang 3, 20% bintang 1-2) untuk menunjukkan analisis tema dan frekuensi.
+- **Survei dummy** 100 responden (usia, kota, frekuensi beli, anggaran, alasan) dan tabel hasilnya; tulis margin kesalahan dengan rumus agar pembaca tahu batas simpulan.
+- **Ukuran pasar:** hitung dengan **asumsi eksplisit** dan rentang (rendah/tengah/tinggi), tandai `ESTIMASI DUMMY`, jangan menyebut angka seolah dari lembaga riset nyata.
+- Laporan tetap utuh (ringkasan, temuan, rekomendasi), plus **rencana mengumpulkan data asli**: sumber, metode, jumlah sampel, siapa mengerjakan, perkiraan waktu.
+
+## Pendalaman
+
+**TAM-SAM-SOM dua arah (selalu hitung keduanya, bandingkan):**
+- Atas-bawah: populasi target x tingkat adopsi x harga tahunan (setiap faktor punya dasar).
+- Bawah-atas: jumlah calon pelanggan yang bisa dijangkau per kanal x konversi realistis x harga. Bila dua hasil berbeda jauh, cari asumsi yang paling goyah.
+
+**Pekerjaan yang ingin diselesaikan (JTBD) untuk wawancara:** "Ceritakan terakhir kali Anda memilih/membeli X. Apa yang terjadi sebelum itu? Apa alternatifnya? Apa yang hampir membuat Anda batal?" Gali kejadian nyata, bukan pendapat; 8-12 wawancara cukup untuk melihat pola.
+
+**Lima kekuatan Porter (ringkas):** ancaman pendatang baru, daya tawar pemasok, daya tawar pembeli, produk pengganti, rivalitas. Beri nilai rendah/sedang/tinggi dengan satu alasan masing-masing; simpulkan menarik atau tidaknya pasar.
+
+**Peta posisi (perceptual map):** pilih dua sumbu yang dipedulikan pelanggan (mis. harga dan kenyamanan), letakkan pesaing dan kita; cari ruang kosong, lalu cek apakah ada permintaan di sana.
+
+**Riset harga Van Westendorp:** empat pertanyaan (terlalu murah sampai meragukan, murah, mahal, terlalu mahal); titik potong kurva memberi rentang harga yang dapat diterima. Dengan dummy, tunjukkan cara membaca grafik saja.
+
+**Model Kano untuk prioritas fitur:** wajib, kinerja, pemikat; fitur wajib yang hilang menghancurkan kepuasan, pemikat memberi pembeda murah.
+
+**Segmentasi RFM (bila ada data transaksi):** recency, frequency, monetary diberi skor 1-5; segmen juara, setia, berisiko, tidur; tiap segmen diberi tindakan.
+
+**Ukuran sampel survei:** n = z^2 x p(1-p) / e^2; untuk tingkat keyakinan 95% (z = 1,96), p = 0,5, galat 10% butuh ~97 responden. Tulis galatnya di setiap temuan.
+
+**Triangulasi:** setiap temuan penting didukung minimal dua jenis bukti (mis. ulasan + wawancara + data harga). Temuan satu sumber diberi label "indikasi".
+
+**Mutu hasil:** keputusan yang dibantu jelas di bagian atas, setiap angka ada sumber atau label dummy/estimasi dengan asumsinya, kompetitor dibandingkan dengan kriteria yang sama dan tanggal cek, rekomendasi berurutan dengan tingkat keyakinan.

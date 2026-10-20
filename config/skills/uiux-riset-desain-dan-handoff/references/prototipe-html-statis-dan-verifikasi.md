@@ -1,0 +1,24 @@
+# Prototipe HTML/CSS statis: resep dan verifikasi
+
+Dipakai saat handoff berupa halaman yang bisa dibuka (landing page, form, kalkulator), bukan hanya teks.
+
+## Struktur berkas
+- `index.html`, `style.css`, `prototype.js` (acuan perilaku, bukan kode produksi), skrip uji pengguna `.md`, dan dokumen handoff di path yang diminta pengguna.
+- `style.css`: 1) token `:root` (warna dengan rasio kontras dalam komentar, font sistem, skala teks 14/16/18/22/28, jarak kelipatan 4, tinggi sentuh 48), 2) reset ringan + `:focus-visible` 3 px + `prefers-reduced-motion`, 3) komponen, 4) @media 768 dan 1280. Tambahan di akhir berkas boleh, tapi pindahkan ke bagiannya bila dirapikan.
+- Penanda prototipe (bilah kontrol, `.annot` catatan desain, lencana DRAF) diberi kelas khusus + tombol sembunyikan agar tidak membocorkan jawaban saat uji pengguna dan mudah dihapus. Buat bilah kontrol ringkas di 360 px (satu-dua baris atau `<details>` yang bisa dilipat): bilah empat baris memakan ~175 px dan mendorong hero keluar dari layar pertama, sehingga peserta uji tidak melihat CTA.
+
+## Pola yang terbukti
+- **Satu komponen, dua varian CTA:** `<section data-cta data-variant="wa|form">`; CSS menyembunyikan panel yang tidak aktif; `?v=A|B` memilih varian awal; kode sumber varian (mis. `Ref: LP-A`, kolom tersembunyi `varian=B`) masuk ke pesan/data agar hasil akhir (booking) bisa dicocokkan ke varian.
+- **Tautan WhatsApp:** `https://wa.me/{62xxxxxxxx}?text={encodeURIComponent(pesan)}`; bila nomor belum ada, jangan buat tautan rusak: tampilkan pratinjau pesan dan tandai MENUNGGU DATA.
+- **Form:** label terlihat, `aria-describedby` ke hint + error, `aria-invalid` pada kolom salah, ringkasan error (`role=alert`, `tabindex=-1`) menerima fokus dan tiap butirnya menaut ke kolom; isian tidak hilang saat gagal kirim; tombol memberi status "Mengirim…"; sukses/gagal menerima fokus. Validasi nomor WA Indonesia: normalkan spasi/strip, `+62`/`62` jadi `0`, lalu `^08[1-9][0-9]{7,11}$`.
+- **Kalkulator cicilan (anuitas):** `pokok * r / (1 - (1+r)^-n)`, r = bunga tahunan/12/100, n = tenor*12; bunga 0 → pokok/n. Catatan "estimasi, bukan penawaran bank" tampil di kepala blok DAN di kotak hasil, pada kondisi kosong, error, dan hasil. Parser harga: titik = pemisah ribuan; persen: koma atau titik desimal.
+- **Placeholder aset:** kotak `role=img` dengan `aria-label` yang menyebut aset belum ada + rasio gambar per breakpoint. Kata MENUNGGU DATA di dalam placeholder (foto, peta) memakai lencana kuning yang sama dengan blok lain, bukan teks huruf kapital biasa; teks biasa menyatu dengan sekitarnya dan tidak terbaca sebagai penanda.
+
+## Verifikasi (urut)
+1. Kontras: `python3 scripts/kontras.py "#1B2B26/#FAF8F4" ...` (jalankan lewat terminal; tulis hasil ke dokumen handoff). Teks ≥ 4,5; garis input/fokus ≥ 3.
+2. Server statis: jalankan `python3 -m http.server <port> --bind 127.0.0.1` dengan terminal `background=true` (foreground ditolak karena proses panjang); matikan dengan `pkill -f "http.server <port>"` setelah selesai.
+3. Peramban lewat CDP: `cdp('Emulation.setDeviceMetricsOverride', width=360, height=800, deviceScaleFactor=1, mobile=True)` lalu ulangi 768 dan 1280; cek `document.documentElement.scrollWidth == clientWidth`. Setelah mengubah CSS, muat ulang dengan parameter cache-busting (`?x=<waktu>`) atau `Network.setCacheDisabled`; kalau tidak, audit membaca CSS lama.
+4. Audit DOM (js): target sentuh (`a, button, input, select, summary` dengan tinggi < 43,5 px), `id` ganda, input tanpa label, urutan `h1..h3`, jumlah penanda MENUNGGU DATA, keberadaan teks wajib ("Estimasi, bukan penawaran bank", "Diambil:"), dan pencarian regex frasa terlarang (`terbatas|hampir habis`) di `outerHTML`.
+5. Perilaku: klik lewat js untuk penukar varian, kirim form kosong/nomor salah/benar, gagal lalu coba lagi, sukses, hitung kalkulator kosong/benar; cocokkan hasil dengan hitungan manual.
+6. Tangkapan layar (`Page.captureScreenshot`, simpan di scratch) lalu `vision_analyze` per breakpoint untuk menangkap masalah komposisi (CTA di bawah lipatan, header 3 baris, ruang kosong kolom). Perbaiki, ulangi. Tangkap per bagian (gulir ke section, lalu tangkap viewport); jangan `captureBeyondViewport` pada halaman setinggi puluhan ribu piksel (apalagi `deviceScaleFactor=2`): permintaan kehabisan waktu dan koneksi peramban bisa putus. Bila koneksi putus, buka sesi bernama baru (`session=`), `new_tab` ulang, atur ulang `setDeviceMetricsOverride`, lalu tangkap viewport saja.
+7. Skrip uji 5 pengguna: tugas bukan pertanyaan, kartu skenario, aturan fasilitator (jangan membantu), angka pencocokan untuk fasilitator (mis. hasil cicilan dari skenario) dan kriteria penerimaan di handoff dihitung ulang dengan python dari parameter yang tertulis, bukan dari ingatan, kriteria sukses ditetapkan sebelum uji dan ditandai ASUMSI, lembar catatan, tabel rekap KOSONG; nyatakan tegas bahwa belum ada pengguna yang diuji dan 5 pengguna tidak membuktikan konversi.

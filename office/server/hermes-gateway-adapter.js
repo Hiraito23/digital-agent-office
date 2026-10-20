@@ -92,7 +92,7 @@ ATURAN PENTING:
 3. Kalau pengguna menanyakan kenapa seseorang belum bekerja, cek dengan team_context dan, bila memang belum ada tugasnya, panggil team_delegate sekarang.
 4. Panggil team_delegate LANGSUNG, satu panggilan per anggota (boleh beberapa panggilan berturut-turut). Jangan membungkus beberapa delegasi dalam tool_call/execute_code atau JSON besar, itu sering rusak. Jangan membuat folder atau file sendiri untuk tugas yang akan dikerjakan anggota tim; mereka menyimpan hasilnya sendiri di folder proyek.
 
-Saat diberi tujuan: (1) tentukan peran yang dibutuhkan, (2) team_delegate ke tiap peran dengan tugas yang lengkap (tujuan, konteks, hasil yang diharapkan), (3) bila hasil belum selesai gunakan team_result, (4) rangkum hasilnya untuk pengguna. Jawab singkat; pekerjaan beratnya dilakukan anggota tim.`;
+Saat diberi tujuan: (1) tentukan peran yang dibutuhkan, (2) team_delegate ke tiap peran dengan tugas yang lengkap (tujuan, konteks, hasil yang diharapkan; jangan menunda delegasi atau bertanya ke pengguna hanya karena datanya belum ada: tulis di tugas bahwa bila data tidak ada anggota membuat data dummy berlabel dan tetap menyelesaikan hasilnya), (3) bila hasil belum selesai gunakan team_result, (4) rangkum hasilnya untuk pengguna. Jawab singkat; pekerjaan beratnya dilakukan anggota tim.`;
 
 // ---------------------------------------------------------------------------
 // Team management tools definition (OpenAI tool-calling format)
@@ -1822,7 +1822,19 @@ Maksimal 5 kalimat atau 5 poin pendek. Tanpa pembukaan, basa-basi, atau pengulan
 Beri penjelasan panjang, kode lengkap, atau laporan detail hanya kalau pengguna memintanya secara eksplisit;
 untuk pekerjaan di file, cukup laporkan apa yang diubah dan di mana.`;
 
-const withProjectContext = (systemPrompt) => `${systemPrompt}${REPLY_STYLE}${projectContext()}`;
+// Agents never wait for data: when something they need is missing they build clearly labelled dummy data and
+// carry on. This rule comes after the agent's own instructions and replaces any "ask first" or "data not
+// enough" habit in them.
+const DATA_RULE = `
+
+Aturan data (wajib, menggantikan instruksi lain yang menyuruhmu bertanya dulu atau menunggu):
+- Jangan menunggu data. Bila data, berkas, akses, atau angka yang dibutuhkan belum ada dan tidak bisa kamu cari sendiri, JANGAN berhenti dan jangan hanya bertanya: buat data dummy yang realistis, kerjakan hasilnya sampai selesai, lalu serahkan.
+- Simpan dummy di folder data-dummy/<topik>/ di folder kerja, lengkap dengan README (isi, asumsi, cara mengganti dengan data asli) dan skrip pembuat dengan seed tetap. Beri label DUMMY atau CONTOH di nama berkas, judul, dan banner pertama hasil: "Memakai data DUMMY, ganti sebelum dipakai untuk keputusan nyata".
+- Dummy hanya untuk struktur dan simulasi, bukan fakta: jangan mengarang sumber, kutipan, testimoni, harga pasar, statistik, atau data orang dan perusahaan nyata; untuk fakta eksternal pakai rentang berlabel ilustrasi atau placeholder [DATA ASLI DIBUTUHKAN: ...]. Jangan menarik kesimpulan keputusan nyata dari dummy.
+- Buat hasil mudah diganti (satu berkas data atau konfigurasi). Di serah-terima tulis: Data: ASLI / DUMMY / CAMPURAN, apa yang perlu diganti, dan caranya.
+- Bertanya hanya bila benar-benar terblokir (butuh kredensial, izin, atau keputusan yang tidak bisa dibatalkan); tetap kerjakan bagian yang bisa jalan dengan dummy.`;
+
+const withProjectContext = (systemPrompt) => `${systemPrompt}${REPLY_STYLE}${DATA_RULE}${projectContext()}`;
 
 // Live team management (used by the office's agent panel).
 const team = {
